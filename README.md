@@ -2,6 +2,40 @@
 
 **Native UI Framework powered by Zyntax** - A declarative, reactive UI system with first-class state machines, spring physics animations, and GPU-accelerated rendering.
 
+## Installation
+
+### Quick Install (macOS/Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/anthropics/blinc/main/scripts/install.sh | bash
+```
+
+### Manual Installation
+
+Download the appropriate binary from [Releases](https://github.com/anthropics/blinc/releases):
+
+| Platform              | Download                                 |
+| --------------------- | ---------------------------------------- |
+| macOS (Apple Silicon) | `blinc-aarch64-apple-darwin.tar.gz`      |
+| macOS (Intel)         | `blinc-x86_64-apple-darwin.tar.gz`       |
+| Linux (x86_64)        | `blinc-x86_64-unknown-linux-gnu.tar.gz`  |
+| Linux (ARM64)         | `blinc-aarch64-unknown-linux-gnu.tar.gz` |
+| Windows               | `blinc-x86_64-pc-windows-msvc.zip`       |
+
+### Build from Source
+
+```bash
+git clone https://github.com/anthropics/blinc
+cd blinc
+cargo install --path crates/blinc_cli
+```
+
+### Verify Installation
+
+```bash
+blinc doctor
+```
+
 ## Overview
 
 Blinc is a next-generation UI framework that combines:
@@ -16,7 +50,7 @@ Blinc is a next-generation UI framework that combines:
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Blinc Application                           │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -43,7 +77,7 @@ Blinc is a next-generation UI framework that combines:
 
 ## Project Structure
 
-```
+```text
 blinc/
 ├── Cargo.toml                 # Workspace manifest
 ├── blinc.toml                 # Blinc toolchain configuration
