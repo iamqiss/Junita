@@ -421,6 +421,127 @@ impl Path {
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
     }
+
+    /// Calculate the bounding rectangle of this path
+    pub fn bounds(&self) -> Rect {
+        if self.commands.is_empty() {
+            return Rect::ZERO;
+        }
+
+        let mut min_x = f32::INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        for cmd in &self.commands {
+            match cmd {
+                PathCommand::MoveTo(p) | PathCommand::LineTo(p) => {
+                    min_x = min_x.min(p.x);
+                    min_y = min_y.min(p.y);
+                    max_x = max_x.max(p.x);
+                    max_y = max_y.max(p.y);
+                }
+                PathCommand::QuadTo { control, end } => {
+                    min_x = min_x.min(control.x).min(end.x);
+                    min_y = min_y.min(control.y).min(end.y);
+                    max_x = max_x.max(control.x).max(end.x);
+                    max_y = max_y.max(control.y).max(end.y);
+                }
+                PathCommand::CubicTo {
+                    control1,
+                    control2,
+                    end,
+                } => {
+                    min_x = min_x.min(control1.x).min(control2.x).min(end.x);
+                    min_y = min_y.min(control1.y).min(control2.y).min(end.y);
+                    max_x = max_x.max(control1.x).max(control2.x).max(end.x);
+                    max_y = max_y.max(control1.y).max(control2.y).max(end.y);
+                }
+                PathCommand::ArcTo { end, radii, .. } => {
+                    // Conservative bounds: include endpoint and radii extent
+                    min_x = min_x.min(end.x).min(end.x - radii.x);
+                    min_y = min_y.min(end.y).min(end.y - radii.y);
+                    max_x = max_x.max(end.x).max(end.x + radii.x);
+                    max_y = max_y.max(end.y).max(end.y + radii.y);
+                }
+                PathCommand::Close => {}
+            }
+        }
+
+        if min_x.is_finite() && min_y.is_finite() && max_x.is_finite() && max_y.is_finite() {
+            Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
+        } else {
+            Rect::ZERO
+        }
+    }
+
+    /// Create a rounded rectangle path
+    pub fn rounded_rect(rect: Rect, corner_radius: impl Into<CornerRadius>) -> Self {
+        let r = corner_radius.into();
+        let x = rect.x();
+        let y = rect.y();
+        let w = rect.width();
+        let h = rect.height();
+
+        // Clamp radii to half the minimum dimension
+        let max_r = (w.min(h) / 2.0).max(0.0);
+        let tl = r.top_left.min(max_r);
+        let tr = r.top_right.min(max_r);
+        let br = r.bottom_right.min(max_r);
+        let bl = r.bottom_left.min(max_r);
+
+        // Magic number for cubic Bézier circle approximation
+        let k = 0.5522847498;
+
+        let mut path = Self::new().move_to(x + tl, y);
+
+        // Top edge
+        path = path.line_to(x + w - tr, y);
+        if tr > 0.0 {
+            path = path.cubic_to(
+                x + w - tr * (1.0 - k),
+                y,
+                x + w,
+                y + tr * (1.0 - k),
+                x + w,
+                y + tr,
+            );
+        }
+
+        // Right edge
+        path = path.line_to(x + w, y + h - br);
+        if br > 0.0 {
+            path = path.cubic_to(
+                x + w,
+                y + h - br * (1.0 - k),
+                x + w - br * (1.0 - k),
+                y + h,
+                x + w - br,
+                y + h,
+            );
+        }
+
+        // Bottom edge
+        path = path.line_to(x + bl, y + h);
+        if bl > 0.0 {
+            path = path.cubic_to(
+                x + bl * (1.0 - k),
+                y + h,
+                x,
+                y + h - bl * (1.0 - k),
+                x,
+                y + h - bl,
+            );
+        }
+
+        // Left edge
+        path = path.line_to(x, y + tl);
+        if tl > 0.0 {
+            path = path.cubic_to(x, y + tl * (1.0 - k), x + tl * (1.0 - k), y, x + tl, y);
+        }
+
+        path.close()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1096,11 +1217,33 @@ impl DrawContext for RecordingContext {
     fn sdf_build(&mut self, f: &mut dyn FnMut(&mut dyn SdfBuilder)) {
         let mut builder = RecordingSdfBuilder::new();
         f(&mut builder);
-        // SDF commands are recorded inline into the main command stream
-        // In a real implementation, this would be a separate batch
+
+        // Process shadows first (they render behind fills)
+        for (shape_id, shadow) in &builder.shadows {
+            if let Some(shape) = builder.shapes.get(shape_id.0 as usize) {
+                match shape {
+                    SdfShape::Rect { rect, corner_radius } => {
+                        self.draw_shadow(*rect, *corner_radius, shadow.clone());
+                    }
+                    SdfShape::Circle { center, radius } => {
+                        // Convert circle shadow to rect shadow (approximation)
+                        let rect = Rect::from_center(*center, Size::new(*radius * 2.0, *radius * 2.0));
+                        self.draw_shadow(rect, (*radius).into(), shadow.clone());
+                    }
+                    SdfShape::Ellipse { center, radii } => {
+                        let rect = Rect::from_center(*center, Size::new(radii.x * 2.0, radii.y * 2.0));
+                        // Use smaller radius for corner approximation
+                        self.draw_shadow(rect, radii.x.min(radii.y).into(), shadow.clone());
+                    }
+                    _ => {
+                        // Complex shapes: use bounding box approximation
+                    }
+                }
+            }
+        }
+
+        // Process fills
         for (shape_id, brush) in builder.fills {
-            // Convert SDF shapes to regular drawing commands
-            // This is a simplified version - real implementation would use GPU SDF
             if let Some(shape) = builder.shapes.get(shape_id.0 as usize) {
                 match shape {
                     SdfShape::Rect { rect, corner_radius } => {
@@ -1109,8 +1252,43 @@ impl DrawContext for RecordingContext {
                     SdfShape::Circle { center, radius } => {
                         self.fill_circle(*center, *radius, brush);
                     }
+                    SdfShape::Ellipse { center, radii } => {
+                        // Ellipse as a path (approximated with bezier curves)
+                        let path = Path::circle(*center, radii.x); // Simplified: use as circle
+                        self.fill_path(&path, brush);
+                    }
+                    SdfShape::Line { from, to, width } => {
+                        // Line as a stroked path
+                        let path = Path::line(*from, *to);
+                        self.stroke_path(&path, &Stroke::new(*width), brush);
+                    }
                     _ => {
-                        // Other shapes would need more complex handling
+                        // Complex SDF shapes need GPU-side evaluation
+                    }
+                }
+            }
+        }
+
+        // Process strokes
+        for (shape_id, stroke, brush) in builder.strokes {
+            if let Some(shape) = builder.shapes.get(shape_id.0 as usize) {
+                match shape {
+                    SdfShape::Rect { rect, corner_radius } => {
+                        self.stroke_rect(*rect, *corner_radius, &stroke, brush);
+                    }
+                    SdfShape::Circle { center, radius } => {
+                        self.stroke_circle(*center, *radius, &stroke, brush);
+                    }
+                    SdfShape::Ellipse { center, radii } => {
+                        let path = Path::circle(*center, radii.x); // Simplified
+                        self.stroke_path(&path, &stroke, brush);
+                    }
+                    SdfShape::Line { from, to, .. } => {
+                        let path = Path::line(*from, *to);
+                        self.stroke_path(&path, &stroke, brush);
+                    }
+                    _ => {
+                        // Complex SDF shapes need GPU-side evaluation
                     }
                 }
             }

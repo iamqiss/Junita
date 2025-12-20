@@ -175,6 +175,8 @@ impl GpuPaintContext {
                 let (stops, fill_type) = match gradient {
                     blinc_core::Gradient::Linear { stops, .. } => (stops, FillType::LinearGradient),
                     blinc_core::Gradient::Radial { stops, .. } => (stops, FillType::RadialGradient),
+                    // Conic gradients treated as radial for now (GPU shader would need enhancement)
+                    blinc_core::Gradient::Conic { stops, .. } => (stops, FillType::RadialGradient),
                 };
 
                 let (c1, c2) = if stops.len() >= 2 {

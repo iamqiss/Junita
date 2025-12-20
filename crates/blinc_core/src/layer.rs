@@ -146,6 +146,50 @@ impl Rect {
             ),
         }
     }
+
+    /// Create a rect from center point and size
+    pub fn from_center(center: Point, size: Size) -> Self {
+        Rect {
+            origin: Point::new(center.x - size.width / 2.0, center.y - size.height / 2.0),
+            size,
+        }
+    }
+
+    /// Create a rect from two corner points
+    pub fn from_points(p1: Point, p2: Point) -> Self {
+        let min_x = p1.x.min(p2.x);
+        let min_y = p1.y.min(p2.y);
+        let max_x = p1.x.max(p2.x);
+        let max_y = p1.y.max(p2.y);
+        Rect {
+            origin: Point::new(min_x, min_y),
+            size: Size::new(max_x - min_x, max_y - min_y),
+        }
+    }
+
+    /// Get the union of two rects (smallest rect containing both)
+    pub fn union(&self, other: &Rect) -> Self {
+        let min_x = self.origin.x.min(other.origin.x);
+        let min_y = self.origin.y.min(other.origin.y);
+        let max_x = (self.origin.x + self.size.width).max(other.origin.x + other.size.width);
+        let max_y = (self.origin.y + self.size.height).max(other.origin.y + other.size.height);
+        Rect {
+            origin: Point::new(min_x, min_y),
+            size: Size::new(max_x - min_x, max_y - min_y),
+        }
+    }
+
+    /// Expand rect to include a point
+    pub fn expand_to_include(&self, point: Point) -> Self {
+        let min_x = self.origin.x.min(point.x);
+        let min_y = self.origin.y.min(point.y);
+        let max_x = (self.origin.x + self.size.width).max(point.x);
+        let max_y = (self.origin.y + self.size.height).max(point.y);
+        Rect {
+            origin: Point::new(min_x, min_y),
+            size: Size::new(max_x - min_x, max_y - min_y),
+        }
+    }
 }
 
 /// 2D vector
@@ -432,23 +476,172 @@ impl Default for Color {
 /// Gradient stop
 #[derive(Clone, Copy, Debug)]
 pub struct GradientStop {
+    /// Position along the gradient (0.0 to 1.0)
     pub offset: f32,
+    /// Color at this stop
     pub color: Color,
+}
+
+impl GradientStop {
+    /// Create a new gradient stop
+    pub fn new(offset: f32, color: Color) -> Self {
+        Self {
+            offset: offset.clamp(0.0, 1.0),
+            color,
+        }
+    }
+}
+
+/// Gradient coordinate space
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GradientSpace {
+    /// Coordinates are in user/world space (absolute pixels)
+    #[default]
+    UserSpace,
+    /// Coordinates are relative to the bounding box (0.0-1.0)
+    ObjectBoundingBox,
+}
+
+/// Gradient spread method for areas outside the gradient
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GradientSpread {
+    /// Pad with the end colors
+    #[default]
+    Pad,
+    /// Reflect the gradient
+    Reflect,
+    /// Repeat the gradient
+    Repeat,
 }
 
 /// Gradient type
 #[derive(Clone, Debug)]
 pub enum Gradient {
+    /// Linear gradient between two points
     Linear {
+        /// Start point
         start: Point,
+        /// End point
         end: Point,
+        /// Color stops (should be sorted by offset)
         stops: Vec<GradientStop>,
+        /// Coordinate space interpretation
+        space: GradientSpace,
+        /// Spread method
+        spread: GradientSpread,
     },
+    /// Radial gradient from center outward
     Radial {
+        /// Center point
         center: Point,
+        /// Radius
         radius: f32,
+        /// Optional focal point (if None, same as center)
+        focal: Option<Point>,
+        /// Color stops (should be sorted by offset)
         stops: Vec<GradientStop>,
+        /// Coordinate space interpretation
+        space: GradientSpace,
+        /// Spread method
+        spread: GradientSpread,
     },
+    /// Conic/angular gradient around a center point
+    Conic {
+        /// Center point
+        center: Point,
+        /// Start angle in radians
+        start_angle: f32,
+        /// Color stops (should be sorted by offset)
+        stops: Vec<GradientStop>,
+        /// Coordinate space interpretation
+        space: GradientSpace,
+    },
+}
+
+impl Gradient {
+    /// Create a simple linear gradient with two colors
+    pub fn linear(start: Point, end: Point, from: Color, to: Color) -> Self {
+        Gradient::Linear {
+            start,
+            end,
+            stops: vec![
+                GradientStop::new(0.0, from),
+                GradientStop::new(1.0, to),
+            ],
+            space: GradientSpace::UserSpace,
+            spread: GradientSpread::Pad,
+        }
+    }
+
+    /// Create a linear gradient with multiple stops
+    pub fn linear_with_stops(start: Point, end: Point, stops: Vec<GradientStop>) -> Self {
+        Gradient::Linear {
+            start,
+            end,
+            stops,
+            space: GradientSpace::UserSpace,
+            spread: GradientSpread::Pad,
+        }
+    }
+
+    /// Create a simple radial gradient with two colors
+    pub fn radial(center: Point, radius: f32, from: Color, to: Color) -> Self {
+        Gradient::Radial {
+            center,
+            radius,
+            focal: None,
+            stops: vec![
+                GradientStop::new(0.0, from),
+                GradientStop::new(1.0, to),
+            ],
+            space: GradientSpace::UserSpace,
+            spread: GradientSpread::Pad,
+        }
+    }
+
+    /// Create a radial gradient with multiple stops
+    pub fn radial_with_stops(center: Point, radius: f32, stops: Vec<GradientStop>) -> Self {
+        Gradient::Radial {
+            center,
+            radius,
+            focal: None,
+            stops,
+            space: GradientSpace::UserSpace,
+            spread: GradientSpread::Pad,
+        }
+    }
+
+    /// Create a conic gradient with two colors
+    pub fn conic(center: Point, from: Color, to: Color) -> Self {
+        Gradient::Conic {
+            center,
+            start_angle: 0.0,
+            stops: vec![
+                GradientStop::new(0.0, from),
+                GradientStop::new(1.0, to),
+            ],
+            space: GradientSpace::UserSpace,
+        }
+    }
+
+    /// Get the gradient stops
+    pub fn stops(&self) -> &[GradientStop] {
+        match self {
+            Gradient::Linear { stops, .. } => stops,
+            Gradient::Radial { stops, .. } => stops,
+            Gradient::Conic { stops, .. } => stops,
+        }
+    }
+
+    /// Get the first color in the gradient (or BLACK if no stops)
+    pub fn first_color(&self) -> Color {
+        self.stops().first().map(|s| s.color).unwrap_or(Color::BLACK)
+    }
+
+    /// Get the last color in the gradient (or BLACK if no stops)
+    pub fn last_color(&self) -> Color {
+        self.stops().last().map(|s| s.color).unwrap_or(Color::BLACK)
+    }
 }
 
 /// Brush for filling shapes
@@ -694,20 +887,70 @@ impl LayerProperties {
 /// Shape used for clipping
 #[derive(Clone, Debug)]
 pub enum ClipShape {
+    /// Axis-aligned rectangle clip
     Rect(Rect),
+    /// Rounded rectangle clip
     RoundedRect {
         rect: Rect,
         corner_radius: CornerRadius,
     },
+    /// Circular clip
     Circle {
         center: Point,
         radius: f32,
     },
+    /// Elliptical clip
     Ellipse {
         center: Point,
         radii: Vec2,
     },
-    // Future: Path
+    /// Arbitrary path clip (requires tessellation or stencil buffer)
+    Path(crate::draw::Path),
+}
+
+impl ClipShape {
+    /// Create a rectangular clip
+    pub fn rect(rect: Rect) -> Self {
+        ClipShape::Rect(rect)
+    }
+
+    /// Create a rounded rectangle clip
+    pub fn rounded_rect(rect: Rect, corner_radius: impl Into<CornerRadius>) -> Self {
+        ClipShape::RoundedRect {
+            rect,
+            corner_radius: corner_radius.into(),
+        }
+    }
+
+    /// Create a circular clip
+    pub fn circle(center: Point, radius: f32) -> Self {
+        ClipShape::Circle { center, radius }
+    }
+
+    /// Create an elliptical clip
+    pub fn ellipse(center: Point, radii: Vec2) -> Self {
+        ClipShape::Ellipse { center, radii }
+    }
+
+    /// Create a path-based clip
+    pub fn path(path: crate::draw::Path) -> Self {
+        ClipShape::Path(path)
+    }
+
+    /// Get the bounding rect of this clip shape
+    pub fn bounds(&self) -> Rect {
+        match self {
+            ClipShape::Rect(rect) => *rect,
+            ClipShape::RoundedRect { rect, .. } => *rect,
+            ClipShape::Circle { center, radius } => {
+                Rect::from_center(*center, Size::new(*radius * 2.0, *radius * 2.0))
+            }
+            ClipShape::Ellipse { center, radii } => {
+                Rect::from_center(*center, Size::new(radii.x * 2.0, radii.y * 2.0))
+            }
+            ClipShape::Path(path) => path.bounds(),
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -839,11 +1082,96 @@ pub struct Canvas2DCommands {
     commands: Vec<Canvas2DCommand>,
 }
 
+/// Individual canvas drawing command
 #[derive(Clone, Debug)]
 pub enum Canvas2DCommand {
-    // Future: Path operations, fills, strokes, etc.
-    // For now, placeholder
+    /// Clear the canvas with a color
     Clear(Color),
+
+    /// Save the current state (transform, clip, opacity)
+    Save,
+
+    /// Restore the previously saved state
+    Restore,
+
+    /// Push a 2D transform
+    Transform(Affine2D),
+
+    /// Set the global opacity
+    SetOpacity(f32),
+
+    /// Set the blend mode
+    SetBlendMode(BlendMode),
+
+    /// Push a clipping shape
+    PushClip(ClipShape),
+
+    /// Pop the last clipping shape
+    PopClip,
+
+    /// Fill a path with a brush
+    FillPath {
+        path: crate::draw::Path,
+        brush: Brush,
+    },
+
+    /// Stroke a path
+    StrokePath {
+        path: crate::draw::Path,
+        stroke: crate::draw::Stroke,
+        brush: Brush,
+    },
+
+    /// Fill a rectangle (optimized primitive)
+    FillRect {
+        rect: Rect,
+        corner_radius: CornerRadius,
+        brush: Brush,
+    },
+
+    /// Stroke a rectangle (optimized primitive)
+    StrokeRect {
+        rect: Rect,
+        corner_radius: CornerRadius,
+        stroke: crate::draw::Stroke,
+        brush: Brush,
+    },
+
+    /// Fill a circle (optimized primitive)
+    FillCircle {
+        center: Point,
+        radius: f32,
+        brush: Brush,
+    },
+
+    /// Stroke a circle (optimized primitive)
+    StrokeCircle {
+        center: Point,
+        radius: f32,
+        stroke: crate::draw::Stroke,
+        brush: Brush,
+    },
+
+    /// Draw text
+    DrawText {
+        text: String,
+        origin: Point,
+        style: crate::draw::TextStyle,
+    },
+
+    /// Draw an image
+    DrawImage {
+        image: crate::draw::ImageId,
+        rect: Rect,
+        options: crate::draw::ImageOptions,
+    },
+
+    /// Draw a shadow
+    DrawShadow {
+        rect: Rect,
+        corner_radius: CornerRadius,
+        shadow: Shadow,
+    },
 }
 
 impl Canvas2DCommands {
@@ -864,6 +1192,14 @@ impl Canvas2DCommands {
     pub fn clear(&mut self) {
         self.commands.clear();
     }
+
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
 }
 
 /// Commands for 3D scene
@@ -872,11 +1208,51 @@ pub struct Scene3DCommands {
     commands: Vec<Scene3DCommand>,
 }
 
+/// Individual 3D scene command
 #[derive(Clone, Debug)]
 pub enum Scene3DCommand {
-    // Future: DrawMesh, AddLight, SetEnvironment, etc.
-    // For now, placeholder
+    /// Clear the scene with a color
     Clear(Color),
+
+    /// Set the active camera
+    SetCamera(Camera),
+
+    /// Push a 3D transform matrix
+    PushTransform(Mat4),
+
+    /// Pop the last transform
+    PopTransform,
+
+    /// Draw a mesh with a material
+    DrawMesh {
+        mesh: crate::draw::MeshId,
+        material: crate::draw::MaterialId,
+        transform: Mat4,
+    },
+
+    /// Draw multiple instances of a mesh
+    DrawMeshInstanced {
+        mesh: crate::draw::MeshId,
+        instances: Vec<crate::draw::MeshInstance>,
+    },
+
+    /// Add a light to the scene
+    AddLight(Light),
+
+    /// Set the environment (skybox, ambient, etc.)
+    SetEnvironment(Environment),
+
+    /// Draw a billboard (2D content in 3D space)
+    DrawBillboard {
+        /// Size of the billboard in world units
+        size: Size,
+        /// Transform in world space
+        transform: Mat4,
+        /// How the billboard faces the camera
+        facing: BillboardFacing,
+        /// The 2D content to render
+        content: Canvas2DCommands,
+    },
 }
 
 impl Scene3DCommands {
@@ -892,6 +1268,18 @@ impl Scene3DCommands {
 
     pub fn commands(&self) -> &[Scene3DCommand] {
         &self.commands
+    }
+
+    pub fn clear(&mut self) {
+        self.commands.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 }
 
