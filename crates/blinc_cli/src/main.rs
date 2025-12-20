@@ -10,6 +10,7 @@ use tracing::{info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 mod config;
+mod doctor;
 mod project;
 
 use config::BlincConfig;
@@ -106,6 +107,9 @@ enum Commands {
 
     /// Show toolchain and target information
     Info,
+
+    /// Check platform setup and dependencies
+    Doctor,
 }
 
 #[derive(Subcommand)]
@@ -172,6 +176,8 @@ fn main() -> Result<()> {
         Commands::Check { source } => cmd_check(&source),
 
         Commands::Info => cmd_info(),
+
+        Commands::Doctor => cmd_doctor(),
     }
 }
 
@@ -350,6 +356,22 @@ fn cmd_info() -> Result<()> {
     println!("  - FSM runtime: Ready");
     println!("  - Animation system: Ready");
     println!("  - Zyntax integration: Pending Grammar2/Runtime2");
+
+    Ok(())
+}
+
+fn cmd_doctor() -> Result<()> {
+    let categories = doctor::run_doctor();
+    doctor::print_doctor_results(&categories);
+
+    // Return error if there are critical issues
+    let has_errors = categories
+        .iter()
+        .any(|c| c.status() == doctor::CheckStatus::Error);
+
+    if has_errors {
+        std::process::exit(1);
+    }
 
     Ok(())
 }

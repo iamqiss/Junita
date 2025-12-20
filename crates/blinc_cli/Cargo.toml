@@ -34,3 +34,6 @@ thiserror.workspace = true
 # Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+# System paths
+dirs = "5.0"
