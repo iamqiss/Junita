@@ -5,6 +5,8 @@
 //! - **Reactive Signals**: Fine-grained reactivity without VDOM overhead
 //! - **State Machines**: Harel statecharts for widget interaction states
 //! - **Event Dispatch**: Unified event handling across platforms
+//! - **Layer Model**: Unified visual content representation (2D, 3D, composition)
+//! - **Draw Context**: Unified rendering API for 2D/3D content
 //!
 //! # Example
 //!
@@ -31,12 +33,25 @@
 //! assert_eq!(graph.get_derived(doubled), Some(10));
 //! ```
 
+pub mod draw;
 pub mod events;
 pub mod fsm;
+pub mod layer;
 pub mod reactive;
 pub mod runtime;
 
+pub use draw::{
+    DrawCommand, DrawContext, DrawContextExt, FontWeight, ImageId, ImageOptions, LayerConfig,
+    LineCap, LineJoin, MaterialId, MeshId, MeshInstance, Path, PathCommand, RecordingContext,
+    SdfBuilder, ShapeId, Stroke, TextAlign, TextBaseline, TextStyle, Transform,
+};
 pub use events::{Event, EventDispatcher, EventType};
 pub use fsm::{FsmId, FsmRuntime, StateId, StateMachine, Transition};
+pub use layer::{
+    Affine2D, BillboardFacing, BlendMode, Brush, CachePolicy, Camera, CameraProjection, ClipShape,
+    Color, CornerRadius, Environment, Gradient, GradientStop, Layer, LayerId, LayerIdGenerator,
+    LayerProperties, Light, Mat4, Point, PointerEvents, PostEffect, Rect, SceneGraph, Shadow,
+    Size, TextureFormat, UiNode, Vec2, Vec3,
+};
 pub use reactive::{Derived, DerivedId, Effect, EffectId, ReactiveGraph, Signal, SignalId};
 pub use runtime::BlincRuntime;
