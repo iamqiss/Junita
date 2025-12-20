@@ -119,12 +119,58 @@ impl CheckCategory {
 pub fn run_doctor() -> Vec<CheckCategory> {
     let mut categories = Vec::new();
 
+    categories.push(check_blinc_ecosystem());
     categories.push(check_rust_toolchain());
     categories.push(check_desktop_platform());
     categories.push(check_android_platform());
     categories.push(check_ios_platform());
 
     categories
+}
+
+/// Check Blinc runtime and compiler ecosystem
+fn check_blinc_ecosystem() -> CheckCategory {
+    let mut cat = CheckCategory::new("Blinc Ecosystem");
+
+    // Check blinc CLI version
+    cat.add(CheckResult::ok(
+        "Blinc CLI",
+        &format!("v{}", env!("CARGO_PKG_VERSION")),
+    ));
+
+    // TODO: Check for Zyntax compiler when available
+    // For now, indicate it's pending
+    cat.add(CheckResult::warning(
+        "Zyntax Compiler",
+        "not yet available",
+        "Zyntax Grammar2 compiler is in development",
+    ));
+
+    // TODO: Check for Blinc runtime when available
+    cat.add(CheckResult::warning(
+        "Blinc Runtime",
+        "not yet available",
+        "Zyntax Runtime2 is in development",
+    ));
+
+    // Check for blinc.toml in current directory (optional)
+    let cwd = std::env::current_dir();
+    if let Ok(dir) = cwd {
+        let config_path = dir.join("blinc.toml");
+        if config_path.exists() {
+            cat.add(CheckResult::ok(
+                "Project config",
+                &format!("blinc.toml found in {}", dir.display()),
+            ));
+        } else {
+            cat.add(CheckResult::not_applicable(
+                "Project config",
+                "no blinc.toml in current directory",
+            ));
+        }
+    }
+
+    cat
 }
 
 /// Check Rust toolchain
