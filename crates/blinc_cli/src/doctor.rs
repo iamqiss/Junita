@@ -132,10 +132,12 @@ pub fn run_doctor() -> Vec<CheckCategory> {
 fn check_blinc_ecosystem() -> CheckCategory {
     let mut cat = CheckCategory::new("Blinc Ecosystem");
 
-    // Check blinc CLI version
+    // Check blinc CLI version with git hash
+    let version = env!("CARGO_PKG_VERSION");
+    let git_hash = option_env!("BLINC_GIT_HASH").unwrap_or("unknown");
     cat.add(CheckResult::ok(
         "Blinc CLI",
-        &format!("v{}", env!("CARGO_PKG_VERSION")),
+        &format!("v{} ({})", version, git_hash),
     ));
 
     // TODO: Check for Zyntax compiler when available

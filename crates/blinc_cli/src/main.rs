@@ -337,7 +337,8 @@ fn cmd_info() -> Result<()> {
     println!("Blinc UI Framework");
     println!("==================");
     println!();
-    println!("Version: {}", env!("CARGO_PKG_VERSION"));
+    let git_hash = option_env!("BLINC_GIT_HASH").unwrap_or("unknown");
+    println!("Version: {} ({})", env!("CARGO_PKG_VERSION"), git_hash);
     println!();
     println!("Supported targets:");
     println!("  - desktop (native window)");
