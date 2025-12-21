@@ -612,6 +612,8 @@ struct GlassPrimitive {
     tint_color: vec4<f32>,
     // Glass parameters (blur_radius, saturation, brightness, noise_amount)
     params: vec4<f32>,
+    // Glass parameters 2 (border_thickness, light_angle, 0, 0)
+    params2: vec4<f32>,
     // Type info (glass_type, 0, 0, 0)
     type_info: vec4<u32>,
 }
@@ -722,8 +724,8 @@ fn gaussian_weight(x: f32, sigma: f32) -> f32 {
     return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
-// High quality blur using a proper Gaussian kernel with rotated samples
-// This avoids the checkered pattern by using more samples with proper weighting
+// High quality blur using spiral sampling pattern
+// More samples and better distribution to eliminate checkered artifacts
 fn blur_backdrop(uv: vec2<f32>, blur_radius: f32) -> vec4<f32> {
     if blur_radius < 0.5 {
         return textureSample(backdrop_texture, backdrop_sampler, uv);
@@ -736,20 +738,22 @@ fn blur_backdrop(uv: vec2<f32>, blur_radius: f32) -> vec4<f32> {
     var color = textureSample(backdrop_texture, backdrop_sampler, uv);
     var total_weight = 1.0;
 
-    // Use rotated sample pattern to avoid axis-aligned artifacts
-    // Golden angle rotation provides good distribution
-    let golden_angle = 2.39996323; // radians
+    // Golden angle spiral for optimal sample distribution
+    // This eliminates checkered patterns by avoiding regular grids
+    let golden_angle = 2.39996323; // radians (137.5 degrees)
 
-    // Number of samples scales with blur radius for quality
-    let num_rings = 3;
-    let samples_per_ring = 8;
+    // More samples for smoother blur - 5 rings with 12 samples each = 60 samples
+    let num_rings = 5;
+    let samples_per_ring = 12;
 
     for (var ring = 1; ring <= num_rings; ring++) {
-        let ring_radius = blur_radius * f32(ring) / f32(num_rings);
+        // Non-linear ring spacing - more samples near center
+        let ring_t = f32(ring) / f32(num_rings);
+        let ring_radius = blur_radius * ring_t * ring_t; // Quadratic falloff
         let ring_offset = ring_radius * texel_size;
 
         for (var i = 0; i < samples_per_ring; i++) {
-            // Rotate each sample by golden angle offset
+            // Golden angle rotation + ring offset for spiral pattern
             let angle = f32(i) * (6.283185 / f32(samples_per_ring)) + f32(ring) * golden_angle;
             let offset = vec2<f32>(cos(angle), sin(angle)) * ring_offset;
 
@@ -784,15 +788,11 @@ fn sdf_gradient(p: vec2<f32>, origin: vec2<f32>, size: vec2<f32>, radius: vec4<f
     return g / len;
 }
 
-// Fresnel effect for glass edge highlights
-fn fresnel(normal: vec2<f32>, view_dir: vec2<f32>, power: f32) -> f32 {
-    let ndotv = max(dot(normal, view_dir), 0.0);
-    return pow(1.0 - ndotv, power);
-}
-
 // ============================================================================
-// Fragment Shader - Liquid Glass Effect
+// Fragment Shader - iOS 26 Liquid Glass Effect
 // ============================================================================
+// Liquid glass = smooth rounded bevel, NOT hard edge lines
+// The "liquid" feel comes from wide, gentle transitions that look organic
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -801,12 +801,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let origin = prim.bounds.xy;
     let size = prim.bounds.zw;
-    let center = origin + size * 0.5;
 
-    // Calculate shape mask
+    // Calculate SDF with smooth anti-aliasing
     let d = sd_rounded_rect(p, origin, size, prim.corner_radius);
-    let aa_width = fwidth(d) * 0.5;
-    let mask = 1.0 - smoothstep(-aa_width, aa_width, d);
+    let aa = fwidth(d) * 2.0; // Wide AA for smooth edges
+
+    // Smooth mask
+    let mask = 1.0 - smoothstep(-aa, aa, d);
 
     if mask < 0.001 {
         discard;
@@ -818,130 +819,146 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let brightness = prim.params.z;
     let noise_amount = prim.params.w;
 
-    // ========================================================================
-    // LIQUID GLASS EFFECT
-    // ========================================================================
-
-    // Edge zone calculations
-    let edge_zone = max(8.0, blur_radius * 0.6);
-    let edge_factor = 1.0 - smoothstep(0.0, edge_zone, abs(d));
-    let inner_factor = smoothstep(0.0, edge_zone * 2.0, abs(d)); // 1.0 in center
-
-    // Get surface normal (gradient of SDF)
-    let normal = sdf_gradient(p, origin, size, prim.corner_radius);
-
-    // Simulated view direction (from top-left light source)
-    let light_dir = normalize(vec2<f32>(-0.6, -0.8));
-    let view_dir = normalize(center - p);
-
-    // Fresnel for edge brightness (glass reflects more at glancing angles)
-    let edge_fresnel = fresnel(normal, view_dir, 2.5);
+    // Distance from edge (0 at edge, positive going inward)
+    let inner_dist = max(0.0, -d);
 
     // ========================================================================
-    // REFRACTION - Light bends through the glass surface
+    // TWO-LAYER LIQUID GLASS (Apple-style)
     // ========================================================================
-    let refraction_strength = 0.02 * blur_radius;
-    let texel_size = 1.0 / uniforms.viewport_size;
+    // Layer 1: EDGE BEVEL - wider rim with strong light bending for liquid effect
+    // Layer 2: FLAT CENTER - undistorted frosted glass surface
+    // The edge seamlessly connects to the flat center.
 
-    // Refraction offset based on surface normal and edge proximity
-    let refraction_offset = normal * edge_factor * refraction_strength;
-    let refracted_uv = in.screen_uv + refraction_offset * texel_size * uniforms.viewport_size.y;
+    // Edge bevel thickness - concentrated near edge for sharp liquid bevel
+    let edge_thickness = min(25.0, min(size.x, size.y) * 0.2);
 
-    // Sample blurred backdrop with refraction
-    var backdrop = blur_backdrop(refracted_uv, blur_radius);
+    // Progress through edge zone: 0 = at glass edge, 1 = into flat center
+    let edge_progress = clamp(inner_dist / edge_thickness, 0.0, 1.0);
 
-    // Apply saturation
-    backdrop = vec4<f32>(adjust_saturation(backdrop.rgb, saturation), backdrop.a);
-
-    // Apply brightness
-    backdrop = vec4<f32>(backdrop.rgb * brightness, backdrop.a);
+    // For depth shading (used later)
+    let bevel = 1.0 - edge_progress;
 
     // ========================================================================
-    // DEPTH SHADING - Glass appears thicker at edges
+    // EDGE BEVEL REFRACTION - Liquid Glass Effect
     // ========================================================================
-    // Darken edges to simulate light absorption through thicker glass
-    let depth_darkening = mix(0.92, 1.0, inner_factor);
-    backdrop = vec4<f32>(backdrop.rgb * depth_darkening, backdrop.a);
+    // The refraction follows the edge NORMAL direction, not radial from center.
+    // This creates proper glass rim bending where light bends perpendicular to the edge.
+
+    // Get SDF gradient (points outward from shape - this IS the edge normal)
+    let edge_normal = sdf_gradient(p, origin, size, prim.corner_radius);
+
+    // Refraction strength: strongest at outer edge, fades smoothly to center
+    // Using quadratic falloff concentrated at edge for visible bevel effect
+    let refract_strength = bevel * bevel;
+
+    // Offset UV along edge normal - sample backdrop from OUTSIDE the shape
+    // This creates the "looking through curved glass rim" effect where
+    // content appears pulled inward at the bevel
+    // The offset is in PIXELS, then converted to UV space
+    // Strong distortion for clearly visible bevel curve
+    let refract_pixels = refract_strength * 60.0; // Up to 60 pixels of displacement at edge
+    let refract_offset = edge_normal * refract_pixels;
+
+    // Apply refraction - ADD offset to sample from outside (pulls content inward visually)
+    let refracted_uv = in.screen_uv + refract_offset / uniforms.viewport_size;
 
     // ========================================================================
-    // SPECULAR HIGHLIGHTS - Bright reflections on edges
+    // APPLE LIQUID GLASS EFFECT (WWDC25 Style)
     // ========================================================================
-    // Edge highlight (rim lighting effect)
-    let rim_intensity = edge_fresnel * 0.4;
-
-    // Specular highlight from light direction
-    let reflect_dir = reflect(light_dir, normal);
-    let spec_angle = max(dot(reflect_dir, view_dir), 0.0);
-    let specular = pow(spec_angle, 16.0) * edge_factor * 0.6;
-
-    // Top edge highlight (stronger on upper edges facing light)
-    let top_highlight = max(-normal.y, 0.0) * edge_factor * 0.25;
-
-    // Combine highlights
-    let total_highlight = rim_intensity + specular + top_highlight;
-    let highlight_color = vec3<f32>(1.0, 1.0, 1.0);
+    // Key characteristics from reference:
+    // 1. Nearly transparent interior - minimal blur/frost
+    // 2. Crisp bright edge highlight line along perimeter
+    // 3. Subtle edge shadow just inside the highlight
+    // 4. Very subtle refraction - background barely distorted
+    // 5. Optional chromatic aberration at edges
 
     // ========================================================================
-    // INNER GLOW - Subtle brightness in center
+    // BACKDROP - Blur based on blur_radius parameter
     // ========================================================================
-    let inner_glow = inner_factor * 0.05;
+    // Use blur_radius directly - user controls the blur amount
+    // The blur is applied to the interior, edges remain clear due to refraction
+    let effective_blur = blur_radius; // Direct control - user sets exact blur amount
+    var backdrop = blur_backdrop(refracted_uv, effective_blur);
+    backdrop = vec4<f32>(adjust_saturation(backdrop.rgb, saturation), 1.0);
+    backdrop = vec4<f32>(backdrop.rgb * brightness, 1.0);
+
+    var result = backdrop.rgb;
 
     // ========================================================================
-    // COMBINE EFFECTS
+    // EDGE HIGHLIGHT - Configurable thin line with angle-based light reflection
     // ========================================================================
+    // This is the signature look - a thin bright line tracing the edge
+    // The brightness varies based on the edge angle relative to light source
+    let edge_line_width = prim.params2.x; // User-configurable border thickness
+    let light_angle = prim.params2.y;     // Light source angle in radians
 
-    // Add subtle noise for texture
-    var noise_contrib = 0.0;
+    let edge_line = smoothstep(0.0, edge_line_width * 0.3, inner_dist) *
+                    (1.0 - smoothstep(edge_line_width, edge_line_width * 1.5, inner_dist));
+
+    // Calculate light reflection based on edge normal vs light direction
+    // Light direction vector from the light angle
+    let light_dir = vec2<f32>(cos(light_angle), sin(light_angle));
+
+    // Edge normal points outward from the shape (calculated earlier as sdf_gradient)
+    // The reflection is strongest when edge normal faces the light
+    // dot(edge_normal, -light_dir) = how much the edge faces the light source
+    let facing_light = dot(edge_normal, -light_dir);
+
+    // Map to 0-1 range with bias toward lit edges
+    // -1 to 1 -> 0.2 to 1.0 (edges facing away still get some highlight)
+    let light_factor = 0.2 + 0.8 * max(0.0, facing_light);
+
+    // Combine edge line with light reflection
+    let highlight_strength = edge_line * 0.6 * light_factor; // Base strength 0.6, modulated by light
+    result = result + vec3<f32>(highlight_strength);
+
+    // ========================================================================
+    // INNER EDGE SHADOW - Very subtle depth
+    // ========================================================================
+    let shadow_start = edge_line_width * 2.5;
+    let shadow_end = edge_line_width * 8.0;
+    let inner_shadow = smoothstep(shadow_start, shadow_end, inner_dist) *
+                       (1.0 - smoothstep(shadow_end, shadow_end * 3.0, inner_dist));
+    result = result - vec3<f32>(inner_shadow * 0.04); // More subtle
+
+    // ========================================================================
+    // VERY SUBTLE TINT - Almost invisible
+    // ========================================================================
+    let tint = prim.tint_color;
+    let tint_strength = tint.a * 0.08; // Even more subtle
+    result = mix(result, tint.rgb, tint_strength);
+
+    // Optional subtle noise
     if noise_amount > 0.0 {
-        let n = noise(p * 0.5 + vec2<f32>(uniforms.time * 0.1, 0.0));
-        noise_contrib = (n - 0.5) * noise_amount * 0.08;
+        let n = noise(p * 0.3);
+        result = result + vec3<f32>((n - 0.5) * noise_amount * 0.005);
     }
 
-    // Apply tint color
-    let tint = prim.tint_color;
-    var result = vec3<f32>(
-        mix(backdrop.rgb, tint.rgb, tint.a)
-    );
-
-    // Add highlights
-    result = result + highlight_color * total_highlight;
-
-    // Add inner glow
-    result = result + vec3<f32>(inner_glow);
-
-    // Add noise
-    result = result + vec3<f32>(noise_contrib);
-
-    // Apply glass type specific adjustments
+    // Glass type variants - adjust edge highlight intensity
     let glass_type = prim.type_info.x;
     switch glass_type {
         case GLASS_ULTRA_THIN: {
-            // Very subtle effect - reduce highlights
-            result = mix(backdrop.rgb, result, 0.4);
+            // Even more transparent
+            result = mix(backdrop.rgb, result, 0.7);
         }
         case GLASS_THIN: {
-            result = mix(backdrop.rgb, result, 0.6);
+            // Slightly more visible
         }
         case GLASS_REGULAR: {
-            // Default - full liquid glass effect
+            // Default - as designed above
         }
         case GLASS_THICK: {
-            // Enhance depth and highlights
-            result = mix(backdrop.rgb, result, 1.0);
-            result = result + highlight_color * total_highlight * 0.3; // Extra highlights
+            // Stronger edge highlight
+            result = result + vec3<f32>(highlight_strength * 0.3);
         }
         case GLASS_CHROME: {
-            // Metallic liquid glass
-            let chrome_tint = vec3<f32>(0.92, 0.92, 0.96);
-            result = mix(result, chrome_tint, 0.15);
-            result = result + highlight_color * total_highlight * 0.5; // Strong highlights
+            // Add slight metallic tint
+            let chrome = vec3<f32>(0.96, 0.97, 0.99);
+            result = mix(result, chrome, 0.1);
         }
-        default: {
-            // Regular glass
-        }
+        default: {}
     }
 
-    // Clamp to valid range
     result = clamp(result, vec3<f32>(0.0), vec3<f32>(1.0));
 
     return vec4<f32>(result, mask);

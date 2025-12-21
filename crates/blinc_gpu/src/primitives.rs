@@ -271,8 +271,9 @@ impl GpuPrimitive {
 /// - corner_radius: `vec4<f32>` (16 bytes)
 /// - tint_color: `vec4<f32>`    (16 bytes)
 /// - params: `vec4<f32>`        (16 bytes)
+/// - params2: `vec4<f32>`       (16 bytes)
 /// - type_info: `vec4<u32>`     (16 bytes)
-/// Total: 80 bytes
+/// Total: 96 bytes
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GpuGlassPrimitive {
@@ -284,6 +285,10 @@ pub struct GpuGlassPrimitive {
     pub tint_color: [f32; 4],
     /// Glass parameters (blur_radius, saturation, brightness, noise_amount)
     pub params: [f32; 4],
+    /// Glass parameters 2 (border_thickness, light_angle, 0, 0)
+    /// - border_thickness: thickness of edge highlight in pixels (default 0.8)
+    /// - light_angle: angle of simulated light source in radians (default 0 = top-left)
+    pub params2: [f32; 4],
     /// Type info (glass_type, 0, 0, 0)
     pub type_info: [u32; 4],
 }
@@ -295,6 +300,8 @@ impl Default for GpuGlassPrimitive {
             corner_radius: [0.0; 4],
             tint_color: [1.0, 1.0, 1.0, 0.1], // Subtle white tint
             params: [20.0, 1.0, 1.0, 0.0],    // blur=20, saturation=1, brightness=1, noise=0
+            // border_thickness=0.8, light_angle=-0.785 (top-left, -45 degrees)
+            params2: [0.8, -0.785398, 0.0, 0.0],
             type_info: [GlassType::Regular as u32, 0, 0, 0],
         }
     }
@@ -384,6 +391,26 @@ impl GpuGlassPrimitive {
         self.type_info[0] = GlassType::Chrome as u32;
         self.params[0] = 25.0;
         self.params[1] = 0.8; // Slightly desaturated
+        self
+    }
+
+    /// Set border/edge highlight thickness in pixels
+    pub fn with_border_thickness(mut self, thickness: f32) -> Self {
+        self.params2[0] = thickness;
+        self
+    }
+
+    /// Set light angle for edge reflection effect in radians
+    /// 0 = light from right, PI/2 = from bottom, PI = from left, -PI/2 = from top
+    /// Default is -PI/4 (-45 degrees, top-left)
+    pub fn with_light_angle(mut self, angle_radians: f32) -> Self {
+        self.params2[1] = angle_radians;
+        self
+    }
+
+    /// Set light angle in degrees (convenience method)
+    pub fn with_light_angle_degrees(mut self, angle_degrees: f32) -> Self {
+        self.params2[1] = angle_degrees * std::f32::consts::PI / 180.0;
         self
     }
 }
