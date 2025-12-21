@@ -7,7 +7,7 @@
 
 use anyhow::{Context, Result};
 use blinc_core::Size;
-use blinc_gpu::{GpuPaintContext, GpuRenderer, PrimitiveBatch, RendererConfig};
+use blinc_gpu::{GpuGlassPrimitive, GpuPaintContext, GpuRenderer, PrimitiveBatch, RendererConfig};
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -76,6 +76,21 @@ impl TestContext {
     /// Clear and reset the paint context
     pub fn clear(&mut self) {
         self.paint_ctx = GpuPaintContext::new(self.size.width, self.size.height);
+    }
+
+    /// Get a mutable reference to the batch for adding glass primitives
+    pub fn batch_mut(&mut self) -> &mut PrimitiveBatch {
+        self.paint_ctx.batch_mut()
+    }
+
+    /// Add a glass primitive to the batch
+    pub fn add_glass(&mut self, glass: GpuGlassPrimitive) {
+        self.paint_ctx.batch_mut().push_glass(glass);
+    }
+
+    /// Create a glass rectangle with default settings
+    pub fn glass_rect(&mut self, x: f32, y: f32, width: f32, height: f32) -> GpuGlassPrimitive {
+        GpuGlassPrimitive::new(x, y, width, height)
     }
 }
 
@@ -330,6 +345,164 @@ impl TestHarness {
         Ok(())
     }
 
+    /// Render a batch with glass effects to a PNG file
+    ///
+    /// This performs multi-pass rendering:
+    /// 1. Render background primitives to a texture
+    /// 2. Copy to backdrop texture for glass sampling
+    /// 3. Render glass primitives with backdrop blur
+    /// 4. Copy final result to PNG
+    pub fn render_with_glass_to_png(
+        &self,
+        batch: &PrimitiveBatch,
+        width: u32,
+        height: u32,
+        path: &Path,
+    ) -> Result<()> {
+        // For glass rendering, we always use non-MSAA for simplicity
+        // (glass shader samples from backdrop which needs to be single-sampled)
+
+        // Create render texture (final output)
+        let render_texture = self.create_resolve_texture(width, height);
+        let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create backdrop texture (copy of rendered content for glass to sample)
+        let backdrop_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Glass Backdrop Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let backdrop_view = backdrop_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Step 1: Render background primitives (non-glass)
+        {
+            let mut renderer = self.renderer.borrow_mut();
+            renderer.resize(width, height);
+            renderer.render_with_clear(&render_view, batch, [1.0, 1.0, 1.0, 1.0]);
+        }
+
+        // Step 2: Copy rendered content to backdrop texture
+        if !batch.glass_primitives.is_empty() {
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Backdrop Copy Encoder"),
+                });
+
+            encoder.copy_texture_to_texture(
+                wgpu::ImageCopyTexture {
+                    texture: &render_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::ImageCopyTexture {
+                    texture: &backdrop_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+            );
+
+            self.queue.submit(std::iter::once(encoder.finish()));
+
+            // Step 3: Render glass primitives on top
+            {
+                let mut renderer = self.renderer.borrow_mut();
+                renderer.render_glass(&render_view, &backdrop_view, batch);
+            }
+        }
+
+        // Step 4: Read back to PNG (reuse existing logic)
+        let buffer = self.create_readback_buffer(width, height);
+        let bytes_per_row = Self::padded_bytes_per_row(width);
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Glass Texture Copy Encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: &render_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Map buffer and read pixels
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+        self.device.poll(wgpu::Maintain::Wait);
+        rx.recv()
+            .context("Failed to receive buffer map result")?
+            .context("Failed to map buffer")?;
+
+        let data = buffer_slice.get_mapped_range();
+        let mut img: RgbaImage = ImageBuffer::new(width, height);
+        for y in 0..height {
+            let row_start = (y * bytes_per_row) as usize;
+            let row_end = row_start + (width * 4) as usize;
+            let row_data = &data[row_start..row_end];
+
+            for x in 0..width {
+                let i = (x * 4) as usize;
+                img.put_pixel(
+                    x,
+                    y,
+                    Rgba([
+                        row_data[i],
+                        row_data[i + 1],
+                        row_data[i + 2],
+                        row_data[i + 3],
+                    ]),
+                );
+            }
+        }
+
+        drop(data);
+        buffer.unmap();
+        img.save(path).context("Failed to save PNG")?;
+
+        Ok(())
+    }
+
     /// Compare two images and return the difference ratio (0.0 = identical, 1.0 = completely different)
     pub fn compare_images(img1: &RgbaImage, img2: &RgbaImage) -> f32 {
         if img1.dimensions() != img2.dimensions() {
@@ -473,6 +646,95 @@ impl TestHarness {
                 .context("Failed to create reference image")?;
             tracing::info!(
                 "Test '{}' created new reference at {:?}",
+                name,
+                reference_path
+            );
+            Ok(TestResult::PassedWithNewReference)
+        }
+    }
+
+    /// Run a glass test (uses multi-pass rendering for backdrop blur)
+    pub fn run_glass_test<F>(&self, name: &str, test_fn: F) -> Result<TestResult>
+    where
+        F: FnOnce(&mut TestContext),
+    {
+        self.run_glass_test_with_size(
+            name,
+            self.default_size.width,
+            self.default_size.height,
+            test_fn,
+        )
+    }
+
+    /// Run a glass test with custom size
+    pub fn run_glass_test_with_size<F>(
+        &self,
+        name: &str,
+        width: f32,
+        height: f32,
+        test_fn: F,
+    ) -> Result<TestResult>
+    where
+        F: FnOnce(&mut TestContext),
+    {
+        let mut ctx = self.create_context_with_size(name, width, height);
+        test_fn(&mut ctx);
+
+        let batch = ctx.take_batch();
+        let output_path = self.output_path(name);
+        let reference_path = self.reference_path(name);
+
+        tracing::info!(
+            "Glass test '{}': {} primitives, {} glass, {} glyphs",
+            name,
+            batch.primitive_count(),
+            batch.glass_count(),
+            batch.glyph_count()
+        );
+
+        // Render with glass to PNG
+        self.render_with_glass_to_png(&batch, width as u32, height as u32, &output_path)?;
+        tracing::info!("Rendered glass test '{}' to {:?}", name, output_path);
+
+        // Compare with reference if it exists
+        if reference_path.exists() {
+            let output_img = image::open(&output_path)
+                .context("Failed to open output image")?
+                .to_rgba8();
+            let reference_img = image::open(&reference_path)
+                .context("Failed to open reference image")?
+                .to_rgba8();
+
+            let difference = Self::compare_images(&output_img, &reference_img);
+
+            if difference <= self.threshold {
+                tracing::info!(
+                    "Glass test '{}' PASSED (diff: {:.4}%)",
+                    name,
+                    difference * 100.0
+                );
+                Ok(TestResult::Passed)
+            } else {
+                let diff_path = self.diff_path(name);
+                if let Some(diff_img) = Self::generate_diff_image(&output_img, &reference_img) {
+                    diff_img.save(&diff_path).ok();
+                }
+                tracing::warn!(
+                    "Glass test '{}' FAILED (diff: {:.4}%, threshold: {:.4}%)",
+                    name,
+                    difference * 100.0,
+                    self.threshold * 100.0
+                );
+                Ok(TestResult::Failed {
+                    difference,
+                    diff_path,
+                })
+            }
+        } else {
+            std::fs::copy(&output_path, &reference_path)
+                .context("Failed to create reference image")?;
+            tracing::info!(
+                "Glass test '{}' created new reference at {:?}",
                 name,
                 reference_path
             );

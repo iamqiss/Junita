@@ -1,6 +1,7 @@
 //! Visual test cases organized by category
 
 pub mod clipping;
+pub mod glass;
 pub mod gradients;
 pub mod opacity;
 pub mod paint_context;
@@ -26,5 +27,6 @@ pub fn all_suites() -> Vec<TestSuite> {
         clipping::suite(),
         sdf::suite(),
         paint_context::suite(),
+        glass::suite(),
     ]
 }

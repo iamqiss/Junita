@@ -15,6 +15,8 @@ pub struct TestCase {
     pub category: String,
     /// Test function
     pub test_fn: Box<dyn FnOnce(&mut crate::harness::TestContext) + Send>,
+    /// Whether this test uses glass effects (requires multi-pass rendering)
+    pub uses_glass: bool,
 }
 
 impl TestCase {
@@ -26,6 +28,19 @@ impl TestCase {
             name: name.to_string(),
             category: category.to_string(),
             test_fn: Box::new(test_fn),
+            uses_glass: false,
+        }
+    }
+
+    pub fn new_glass<F>(name: &str, category: &str, test_fn: F) -> Self
+    where
+        F: FnOnce(&mut crate::harness::TestContext) + Send + 'static,
+    {
+        Self {
+            name: name.to_string(),
+            category: category.to_string(),
+            test_fn: Box::new(test_fn),
+            uses_glass: true,
         }
     }
 }
@@ -69,6 +84,16 @@ impl TestSuite {
         F: FnOnce(&mut crate::harness::TestContext) + Send + 'static,
     {
         self.cases.push(TestCase::new(name, &self.name, test_fn));
+        self
+    }
+
+    /// Add a glass test case (uses multi-pass rendering for backdrop blur)
+    pub fn add_glass<F>(&mut self, name: &str, test_fn: F) -> &mut Self
+    where
+        F: FnOnce(&mut crate::harness::TestContext) + Send + 'static,
+    {
+        self.cases
+            .push(TestCase::new_glass(name, &self.name, test_fn));
         self
     }
 }
@@ -135,13 +160,27 @@ impl TestRunner {
 
                 tracing::debug!("Running test: {}", full_name);
 
-                let result = match self.harness.run_test(&full_name, case.test_fn) {
-                    Ok(result) => result,
-                    Err(e) => {
-                        tracing::error!("Test {} failed with error: {}", full_name, e);
-                        TestResult::Failed {
-                            difference: 1.0,
-                            diff_path: self.harness.diff_path(&full_name),
+                // Use glass test runner if this test uses glass effects
+                let result = if case.uses_glass {
+                    match self.harness.run_glass_test(&full_name, case.test_fn) {
+                        Ok(result) => result,
+                        Err(e) => {
+                            tracing::error!("Glass test {} failed with error: {}", full_name, e);
+                            TestResult::Failed {
+                                difference: 1.0,
+                                diff_path: self.harness.diff_path(&full_name),
+                            }
+                        }
+                    }
+                } else {
+                    match self.harness.run_test(&full_name, case.test_fn) {
+                        Ok(result) => result,
+                        Err(e) => {
+                            tracing::error!("Test {} failed with error: {}", full_name, e);
+                            TestResult::Failed {
+                                difference: 1.0,
+                                diff_path: self.harness.diff_path(&full_name),
+                            }
                         }
                     }
                 };

@@ -411,6 +411,11 @@ impl GpuPaintContext {
         &self.batch
     }
 
+    /// Get a mutable reference to the current batch
+    pub fn batch_mut(&mut self) -> &mut PrimitiveBatch {
+        &mut self.batch
+    }
+
     /// Clear the batch
     pub fn clear(&mut self) {
         self.batch.clear();
