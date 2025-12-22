@@ -3,6 +3,7 @@
 pub mod clipping;
 pub mod glass;
 pub mod gradients;
+pub mod layout;
 pub mod opacity;
 pub mod paint_context;
 pub mod paths;
@@ -30,5 +31,6 @@ pub fn all_suites() -> Vec<TestSuite> {
         paint_context::suite(),
         glass::suite(),
         svg::suite(),
+        layout::suite(),
     ]
 }
