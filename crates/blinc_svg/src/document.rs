@@ -313,4 +313,30 @@ mod tests {
         let commands = doc.commands();
         assert!(!commands.is_empty());
     }
+
+    #[test]
+    fn test_fill_only_no_stroke() {
+        // SVG with fill but no stroke - should NOT have a stroke command
+        let svg = r#"
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                <path d="M10 8 L18 12 L10 16 Z" fill="white"/>
+            </svg>
+        "#;
+
+        let doc = SvgDocument::from_str(svg).unwrap();
+        let commands = doc.commands();
+
+        // Should have exactly 1 command (fill only)
+        let fill_count = commands
+            .iter()
+            .filter(|c| matches!(c, SvgDrawCommand::FillPath { .. }))
+            .count();
+        let stroke_count = commands
+            .iter()
+            .filter(|c| matches!(c, SvgDrawCommand::StrokePath { .. }))
+            .count();
+
+        assert_eq!(fill_count, 1, "Should have exactly 1 fill command");
+        assert_eq!(stroke_count, 0, "Should have NO stroke commands when stroke is not specified");
+    }
 }

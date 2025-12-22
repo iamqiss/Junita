@@ -931,12 +931,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Using quadratic falloff concentrated at edge for visible bevel effect
     let refract_strength = bevel * bevel;
 
+    // Refraction multiplier from type_info.w (0.0 = no refraction, 1.0 = full refraction)
+    // We use a sentinel value: if type_info.w == 0 (unset), default to 1.0 (full refraction)
+    // To disable refraction, set type_info.w to the bits of a small negative number like -1.0
+    // This way 0 (unset) = full refraction, any other value = that value's refraction
+    let refraction_mult = bitcast<f32>(prim.type_info.w);
+    // Check if explicitly set (non-zero bits) - if unset (0), use 1.0 for backwards compat
+    // If set to 0.0f (which has bits 0x00000000), we need a different sentinel
+    // Solution: use -1.0 as "use explicit value" flag in the sign bit
+    let is_explicitly_set = (prim.type_info.w & 0x80000000u) != 0u; // Check sign bit
+    let explicit_value = abs(refraction_mult); // Remove sign to get actual value
+    let effective_refract_mult = select(1.0, explicit_value, is_explicitly_set);
+
     // Offset UV along edge normal - sample backdrop from OUTSIDE the shape
     // This creates the "looking through curved glass rim" effect where
     // content appears pulled inward at the bevel
     // The offset is in PIXELS, then converted to UV space
     // Strong distortion for clearly visible bevel curve
-    let refract_pixels = refract_strength * 60.0; // Up to 60 pixels of displacement at edge
+    let refract_pixels = refract_strength * 60.0 * effective_refract_mult; // Up to 60 pixels of displacement at edge
     let refract_offset = edge_normal * refract_pixels;
 
     // Apply refraction - ADD offset to sample from outside (pulls content inward visually)

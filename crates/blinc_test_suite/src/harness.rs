@@ -1111,7 +1111,7 @@ impl Default for TestHarnessConfig {
         Self {
             output_dir: PathBuf::from("test_output"),
             reference_dir: PathBuf::from("test_output/references"),
-            default_size: Size::new(400.0, 300.0),
+            default_size: Size::new(800.0, 600.0), // 2x resolution for better quality
             threshold: 0.001, // 0.1% difference allowed
             max_primitives: 10_000,
             max_glass_primitives: 1_000,

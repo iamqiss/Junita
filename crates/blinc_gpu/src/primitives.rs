@@ -447,6 +447,22 @@ impl GpuGlassPrimitive {
         self.type_info[2] = offset_y.to_bits();
         self
     }
+
+    /// Set refraction strength multiplier (0.0 = no refraction/flat, 1.0 = full refraction)
+    /// Use this to create flat blurred backgrounds without the edge bending effect
+    pub fn with_refraction(mut self, strength: f32) -> Self {
+        // Store as negative to signal "explicitly set" (shader checks sign bit)
+        // The shader will use abs() to get the actual value
+        self.type_info[3] = (-strength).to_bits();
+        self
+    }
+
+    /// Disable refraction for a flat blurred background (no edge bending)
+    pub fn flat(mut self) -> Self {
+        // Store -0.0 which has sign bit set but value 0
+        self.type_info[3] = (-0.0_f32).to_bits();
+        self
+    }
 }
 
 /// A GPU text glyph instance (matches shader `GlyphInstance` struct)

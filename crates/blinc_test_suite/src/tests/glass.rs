@@ -597,30 +597,33 @@ pub fn suite() -> TestSuite {
     suite.add_glass("music_player", |ctx| {
         use blinc_core::Point;
 
-        // Layout constants - iPhone-like aspect ratio
-        let width = 400.0;
-        let height = 300.0;
+        // Scale factor for high-resolution rendering (2x for 800x600)
+        let scale = 2.0;
 
-        // Player card dimensions
-        let player_x = 30.0;
-        let player_y = 30.0;
-        let player_w = 340.0;
-        let player_h = 140.0;
-        let player_radius = 28.0;
+        // Layout constants - iPhone-like aspect ratio (scaled)
+        let width = 400.0 * scale;
+        let height = 300.0 * scale;
+
+        // Player card dimensions (scaled)
+        let player_x = 30.0 * scale;
+        let player_y = 30.0 * scale;
+        let player_w = 340.0 * scale;
+        let player_h = 140.0 * scale;
+        let player_radius = 28.0 * scale;
 
         // Progress bar (slider) - iOS style with no knob
         // Leave space for time labels on both sides
-        let time_label_width = 35.0;
-        let bar_x = player_x + 20.0 + time_label_width;
-        let bar_y = player_y + 50.0;
-        let bar_w = player_w - 40.0 - (time_label_width * 2.0);
-        let bar_h = 7.0; // Track thickness
+        let time_label_width = 35.0 * scale;
+        let bar_x = player_x + 20.0 * scale + time_label_width;
+        let bar_y = player_y + 50.0 * scale;
+        let bar_w = player_w - 40.0 * scale - (time_label_width * 2.0);
+        let bar_h = 7.0 * scale; // Track thickness
         let progress = 0.08; // ~0:10 of 3:34
 
         // Control buttons layout
-        let controls_y = player_y + 85.0;
+        let controls_y = player_y + 85.0 * scale;
         let controls_center_x = player_x + player_w / 2.0;
-        let btn_spacing = 70.0;
+        let btn_spacing = 70.0 * scale;
 
 
         // First, draw all background primitives (will be blurred behind glass)
@@ -635,46 +638,46 @@ pub fn suite() -> TestSuite {
                 Color::rgba(0.4, 0.2, 0.6, 1.0).into(),
             );
 
-            // Large colorful shapes for interesting blur
+            // Large colorful shapes for interesting blur (scaled)
             // Pink/magenta blob top-left
             c.fill_circle(
-                Point::new(80.0, 60.0),
-                100.0,
+                Point::new(80.0 * scale, 60.0 * scale),
+                100.0 * scale,
                 Color::rgba(0.95, 0.3, 0.5, 1.0).into(),
             );
 
             // Cyan/teal blob center-right
             c.fill_circle(
-                Point::new(320.0, 120.0),
-                90.0,
+                Point::new(320.0 * scale, 120.0 * scale),
+                90.0 * scale,
                 Color::rgba(0.2, 0.8, 0.85, 1.0).into(),
             );
 
             // Orange blob bottom
             c.fill_circle(
-                Point::new(180.0, 260.0),
-                80.0,
+                Point::new(180.0 * scale, 260.0 * scale),
+                80.0 * scale,
                 Color::rgba(1.0, 0.5, 0.2, 1.0).into(),
             );
 
             // Yellow accent
             c.fill_circle(
-                Point::new(350.0, 240.0),
-                60.0,
+                Point::new(350.0 * scale, 240.0 * scale),
+                60.0 * scale,
                 Color::rgba(1.0, 0.85, 0.2, 1.0).into(),
             );
 
             // Green accent bottom-left
             c.fill_circle(
-                Point::new(50.0, 220.0),
-                70.0,
+                Point::new(50.0 * scale, 220.0 * scale),
+                70.0 * scale,
                 Color::rgba(0.3, 0.9, 0.4, 1.0).into(),
             );
 
             // Blue accent top-right
             c.fill_rect(
-                Rect::new(280.0, 0.0, 120.0, 80.0),
-                20.0.into(),
+                Rect::new(280.0 * scale, 0.0, 120.0 * scale, 80.0 * scale),
+                (20.0 * scale).into(),
                 Color::rgba(0.3, 0.4, 0.95, 1.0).into(),
             );
         }
@@ -683,25 +686,61 @@ pub fn suite() -> TestSuite {
         // Main player card - iOS liquid glass style with shadow
         let player_glass = GpuGlassPrimitive::new(player_x, player_y, player_w, player_h)
             .with_corner_radius(player_radius)
-            .with_blur(30.0)
+            .with_blur(30.0 * scale)
             .with_tint(0.12, 0.12, 0.14, 0.55)
             .with_saturation(0.85)
             .with_brightness(1.05)
-            .with_border_thickness(0.6)
+            .with_border_thickness(0.6 * scale)
             .with_light_angle_degrees(-45.0)
-            .with_shadow_offset(20.0, 0.35, 0.0, 10.0);
+            .with_shadow_offset(20.0 * scale, 0.35, 0.0, 10.0 * scale);
         ctx.add_glass(player_glass);
 
         // Slider track as glass element (for refraction effect)
         let slider_track_glass = GpuGlassPrimitive::new(bar_x, bar_y, bar_w, bar_h)
             .with_corner_radius(bar_h / 2.0)
-            .with_blur(25.0)  // Higher blur for more frosted effect
+            .with_blur(25.0 * scale)  // Higher blur for more frosted effect
             .with_tint(1.0, 1.0, 1.0, 0.65)  // More opaque white tint
             .with_saturation(0.3)  // Very low saturation for whiter appearance
             .with_brightness(1.3)  // Brighter
             .with_border_thickness(0.0);
         ctx.add_glass(slider_track_glass);
 
+
+        // Pill button settings (shared between left and right pills)
+        let pill_icon_size = 20.0 * scale;
+        let pill_padding = 12.0 * scale;
+        let pill_w = pill_icon_size + pill_padding * 2.0;
+        let pill_h = pill_icon_size + pill_padding * 2.0;
+        // Center pills vertically with the control icons (32.0 * scale height)
+        let control_icon_height = 32.0 * scale;
+        let pill_y = controls_y + (control_icon_height - pill_h) / 2.0;
+
+        // AirPlay button glass pill (left side)
+        let airplay_pill_x = player_x + 16.0 * scale;
+
+        // Glass pill with etched/inset appearance - flat blur with visible border
+        let airplay_pill_glass = GpuGlassPrimitive::new(airplay_pill_x, pill_y, pill_w, pill_h)
+            .with_corner_radius(pill_h / 2.0)
+            .with_blur(20.0 * scale)
+            .with_tint(0.92, 0.92, 0.94, 0.4)
+            .with_saturation(0.8)
+            .with_brightness(0.95)
+            .with_border_thickness(1.0 * scale)
+            .flat();
+        ctx.add_glass(airplay_pill_glass);
+
+        // Radio/wave button glass pill (right side)
+        let radio_pill_x = player_x + player_w - 16.0 * scale - pill_w;
+
+        let radio_pill_glass = GpuGlassPrimitive::new(radio_pill_x, pill_y, pill_w, pill_h)
+            .with_corner_radius(pill_h / 2.0)
+            .with_blur(20.0 * scale)
+            .with_tint(0.92, 0.92, 0.94, 0.4)
+            .with_saturation(0.8)
+            .with_brightness(0.95)
+            .with_border_thickness(1.0 * scale)
+            .flat();
+        ctx.add_glass(radio_pill_glass);
 
         // Draw foreground elements ON TOP of glass (not blurred)
         {
@@ -719,7 +758,7 @@ pub fn suite() -> TestSuite {
                 <path d="M236.3 107.1C247.9 96 265 92.9 279.7 99.2C294.4 105.5 304 120 304 136L304 272.3L476.3 107.2C487.9 96 505 92.9 519.7 99.2C534.4 105.5 544 120 544 136L544 504C544 520 534.4 534.5 519.7 540.8C505 547.1 487.9 544 476.3 532.9L304 367.7L304 504C304 520 294.4 534.5 279.7 540.8C265 547.1 247.9 544 236.3 532.9L44.3 348.9C36.4 341.4 32 330.9 32 320C32 309.1 36.5 298.7 44.3 291.1L236.3 107.1z" fill="white"/>
             </svg>"#;
             if let Ok(doc) = SvgDocument::from_str(rewind_svg) {
-                let icon_size = 32.0;
+                let icon_size = 32.0 * scale;
                 let rew_x = controls_center_x - btn_spacing - icon_size / 2.0;
                 doc.render_fit(fg, Rect::new(rew_x, controls_y, icon_size, icon_size));
             }
@@ -729,7 +768,7 @@ pub fn suite() -> TestSuite {
                 <path d="M176 96C149.5 96 128 117.5 128 144L128 496C128 522.5 149.5 544 176 544L240 544C266.5 544 288 522.5 288 496L288 144C288 117.5 266.5 96 240 96L176 96zM400 96C373.5 96 352 117.5 352 144L352 496C352 522.5 373.5 544 400 544L464 544C490.5 544 512 522.5 512 496L512 144C512 117.5 490.5 96 464 96L400 96z" fill="white"/>
             </svg>"#;
             if let Ok(doc) = SvgDocument::from_str(pause_svg) {
-                let pause_size = 32.0;
+                let pause_size = 32.0 * scale;
                 let pause_x = controls_center_x - pause_size / 2.0;
                 doc.render_fit(fg, Rect::new(pause_x, controls_y, pause_size, pause_size));
             }
@@ -739,54 +778,60 @@ pub fn suite() -> TestSuite {
                 <path d="M403.7 107.1C392.1 96 375 92.9 360.3 99.2C345.6 105.5 336 120 336 136L336 272.3L163.7 107.2C152.1 96 135 92.9 120.3 99.2C105.6 105.5 96 120 96 136L96 504C96 520 105.6 534.5 120.3 540.8C135 547.1 152.1 544 163.7 532.9L336 367.7L336 504C336 520 345.6 534.5 360.3 540.8C375 547.1 392.1 544 403.7 532.9L595.7 348.9C603.6 341.4 608 330.9 608 320C608 309.1 603.5 298.7 595.7 291.1L403.7 107.1z" fill="white"/>
             </svg>"#;
             if let Ok(doc) = SvgDocument::from_str(forward_svg) {
-                let icon_size = 32.0;
+                let icon_size = 32.0 * scale;
                 let ff_x = controls_center_x + btn_spacing - icon_size / 2.0;
                 doc.render_fit(fg, Rect::new(ff_x, controls_y, icon_size, icon_size));
             }
 
-            // Volume indicator (5 ascending bars) - top right of player
-            let vol_x = player_x + player_w - 45.0;
-            let vol_y = player_y + 15.0;
-            for i in 0..5 {
-                let bar_height = 6.0 + i as f32 * 3.5;
-                fg.fill_rect(
-                    Rect::new(vol_x + i as f32 * 6.0, vol_y + 20.0 - bar_height, 3.0, bar_height),
-                    1.0.into(),
-                    Color::WHITE.into(),
-                );
+            // Audio wave icon (Lucide audio-lines) - top right of player
+            let audio_icon_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>"##;
+            if let Ok(doc) = SvgDocument::from_str(audio_icon_svg) {
+                let icon_size = 22.0 * scale;
+                let audio_icon_x = player_x + player_w - 48.0 * scale;
+                let audio_icon_y = player_y + 12.0 * scale;
+                doc.render_fit(fg, Rect::new(audio_icon_x, audio_icon_y, icon_size, icon_size));
             }
 
-            // AirPlay button (concentric circles) - bottom right of player
-            let airplay_x = player_x + player_w - 40.0;
-            let airplay_y = controls_y + 8.0;
-            // Outer ring
-            fg.fill_circle(
-                Point::new(airplay_x, airplay_y),
-                12.0,
-                Color::rgba(1.0, 1.0, 1.0, 0.25).into(),
-            );
-            // Middle ring
-            fg.fill_circle(
-                Point::new(airplay_x, airplay_y),
-                8.0,
-                Color::rgba(0.15, 0.15, 0.18, 0.8).into(),
-            );
-            // Inner dot
-            fg.fill_circle(
-                Point::new(airplay_x, airplay_y),
-                4.0,
-                Color::rgba(1.0, 1.0, 1.0, 0.9).into(),
-            );
+            // AirPlay icon (Lucide airplay) - in glass pill on left side
+            let airplay_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1"/><path d="m12 15 5 6H7Z"/></svg>"##;
+            if let Ok(doc) = SvgDocument::from_str(airplay_svg) {
+                let airplay_icon_x = airplay_pill_x + pill_padding;
+                let airplay_icon_y = pill_y + pill_padding;
+                doc.render_fit(fg, Rect::new(airplay_icon_x, airplay_icon_y, pill_icon_size, pill_icon_size));
+            }
+
+            // Radio icon (Lucide radio) - in glass pill on right side
+            // Use filled circle for smoother rendering (stroked paths have jagged edges without AA)
+            let radio_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.247 7.761a6 6 0 0 1 0 8.478"/><path d="M19.075 4.933a10 10 0 0 1 0 14.134"/><path d="M4.925 19.067a10 10 0 0 1 0-14.134"/><path d="M7.753 16.239a6 6 0 0 1 0-8.478"/><circle cx="12" cy="12" r="2.5" fill="white"/></svg>"##;
+            if let Ok(doc) = SvgDocument::from_str(radio_svg) {
+                let radio_icon_x = radio_pill_x + pill_padding;
+                let radio_icon_y = pill_y + pill_padding;
+                doc.render_fit(fg, Rect::new(radio_icon_x, radio_icon_y, pill_icon_size, pill_icon_size));
+            }
         }
 
+        // Title label above the slider (horizontally centered)
+        let title_font_size = 14.0 * scale;
+        let title_y = bar_y - 20.0 * scale;  // Position above the slider
+        // Approximate text width: "Blinc UI 0.1.0" is 14 chars, ~0.5 * font_size per char
+        let title_text = "Blinc UI 0.1.0";
+        let approx_title_width = title_text.len() as f32 * title_font_size * 0.5;
+        ctx.draw_text_centered(
+            title_text,
+            player_x + (player_w - approx_title_width) / 2.0,  // Center horizontally
+            title_y,
+            title_font_size,
+            [1.0, 1.0, 1.0, 0.95],
+        );
+
         // Time labels (rendered as text on top of everything)
-        let font_size = 11.0;
+        let font_size = 11.0 * scale;
         // Use centered text anchor so y coordinate is the vertical center
         let slider_center_y = bar_y + bar_h / 2.0;
         // Left time label (elapsed)
         ctx.draw_text_centered(
             "0:10",
-            player_x + 20.0,
+            player_x + 20.0 * scale,
             slider_center_y,
             font_size,
             [1.0, 1.0, 1.0, 0.85],
@@ -794,11 +839,48 @@ pub fn suite() -> TestSuite {
         // Right time label (remaining)
         ctx.draw_text_centered(
             "-3:24",
-            player_x + player_w - 20.0 - 28.0,
+            player_x + player_w - 20.0 * scale - 28.0 * scale,
             slider_center_y,
             font_size,
             [1.0, 1.0, 1.0, 0.85],
         );
+    });
+
+    // SVG stroke test - white filled SVG on colored background
+    suite.add_glass("svg_stroke_test", |ctx| {
+        let c = ctx.ctx();
+        let scale = 2.0; // Match new default resolution
+
+        // Solid colored background
+        c.fill_rect(
+            Rect::new(0.0, 0.0, 800.0, 600.0),
+            0.0.into(),
+            Color::rgba(0.2, 0.4, 0.8, 1.0).into(),
+        );
+
+        // AirPlay icon (stroked SVG - should have visible stroke)
+        let airplay_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1"/><path d="m12 15 5 6H7Z"/></svg>"##;
+        if let Ok(doc) = SvgDocument::from_str(airplay_svg) {
+            doc.render_fit(c, Rect::new(50.0 * scale, 50.0 * scale, 80.0 * scale, 80.0 * scale));
+        }
+
+        // Audio lines icon (stroked SVG)
+        let audio_icon_svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>"##;
+        if let Ok(doc) = SvgDocument::from_str(audio_icon_svg) {
+            doc.render_fit(c, Rect::new(160.0 * scale, 50.0 * scale, 80.0 * scale, 80.0 * scale));
+        }
+
+        // Forward button (filled SVG - should NOT have stroke outline)
+        let forward_svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+            <path d="M403.7 107.1C392.1 96 375 92.9 360.3 99.2C345.6 105.5 336 120 336 136L336 272.3L163.7 107.2C152.1 96 135 92.9 120.3 99.2C105.6 105.5 96 120 96 136L96 504C96 520 105.6 534.5 120.3 540.8C135 547.1 152.1 544 163.7 532.9L336 367.7L336 504C336 520 345.6 534.5 360.3 540.8C375 547.1 392.1 544 403.7 532.9L595.7 348.9C603.6 341.4 608 330.9 608 320C608 309.1 603.5 298.7 595.7 291.1L403.7 107.1z" fill="white"/>
+        </svg>"#;
+        if let Ok(doc) = SvgDocument::from_str(forward_svg) {
+            doc.render_fit(c, Rect::new(270.0 * scale, 50.0 * scale, 80.0 * scale, 80.0 * scale));
+        }
+
+        // Labels
+        ctx.draw_text("Stroked SVGs", 100.0 * scale, 150.0 * scale, 14.0 * scale, [1.0, 1.0, 1.0, 1.0]);
+        ctx.draw_text("Filled SVG", 290.0 * scale, 150.0 * scale, 14.0 * scale, [1.0, 1.0, 1.0, 1.0]);
     });
 
     suite
