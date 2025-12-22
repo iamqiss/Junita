@@ -120,7 +120,12 @@ fn save_to_png(
             img.put_pixel(
                 x,
                 y,
-                Rgba([row_data[i + 2], row_data[i + 1], row_data[i], row_data[i + 3]]),
+                Rgba([
+                    row_data[i + 2],
+                    row_data[i + 1],
+                    row_data[i],
+                    row_data[i + 3],
+                ]),
             );
         }
     }
@@ -137,7 +142,13 @@ fn save_to_png(
 }
 
 /// Render a UI element and save to PNG
-fn render_to_png(app: &mut BlincApp, name: &str, ui: &impl ElementBuilder, width: u32, height: u32) {
+fn render_to_png(
+    app: &mut BlincApp,
+    name: &str,
+    ui: &impl ElementBuilder,
+    width: u32,
+    height: u32,
+) {
     let (texture, view) = create_test_texture(app.device(), width, height);
     app.render(ui, &view, width as f32, height as f32)
         .expect("Render failed");

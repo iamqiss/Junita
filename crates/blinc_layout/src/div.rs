@@ -16,7 +16,9 @@
 use blinc_core::{Brush, Color, CornerRadius};
 use taffy::prelude::*;
 
-use crate::element::{GlassMaterial, Material, MetallicMaterial, RenderLayer, RenderProps, WoodMaterial};
+use crate::element::{
+    GlassMaterial, Material, MetallicMaterial, RenderLayer, RenderProps, WoodMaterial,
+};
 use crate::tree::{LayoutNodeId, LayoutTree};
 
 /// A div element builder with GPUI/Tailwind-style methods
@@ -754,10 +756,7 @@ mod tests {
 
     #[test]
     fn test_div_with_children() {
-        let parent = div()
-            .flex_col()
-            .child(div().h(20.0))
-            .child(div().h(30.0));
+        let parent = div().flex_col().child(div().h(20.0)).child(div().h(30.0));
 
         assert_eq!(parent.children.len(), 2);
     }
@@ -791,17 +790,26 @@ mod tests {
         let children: Vec<_> = tree.layout_tree.children(root);
 
         // First child at x=0
-        let first = tree.layout_tree.get_bounds(children[0], (0.0, 0.0)).unwrap();
+        let first = tree
+            .layout_tree
+            .get_bounds(children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(first.x, 0.0);
         assert_eq!(first.width, 50.0);
 
         // Second child at x=50
-        let second = tree.layout_tree.get_bounds(children[1], (0.0, 0.0)).unwrap();
+        let second = tree
+            .layout_tree
+            .get_bounds(children[1], (0.0, 0.0))
+            .unwrap();
         assert_eq!(second.x, 50.0);
         assert_eq!(second.width, 100.0);
 
         // Third child at x=150
-        let third = tree.layout_tree.get_bounds(children[2], (0.0, 0.0)).unwrap();
+        let third = tree
+            .layout_tree
+            .get_bounds(children[2], (0.0, 0.0))
+            .unwrap();
         assert_eq!(third.x, 150.0);
         assert_eq!(third.width, 50.0);
     }
@@ -825,17 +833,26 @@ mod tests {
         let children: Vec<_> = tree.layout_tree.children(root);
 
         // First child at y=0
-        let first = tree.layout_tree.get_bounds(children[0], (0.0, 0.0)).unwrap();
+        let first = tree
+            .layout_tree
+            .get_bounds(children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(first.y, 0.0);
         assert_eq!(first.height, 40.0);
 
         // Second child at y=50 (40 + 10 gap)
-        let second = tree.layout_tree.get_bounds(children[1], (0.0, 0.0)).unwrap();
+        let second = tree
+            .layout_tree
+            .get_bounds(children[1], (0.0, 0.0))
+            .unwrap();
         assert_eq!(second.y, 50.0);
         assert_eq!(second.height, 40.0);
 
         // Third child at y=100 (50 + 40 + 10 gap)
-        let third = tree.layout_tree.get_bounds(children[2], (0.0, 0.0)).unwrap();
+        let third = tree
+            .layout_tree
+            .get_bounds(children[2], (0.0, 0.0))
+            .unwrap();
         assert_eq!(third.y, 100.0);
         assert_eq!(third.height, 40.0);
     }
@@ -857,11 +874,17 @@ mod tests {
         let children: Vec<_> = tree.layout_tree.children(root);
 
         // Fixed child
-        let fixed = tree.layout_tree.get_bounds(children[0], (0.0, 0.0)).unwrap();
+        let fixed = tree
+            .layout_tree
+            .get_bounds(children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(fixed.width, 50.0);
 
         // Growing child should fill remaining space
-        let growing = tree.layout_tree.get_bounds(children[1], (0.0, 0.0)).unwrap();
+        let growing = tree
+            .layout_tree
+            .get_bounds(children[1], (0.0, 0.0))
+            .unwrap();
         assert_eq!(growing.x, 50.0);
         assert_eq!(growing.width, 150.0);
     }
@@ -882,7 +905,10 @@ mod tests {
         let children: Vec<_> = tree.layout_tree.children(root);
 
         // Child should be inset by padding
-        let child = tree.layout_tree.get_bounds(children[0], (0.0, 0.0)).unwrap();
+        let child = tree
+            .layout_tree
+            .get_bounds(children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(child.x, 8.0);
         assert_eq!(child.y, 8.0);
         assert_eq!(child.width, 84.0); // 100 - 8 - 8
@@ -908,15 +934,24 @@ mod tests {
         let children: Vec<_> = tree.layout_tree.children(root);
 
         // First at start
-        let first = tree.layout_tree.get_bounds(children[0], (0.0, 0.0)).unwrap();
+        let first = tree
+            .layout_tree
+            .get_bounds(children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(first.x, 0.0);
 
         // Last at end
-        let third = tree.layout_tree.get_bounds(children[2], (0.0, 0.0)).unwrap();
+        let third = tree
+            .layout_tree
+            .get_bounds(children[2], (0.0, 0.0))
+            .unwrap();
         assert_eq!(third.x, 170.0); // 200 - 30
 
         // Middle should be centered between first and third
-        let second = tree.layout_tree.get_bounds(children[1], (0.0, 0.0)).unwrap();
+        let second = tree
+            .layout_tree
+            .get_bounds(children[1], (0.0, 0.0))
+            .unwrap();
         assert_eq!(second.x, 85.0); // (170 - 0) / 2 - 30/2 + 30/2 = 85
     }
 
@@ -948,12 +983,18 @@ mod tests {
         let root_children: Vec<_> = tree.layout_tree.children(root);
 
         // First row
-        let row = tree.layout_tree.get_bounds(root_children[0], (0.0, 0.0)).unwrap();
+        let row = tree
+            .layout_tree
+            .get_bounds(root_children[0], (0.0, 0.0))
+            .unwrap();
         assert_eq!(row.height, 50.0);
         assert_eq!(row.width, 200.0);
 
         // Second element should fill remaining height
-        let bottom = tree.layout_tree.get_bounds(root_children[1], (0.0, 0.0)).unwrap();
+        let bottom = tree
+            .layout_tree
+            .get_bounds(root_children[1], (0.0, 0.0))
+            .unwrap();
         assert_eq!(bottom.y, 50.0);
         assert_eq!(bottom.height, 150.0);
     }

@@ -340,13 +340,7 @@ impl GpuGlassPrimitive {
     }
 
     /// Set per-corner radius (top-left, top-right, bottom-right, bottom-left)
-    pub fn with_corner_radius_per_corner(
-        mut self,
-        tl: f32,
-        tr: f32,
-        br: f32,
-        bl: f32,
-    ) -> Self {
+    pub fn with_corner_radius_per_corner(mut self, tl: f32, tr: f32, br: f32, bl: f32) -> Self {
         self.corner_radius = [tl, tr, br, bl];
         self
     }

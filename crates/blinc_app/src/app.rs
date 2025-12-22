@@ -161,7 +161,8 @@ impl BlincApp {
     ) -> Result<()> {
         let mut tree = RenderTree::from_element(element);
         tree.compute_layout(width, height);
-        self.ctx.render_tree(&tree, width as u32, height as u32, target)
+        self.ctx
+            .render_tree(&tree, width as u32, height as u32, target)
     }
 
     /// Render a pre-computed render tree

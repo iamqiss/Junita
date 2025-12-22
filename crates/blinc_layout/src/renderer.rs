@@ -316,7 +316,12 @@ impl RenderTree {
     }
 
     /// Render a single node and its children
-    fn render_node(&self, ctx: &mut dyn DrawContext, node: LayoutNodeId, parent_offset: (f32, f32)) {
+    fn render_node(
+        &self,
+        ctx: &mut dyn DrawContext,
+        node: LayoutNodeId,
+        parent_offset: (f32, f32),
+    ) {
         let Some(bounds) = self.layout_tree.get_bounds(node, parent_offset) else {
             return;
         };
@@ -400,13 +405,25 @@ impl RenderTree {
     ) {
         if let Some(root) = self.root {
             // Pass 1: Background (excludes children of glass elements)
-            self.render_layer(background_ctx, root, (0.0, 0.0), RenderLayer::Background, false);
+            self.render_layer(
+                background_ctx,
+                root,
+                (0.0, 0.0),
+                RenderLayer::Background,
+                false,
+            );
 
             // Pass 2: Glass - render as Brush::Glass
             self.render_layer(glass_ctx, root, (0.0, 0.0), RenderLayer::Glass, false);
 
             // Pass 3: Foreground (includes children of glass elements)
-            self.render_layer(foreground_ctx, root, (0.0, 0.0), RenderLayer::Foreground, false);
+            self.render_layer(
+                foreground_ctx,
+                root,
+                (0.0, 0.0),
+                RenderLayer::Foreground,
+                false,
+            );
         }
     }
 
@@ -491,12 +508,17 @@ impl RenderTree {
 
         // Traverse children (they inherit our transform)
         for child_id in self.layout_tree.children(node) {
-            self.render_layer(ctx, child_id, (0.0, 0.0), target_layer, children_inside_glass);
+            self.render_layer(
+                ctx,
+                child_id,
+                (0.0, 0.0),
+                target_layer,
+                children_inside_glass,
+            );
         }
 
         ctx.pop_transform();
     }
-
 
     /// Get bounds for a specific node
     pub fn get_bounds(&self, node: LayoutNodeId) -> Option<ElementBounds> {
@@ -522,9 +544,9 @@ impl RenderTree {
 
     /// Check if this tree contains any glass elements
     pub fn has_glass(&self) -> bool {
-        self.render_nodes.values().any(|node| {
-            matches!(node.props.material, Some(Material::Glass(_)))
-        })
+        self.render_nodes
+            .values()
+            .any(|node| matches!(node.props.material, Some(Material::Glass(_))))
     }
 
     /// Render the tree using a LayoutRenderer
@@ -543,7 +565,13 @@ impl RenderTree {
             // Pass 1: Background elements
             {
                 let ctx = renderer.background();
-                self.render_layer_with_content(ctx, root, (0.0, 0.0), RenderLayer::Background, false);
+                self.render_layer_with_content(
+                    ctx,
+                    root,
+                    (0.0, 0.0),
+                    RenderLayer::Background,
+                    false,
+                );
             }
 
             // Pass 2: Glass elements (to background context)
@@ -555,7 +583,13 @@ impl RenderTree {
             // Pass 3: Foreground elements (including glass children)
             {
                 let ctx = renderer.foreground();
-                self.render_layer_with_content(ctx, root, (0.0, 0.0), RenderLayer::Foreground, false);
+                self.render_layer_with_content(
+                    ctx,
+                    root,
+                    (0.0, 0.0),
+                    RenderLayer::Foreground,
+                    false,
+                );
             }
 
             // Pass 4: Render text elements
@@ -625,7 +659,13 @@ impl RenderTree {
 
         // Traverse children
         for child_id in self.layout_tree.children(node) {
-            self.render_layer_with_content(ctx, child_id, (0.0, 0.0), target_layer, children_inside_glass);
+            self.render_layer_with_content(
+                ctx,
+                child_id,
+                (0.0, 0.0),
+                target_layer,
+                children_inside_glass,
+            );
         }
 
         ctx.pop_transform();
@@ -658,7 +698,8 @@ impl RenderTree {
         let children_inside_glass = inside_glass || is_glass;
 
         // Text inside glass goes to foreground
-        let to_foreground = children_inside_glass || render_node.props.layer == RenderLayer::Foreground;
+        let to_foreground =
+            children_inside_glass || render_node.props.layer == RenderLayer::Foreground;
 
         if let ElementType::Text(text_data) = &render_node.element_type {
             // Absolute position for text
@@ -721,7 +762,8 @@ impl RenderTree {
         let children_inside_glass = inside_glass || is_glass;
 
         // SVG inside glass goes to foreground
-        let to_foreground = children_inside_glass || render_node.props.layer == RenderLayer::Foreground;
+        let to_foreground =
+            children_inside_glass || render_node.props.layer == RenderLayer::Foreground;
 
         if let ElementType::Svg(svg_data) = &render_node.element_type {
             // Absolute position for SVG

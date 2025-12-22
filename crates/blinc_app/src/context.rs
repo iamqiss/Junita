@@ -183,7 +183,9 @@ impl RenderContext {
 
     /// Ensure internal textures exist and are the right size
     fn ensure_textures(&mut self, width: u32, height: u32) {
-        let needs_pre_glass = self.pre_glass_texture.as_ref()
+        let needs_pre_glass = self
+            .pre_glass_texture
+            .as_ref()
             .map(|t| t.width != width || t.height != height)
             .unwrap_or(true);
 
@@ -199,15 +201,21 @@ impl RenderContext {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | wgpu::TextureUsages::COPY_SRC,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
                 view_formats: &[],
             });
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            self.pre_glass_texture = Some(CachedTexture { texture, view, width, height });
+            self.pre_glass_texture = Some(CachedTexture {
+                texture,
+                view,
+                width,
+                height,
+            });
         }
 
-        let needs_backdrop = self.backdrop_texture.as_ref()
+        let needs_backdrop = self
+            .backdrop_texture
+            .as_ref()
             .map(|t| t.width != width || t.height != height)
             .unwrap_or(true);
 
@@ -223,12 +231,16 @@ impl RenderContext {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING
-                    | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
             });
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            self.backdrop_texture = Some(CachedTexture { texture, view, width, height });
+            self.backdrop_texture = Some(CachedTexture {
+                texture,
+                view,
+                width,
+                height,
+            });
         }
 
         // Note: MSAA textures for overlay rendering are created internally by

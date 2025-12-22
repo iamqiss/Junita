@@ -185,9 +185,7 @@ impl GlassMaterial {
 
     /// Card style with border and shadow
     pub fn card() -> Self {
-        Self::new()
-            .border(1.0)
-            .shadow(MaterialShadow::md())
+        Self::new().border(1.0).shadow(MaterialShadow::md())
     }
 }
 
@@ -264,16 +262,12 @@ impl MetallicMaterial {
 
     /// Chrome/mirror finish
     pub fn chrome() -> Self {
-        Self::new()
-            .roughness(0.1)
-            .reflection(0.8)
+        Self::new().roughness(0.1).reflection(0.8)
     }
 
     /// Brushed metal
     pub fn brushed() -> Self {
-        Self::new()
-            .roughness(0.5)
-            .reflection(0.3)
+        Self::new().roughness(0.5).reflection(0.3)
     }
 
     /// Gold finish
