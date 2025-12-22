@@ -6,6 +6,7 @@
 use crate::runner::TestSuite;
 use blinc_core::{Color, DrawContext, Rect};
 use blinc_gpu::GpuGlassPrimitive;
+use blinc_svg::SvgDocument;
 
 /// Create the glass test suite
 pub fn suite() -> TestSuite {
@@ -594,188 +595,188 @@ pub fn suite() -> TestSuite {
     // iOS 26 Liquid Glass Music Player (based on reference image)
     // This test recreates the Apple Control Center music player widget
     suite.add_glass("music_player", |ctx| {
-        // Layout constants
-        let player_x = 40.0;
-        let player_y = 60.0;
-        let player_w = 320.0;
-        let player_h = 180.0;
-        let bar_x = player_x + 50.0;
-        let bar_y = player_y + 55.0;
-        let bar_w = player_w - 100.0;
+        use blinc_core::Point;
+
+        // Layout constants - iPhone-like aspect ratio
+        let width = 400.0;
+        let height = 300.0;
+
+        // Player card dimensions
+        let player_x = 30.0;
+        let player_y = 30.0;
+        let player_w = 340.0;
+        let player_h = 140.0;
+        let player_radius = 28.0;
+
+        // Progress bar
+        let bar_x = player_x + 20.0;
+        let bar_y = player_y + 50.0;
+        let bar_w = player_w - 40.0;
         let bar_h = 4.0;
-        let progress = 0.05;
-        let knob_x = bar_x + bar_w * progress - 6.0;
-        let controls_y = player_y + 100.0;
+        let progress = 0.08; // ~0:10 of 3:34
+
+        // Control buttons layout
+        let controls_y = player_y + 85.0;
         let controls_center_x = player_x + player_w / 2.0;
-        let rewind_x = controls_center_x - 80.0;
-        let pause_x = controls_center_x - 20.0;
-        let ff_x = controls_center_x + 50.0;
-        let vol_x = player_x + player_w - 45.0;
-        let vol_y = player_y + 20.0;
-        let airplay_x = player_x + player_w - 45.0;
-        let airplay_y = controls_y + 8.0;
-        let toolbar_y = 280.0;
+        let btn_spacing = 70.0;
+
 
         // First, draw all background primitives (will be blurred behind glass)
         {
             let c = ctx.ctx();
 
-            // Background - nature/leaf gradient simulation
-            // Top half: olive green
+            // Vibrant multicolor background pattern
+            // Base gradient: purple to orange
             c.fill_rect(
-                Rect::new(0.0, 0.0, 400.0, 200.0),
+                Rect::new(0.0, 0.0, width, height),
                 0.0.into(),
-                Color::rgba(0.35, 0.40, 0.30, 1.0).into(),
+                Color::rgba(0.4, 0.2, 0.6, 1.0).into(),
             );
-            // Bottom half: lighter sage
-            c.fill_rect(
-                Rect::new(0.0, 200.0, 400.0, 200.0),
-                0.0.into(),
-                Color::rgba(0.55, 0.60, 0.50, 1.0).into(),
+
+            // Large colorful shapes for interesting blur
+            // Pink/magenta blob top-left
+            c.fill_circle(
+                Point::new(80.0, 60.0),
+                100.0,
+                Color::rgba(0.95, 0.3, 0.5, 1.0).into(),
             );
-            // Diagonal leaf shape (simplified as overlapping rect)
+
+            // Cyan/teal blob center-right
+            c.fill_circle(
+                Point::new(320.0, 120.0),
+                90.0,
+                Color::rgba(0.2, 0.8, 0.85, 1.0).into(),
+            );
+
+            // Orange blob bottom
+            c.fill_circle(
+                Point::new(180.0, 260.0),
+                80.0,
+                Color::rgba(1.0, 0.5, 0.2, 1.0).into(),
+            );
+
+            // Yellow accent
+            c.fill_circle(
+                Point::new(350.0, 240.0),
+                60.0,
+                Color::rgba(1.0, 0.85, 0.2, 1.0).into(),
+            );
+
+            // Green accent bottom-left
+            c.fill_circle(
+                Point::new(50.0, 220.0),
+                70.0,
+                Color::rgba(0.3, 0.9, 0.4, 1.0).into(),
+            );
+
+            // Blue accent top-right
             c.fill_rect(
-                Rect::new(50.0, 100.0, 200.0, 250.0),
-                0.0.into(),
-                Color::rgba(0.30, 0.35, 0.25, 1.0).into(),
+                Rect::new(280.0, 0.0, 120.0, 80.0),
+                20.0.into(),
+                Color::rgba(0.3, 0.4, 0.95, 1.0).into(),
             );
         }
 
         // Add all glass primitives
-        // Main player card
+        // Main player card - iOS liquid glass style with shadow
         let player_glass = GpuGlassPrimitive::new(player_x, player_y, player_w, player_h)
-            .with_corner_radius(24.0)
-            .with_blur(25.0)
-            .with_tint(0.15, 0.15, 0.18, 0.6)
-            .with_saturation(0.9)
-            .with_border_thickness(1.0)
-            .with_light_angle_degrees(-45.0);
+            .with_corner_radius(player_radius)
+            .with_blur(30.0)
+            .with_tint(0.12, 0.12, 0.14, 0.55)
+            .with_saturation(0.85)
+            .with_brightness(1.05)
+            .with_border_thickness(0.6)
+            .with_light_angle_degrees(-45.0)
+            .with_shadow_offset(20.0, 0.35, 0.0, 10.0);
         ctx.add_glass(player_glass);
 
-        // Flashlight button
-        let flash_glass = GpuGlassPrimitive::new(100.0, toolbar_y, 60.0, 60.0)
-            .with_corner_radius(30.0)
-            .with_blur(20.0)
-            .with_tint(0.2, 0.2, 0.25, 0.5)
-            .with_border_thickness(0.8)
-            .with_light_angle_degrees(-45.0);
-        ctx.add_glass(flash_glass);
-
-        // Camera button
-        let camera_glass = GpuGlassPrimitive::new(240.0, toolbar_y, 60.0, 60.0)
-            .with_corner_radius(30.0)
-            .with_blur(20.0)
-            .with_tint(0.2, 0.2, 0.25, 0.5)
-            .with_border_thickness(0.8)
-            .with_light_angle_degrees(-45.0);
-        ctx.add_glass(camera_glass);
 
         // Draw foreground elements ON TOP of glass (not blurred)
         {
             let fg = ctx.foreground();
 
-            // Progress bar track
+            // Progress bar track (dark, semi-transparent)
             fg.fill_rect(
                 Rect::new(bar_x, bar_y, bar_w, bar_h),
                 2.0.into(),
-                Color::rgba(0.3, 0.3, 0.35, 0.6).into(),
+                Color::rgba(0.25, 0.25, 0.28, 0.5).into(),
             );
 
-            // Progress fill
+            // Progress fill (white)
             fg.fill_rect(
                 Rect::new(bar_x, bar_y, bar_w * progress, bar_h),
                 2.0.into(),
-                Color::rgba(1.0, 1.0, 1.0, 0.9).into(),
+                Color::rgba(1.0, 1.0, 1.0, 0.95).into(),
             );
 
-            // Scrubber knob
-            fg.fill_rect(
-                Rect::new(knob_x, bar_y - 4.0, 12.0, 12.0),
-                6.0.into(),
-                Color::WHITE.into(),
-            );
+            // Scrubber knob (circular)
+            let knob_x = bar_x + bar_w * progress;
+            fg.fill_circle(Point::new(knob_x, bar_y + 2.0), 6.0, Color::WHITE.into());
 
-            // Rewind button (two bars representing << icon)
-            fg.fill_rect(
-                Rect::new(rewind_x - 12.0, controls_y, 16.0, 32.0),
-                2.0.into(),
-                Color::WHITE.into(),
-            );
-            fg.fill_rect(
-                Rect::new(rewind_x + 4.0, controls_y, 16.0, 32.0),
-                2.0.into(),
-                Color::WHITE.into(),
-            );
+            // Rewind button (SVG icon - mirrored forward)
+            let rewind_svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                <path d="M236.3 107.1C247.9 96 265 92.9 279.7 99.2C294.4 105.5 304 120 304 136L304 272.3L476.3 107.2C487.9 96 505 92.9 519.7 99.2C534.4 105.5 544 120 544 136L544 504C544 520 534.4 534.5 519.7 540.8C505 547.1 487.9 544 476.3 532.9L304 367.7L304 504C304 520 294.4 534.5 279.7 540.8C265 547.1 247.9 544 236.3 532.9L44.3 348.9C36.4 341.4 32 330.9 32 320C32 309.1 36.5 298.7 44.3 291.1L236.3 107.1z" fill="white"/>
+            </svg>"#;
+            if let Ok(doc) = SvgDocument::from_str(rewind_svg) {
+                let icon_size = 32.0;
+                let rew_x = controls_center_x - btn_spacing - icon_size / 2.0;
+                doc.render_fit(fg, Rect::new(rew_x, controls_y, icon_size, icon_size));
+            }
 
-            // Pause button (two vertical bars)
-            fg.fill_rect(
-                Rect::new(pause_x, controls_y, 12.0, 36.0),
-                3.0.into(),
-                Color::WHITE.into(),
-            );
-            fg.fill_rect(
-                Rect::new(pause_x + 20.0, controls_y, 12.0, 36.0),
-                3.0.into(),
-                Color::WHITE.into(),
-            );
+            // Pause button (SVG icon)
+            let pause_svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                <path d="M176 96C149.5 96 128 117.5 128 144L128 496C128 522.5 149.5 544 176 544L240 544C266.5 544 288 522.5 288 496L288 144C288 117.5 266.5 96 240 96L176 96zM400 96C373.5 96 352 117.5 352 144L352 496C352 522.5 373.5 544 400 544L464 544C490.5 544 512 522.5 512 496L512 144C512 117.5 490.5 96 464 96L400 96z" fill="white"/>
+            </svg>"#;
+            if let Ok(doc) = SvgDocument::from_str(pause_svg) {
+                let pause_size = 32.0;
+                let pause_x = controls_center_x - pause_size / 2.0;
+                doc.render_fit(fg, Rect::new(pause_x, controls_y, pause_size, pause_size));
+            }
 
-            // Fast-forward button (two bars representing >> icon)
-            fg.fill_rect(
-                Rect::new(ff_x, controls_y, 16.0, 32.0),
-                2.0.into(),
-                Color::WHITE.into(),
-            );
-            fg.fill_rect(
-                Rect::new(ff_x + 16.0, controls_y, 16.0, 32.0),
-                2.0.into(),
-                Color::WHITE.into(),
-            );
+            // Fast-forward button (SVG icon)
+            let forward_svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+                <path d="M403.7 107.1C392.1 96 375 92.9 360.3 99.2C345.6 105.5 336 120 336 136L336 272.3L163.7 107.2C152.1 96 135 92.9 120.3 99.2C105.6 105.5 96 120 96 136L96 504C96 520 105.6 534.5 120.3 540.8C135 547.1 152.1 544 163.7 532.9L336 367.7L336 504C336 520 345.6 534.5 360.3 540.8C375 547.1 392.1 544 403.7 532.9L595.7 348.9C603.6 341.4 608 330.9 608 320C608 309.1 603.5 298.7 595.7 291.1L403.7 107.1z" fill="white"/>
+            </svg>"#;
+            if let Ok(doc) = SvgDocument::from_str(forward_svg) {
+                let icon_size = 32.0;
+                let ff_x = controls_center_x + btn_spacing - icon_size / 2.0;
+                doc.render_fit(fg, Rect::new(ff_x, controls_y, icon_size, icon_size));
+            }
 
-            // Volume indicator (5 bars increasing in height)
+            // Volume indicator (5 ascending bars) - top right of player
+            let vol_x = player_x + player_w - 45.0;
+            let vol_y = player_y + 15.0;
             for i in 0..5 {
-                let bar_height = 8.0 + i as f32 * 4.0;
+                let bar_height = 6.0 + i as f32 * 3.5;
                 fg.fill_rect(
-                    Rect::new(
-                        vol_x + i as f32 * 6.0,
-                        vol_y + 20.0 - bar_height,
-                        4.0,
-                        bar_height,
-                    ),
+                    Rect::new(vol_x + i as f32 * 6.0, vol_y + 20.0 - bar_height, 3.0, bar_height),
                     1.0.into(),
                     Color::WHITE.into(),
                 );
             }
 
-            // AirPlay button (circle with inner dot)
-            fg.fill_rect(
-                Rect::new(airplay_x, airplay_y, 24.0, 24.0),
-                12.0.into(),
-                Color::rgba(1.0, 1.0, 1.0, 0.3).into(),
+            // AirPlay button (concentric circles) - bottom right of player
+            let airplay_x = player_x + player_w - 40.0;
+            let airplay_y = controls_y + 8.0;
+            // Outer ring
+            fg.fill_circle(
+                Point::new(airplay_x, airplay_y),
+                12.0,
+                Color::rgba(1.0, 1.0, 1.0, 0.25).into(),
             );
-            fg.fill_rect(
-                Rect::new(airplay_x + 8.0, airplay_y + 8.0, 8.0, 8.0),
-                4.0.into(),
-                Color::WHITE.into(),
+            // Middle ring
+            fg.fill_circle(
+                Point::new(airplay_x, airplay_y),
+                8.0,
+                Color::rgba(0.15, 0.15, 0.18, 0.8).into(),
+            );
+            // Inner dot
+            fg.fill_circle(
+                Point::new(airplay_x, airplay_y),
+                4.0,
+                Color::rgba(1.0, 1.0, 1.0, 0.9).into(),
             );
 
-            // Flashlight icon (vertical bar)
-            fg.fill_rect(
-                Rect::new(122.0, toolbar_y + 15.0, 16.0, 30.0),
-                2.0.into(),
-                Color::WHITE.into(),
-            );
-
-            // Camera icon (rounded rect with lens circle)
-            fg.fill_rect(
-                Rect::new(252.0, toolbar_y + 18.0, 36.0, 24.0),
-                4.0.into(),
-                Color::WHITE.into(),
-            );
-            fg.fill_rect(
-                Rect::new(262.0, toolbar_y + 22.0, 16.0, 16.0),
-                8.0.into(),
-                Color::rgba(0.3, 0.3, 0.35, 1.0).into(),
-            );
         }
     });
 
