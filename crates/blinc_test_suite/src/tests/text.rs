@@ -74,20 +74,20 @@ pub fn suite() -> TestSuite {
         }
     });
 
-    // Text with background
+    // Text with background - text should be vertically centered in box
     suite.add("text_with_background", |ctx| {
-        // Draw background first
+        // Draw background first (y=90, height=40, so center is y=110)
         ctx.ctx().fill_rect(
             Rect::new(40.0, 90.0, 220.0, 40.0),
             8.0.into(),
             Color::rgba(0.9, 0.9, 0.9, 1.0).into(),
         );
 
-        // Draw text on top
-        ctx.draw_text(
+        // Draw text centered vertically at y=110 (center of the box)
+        ctx.draw_text_centered(
             "Text on background",
             50.0,
-            120.0,
+            110.0, // Center of the box (90 + 40/2 = 110)
             20.0,
             color_to_array(Color::BLACK),
         );

@@ -28,8 +28,12 @@ pub struct PreparedText {
     pub glyphs: Vec<GlyphInstance>,
     /// Total width of the text
     pub width: f32,
-    /// Total height of the text
+    /// Total height of the text (line height)
     pub height: f32,
+    /// Ascender in pixels (distance from baseline to top of em box)
+    pub ascender: f32,
+    /// Descender in pixels (typically negative, distance from baseline to bottom)
+    pub descender: f32,
 }
 
 /// Text renderer that manages fonts, atlas, and glyph rendering
@@ -131,6 +135,13 @@ impl TextRenderer {
             return Err(TextError::FontLoadError("No default font set".to_string()));
         }
 
+        // Get font metrics for the PreparedText result
+        let (ascender, descender) = {
+            let font = self.default_font.as_ref().unwrap();
+            let metrics = font.metrics();
+            (metrics.ascender_px(font_size), metrics.descender_px(font_size))
+        };
+
         // Layout the text - borrow font temporarily
         let layout = {
             let font = self.default_font.as_ref().unwrap();
@@ -190,6 +201,8 @@ impl TextRenderer {
             glyphs,
             width: layout.width,
             height: layout.height,
+            ascender,
+            descender,
         })
     }
 

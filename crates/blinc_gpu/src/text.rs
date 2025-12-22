@@ -3,7 +3,7 @@
 //! This module provides integration between blinc_text's TextRenderer
 //! and the GPU rendering pipeline.
 
-use blinc_text::{LayoutOptions, TextRenderer};
+use blinc_text::{LayoutOptions, TextAnchor, TextRenderer};
 use std::sync::Arc;
 
 use crate::primitives::GpuGlyph;
@@ -65,9 +65,10 @@ impl TextRenderingContext {
         self.renderer.set_default_font(font);
     }
 
-    /// Prepare text for GPU rendering
+    /// Prepare text for GPU rendering with default top anchor
     ///
-    /// Returns a list of GPU glyphs ready for rendering
+    /// Returns a list of GPU glyphs ready for rendering.
+    /// The y coordinate represents the top of the text bounding box.
     pub fn prepare_text(
         &mut self,
         text: &str,
@@ -76,17 +77,59 @@ impl TextRenderingContext {
         font_size: f32,
         color: [f32; 4],
     ) -> Result<Vec<GpuGlyph>, blinc_text::TextError> {
-        let options = LayoutOptions::default();
+        self.prepare_text_with_anchor(text, x, y, font_size, color, TextAnchor::Top)
+    }
+
+    /// Prepare text for GPU rendering with specified anchor
+    ///
+    /// Returns a list of GPU glyphs ready for rendering.
+    /// The anchor determines how the y coordinate is interpreted:
+    /// - Top: y is the top of the text bounding box
+    /// - Center: y is the vertical center of the text
+    /// - Baseline: y is the text baseline
+    pub fn prepare_text_with_anchor(
+        &mut self,
+        text: &str,
+        x: f32,
+        y: f32,
+        font_size: f32,
+        color: [f32; 4],
+        anchor: TextAnchor,
+    ) -> Result<Vec<GpuGlyph>, blinc_text::TextError> {
+        let mut options = LayoutOptions::default();
+        options.anchor = anchor;
         let prepared = self
             .renderer
             .prepare_text(text, font_size, color, &options)?;
+
+        let y_offset = match anchor {
+            TextAnchor::Top => y,
+            TextAnchor::Center => {
+                // For optical centering, center based on cap-height region (baseline to cap top)
+                // rather than full glyph bounds (which includes descenders)
+                // Cap height is approximately ascender (the baseline is at y = ascender in layout coords)
+                // The visual center of text without descenders is at: baseline - cap_height/2
+                // In layout coordinates: ascender - (ascender * 0.7) / 2 = ascender * 0.65
+                //
+                // But we want to center the cap-height region at user's y
+                // Cap top is at glyph_min_y (≈0), cap bottom is at baseline (≈ascender)
+                // So cap center is at ascender / 2
+                let cap_center = prepared.ascender / 2.0;
+                y - cap_center
+            }
+            TextAnchor::Baseline => {
+                // Baseline is at y = ascender from the top of the em box
+                // We want baseline at user's y, so offset = y - ascender
+                y - prepared.ascender
+            }
+        };
 
         // Convert to GPU glyphs with position offset
         let glyphs = prepared
             .glyphs
             .iter()
             .map(|g| GpuGlyph {
-                bounds: [g.bounds[0] + x, g.bounds[1] + y, g.bounds[2], g.bounds[3]],
+                bounds: [g.bounds[0] + x, g.bounds[1] + y_offset, g.bounds[2], g.bounds[3]],
                 uv_bounds: g.uv_bounds,
                 color: g.color,
             })

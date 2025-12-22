@@ -781,28 +781,21 @@ pub fn suite() -> TestSuite {
 
         // Time labels (rendered as text on top of everything)
         let font_size = 11.0;
-        // Text y coordinate is the baseline position.
-        // For vertical centering with the slider:
-        // - Slider center = bar_y + bar_h / 2
-        // - Text visual center ≈ baseline - cap_height / 2
-        // - Cap height ≈ font_size * 0.7 (typical for most fonts)
-        // Move text up (reduce label_y) to align with slider center
+        // Use centered text anchor so y coordinate is the vertical center
         let slider_center_y = bar_y + bar_h / 2.0;
-        let cap_height = font_size * 0.7;
-        let label_y = slider_center_y + cap_height / 2.0 - 2.0;
         // Left time label (elapsed)
-        ctx.draw_text(
+        ctx.draw_text_centered(
             "0:10",
             player_x + 20.0,
-            label_y,
+            slider_center_y,
             font_size,
             [1.0, 1.0, 1.0, 0.85],
         );
         // Right time label (remaining)
-        ctx.draw_text(
+        ctx.draw_text_centered(
             "-3:24",
             player_x + player_w - 20.0 - 28.0,
-            label_y,
+            slider_center_y,
             font_size,
             [1.0, 1.0, 1.0, 0.85],
         );

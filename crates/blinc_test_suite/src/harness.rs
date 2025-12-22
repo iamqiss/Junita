@@ -11,6 +11,7 @@ use blinc_gpu::{
     GpuGlassPrimitive, GpuGlyph, GpuPaintContext, GpuRenderer, PrimitiveBatch, RendererConfig,
     TextRenderingContext,
 };
+use blinc_text::TextAnchor;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -51,6 +52,8 @@ pub struct TextCommand {
     pub font_size: f32,
     /// Text color as RGBA
     pub color: [f32; 4],
+    /// Vertical anchor (Top, Center, or Baseline)
+    pub anchor: TextAnchor,
 }
 
 /// Context for a single test
@@ -114,7 +117,7 @@ impl TestContext {
         self.text_commands.clear();
     }
 
-    /// Add a text rendering command
+    /// Add a text rendering command (top-anchored by default)
     pub fn draw_text(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4]) {
         self.text_commands.push(TextCommand {
             text: text.to_string(),
@@ -122,6 +125,32 @@ impl TestContext {
             y,
             font_size,
             color,
+            anchor: TextAnchor::Top,
+        });
+    }
+
+    /// Add a text rendering command with vertical centering
+    /// The y coordinate will be the vertical center of the text
+    pub fn draw_text_centered(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4]) {
+        self.text_commands.push(TextCommand {
+            text: text.to_string(),
+            x,
+            y,
+            font_size,
+            color,
+            anchor: TextAnchor::Center,
+        });
+    }
+
+    /// Add a text rendering command with specified anchor
+    pub fn draw_text_with_anchor(&mut self, text: &str, x: f32, y: f32, font_size: f32, color: [f32; 4], anchor: TextAnchor) {
+        self.text_commands.push(TextCommand {
+            text: text.to_string(),
+            x,
+            y,
+            font_size,
+            color,
+            anchor,
         });
     }
 
@@ -236,7 +265,7 @@ impl TestHarness {
         ctx
     }
 
-    /// Prepare text for rendering
+    /// Prepare text for rendering (top-anchored)
     ///
     /// Returns GPU glyphs that can be rendered with render_text
     pub fn prepare_text(
@@ -247,9 +276,24 @@ impl TestHarness {
         font_size: f32,
         color: [f32; 4],
     ) -> Result<Vec<GpuGlyph>> {
+        self.prepare_text_with_anchor(text, x, y, font_size, color, TextAnchor::Top)
+    }
+
+    /// Prepare text for rendering with specified anchor
+    ///
+    /// Returns GPU glyphs that can be rendered with render_text
+    pub fn prepare_text_with_anchor(
+        &self,
+        text: &str,
+        x: f32,
+        y: f32,
+        font_size: f32,
+        color: [f32; 4],
+        anchor: TextAnchor,
+    ) -> Result<Vec<GpuGlyph>> {
         self.text_ctx
             .borrow_mut()
-            .prepare_text(text, x, y, font_size, color)
+            .prepare_text_with_anchor(text, x, y, font_size, color, anchor)
             .map_err(|e| anyhow::anyhow!("Text preparation failed: {}", e))
     }
 
@@ -728,7 +772,7 @@ impl TestHarness {
         // Prepare text glyphs if there are text commands
         let mut all_glyphs = Vec::new();
         for cmd in &text_commands {
-            match self.prepare_text(&cmd.text, cmd.x, cmd.y, cmd.font_size, cmd.color) {
+            match self.prepare_text_with_anchor(&cmd.text, cmd.x, cmd.y, cmd.font_size, cmd.color, cmd.anchor) {
                 Ok(glyphs) => all_glyphs.extend(glyphs),
                 Err(e) => tracing::warn!("Failed to prepare text '{}': {}", cmd.text, e),
             }
@@ -837,7 +881,7 @@ impl TestHarness {
         // Prepare text glyphs if any
         let mut all_glyphs = Vec::new();
         for cmd in &text_commands {
-            if let Ok(glyphs) = self.prepare_text(&cmd.text, cmd.x, cmd.y, cmd.font_size, cmd.color)
+            if let Ok(glyphs) = self.prepare_text_with_anchor(&cmd.text, cmd.x, cmd.y, cmd.font_size, cmd.color, cmd.anchor)
             {
                 all_glyphs.extend(glyphs);
             }

@@ -5,13 +5,25 @@
 use crate::font::FontFace;
 use crate::shaper::{ShapedGlyph, ShapedText, TextShaper};
 
-/// Text alignment options
+/// Text alignment options (horizontal)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextAlignment {
     #[default]
     Left,
     Center,
     Right,
+}
+
+/// Vertical anchor point for text positioning
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextAnchor {
+    /// Y coordinate is the top of the text bounding box
+    #[default]
+    Top,
+    /// Y coordinate is the text baseline
+    Baseline,
+    /// Y coordinate is the vertical center of the text
+    Center,
 }
 
 /// Line break mode
@@ -31,8 +43,10 @@ pub enum LineBreakMode {
 pub struct LayoutOptions {
     /// Maximum width for line wrapping (None = no wrapping)
     pub max_width: Option<f32>,
-    /// Text alignment
+    /// Text alignment (horizontal)
     pub alignment: TextAlignment,
+    /// Vertical anchor point
+    pub anchor: TextAnchor,
     /// Line break mode
     pub line_break: LineBreakMode,
     /// Line height multiplier (1.0 = default)
@@ -46,6 +60,7 @@ impl Default for LayoutOptions {
         Self {
             max_width: None,
             alignment: TextAlignment::Left,
+            anchor: TextAnchor::Top,
             line_break: LineBreakMode::Word,
             line_height: 1.2,
             letter_spacing: 0.0,
