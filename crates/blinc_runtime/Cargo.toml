@@ -1,6 +1,6 @@
 [package]
-name = "blinc_embed"
-description = "Blinc embedding SDK - integrate Blinc UI into Rust applications"
+name = "blinc_runtime"
+description = "Blinc runtime - core runtime for Blinc UI applications"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

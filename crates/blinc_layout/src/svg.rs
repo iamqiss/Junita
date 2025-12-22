@@ -3,8 +3,9 @@
 //! Provides a builder for SVG elements that participate in layout:
 //! ```rust
 //! use blinc_layout::prelude::*;
+//! use blinc_core::Color;
 //!
-//! let icon = svg(PLAY_ICON_SVG)
+//! let icon = svg("<svg></svg>")
 //!     .size(32.0, 32.0)
 //!     .color(Color::WHITE);
 //! ```

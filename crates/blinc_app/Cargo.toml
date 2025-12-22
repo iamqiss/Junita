@@ -1,0 +1,36 @@
+[package]
+name = "blinc_app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Blinc application framework with clean layout and rendering API"
+
+[dependencies]
+blinc_core = { path = "../blinc_core" }
+blinc_layout = { path = "../blinc_layout" }
+blinc_gpu = { path = "../blinc_gpu" }
+blinc_svg = { path = "../blinc_svg" }
+blinc_text = { path = "../blinc_text" }
+
+# GPU
+wgpu.workspace = true
+
+# Windowing
+winit = { workspace = true, optional = true }
+raw-window-handle = { workspace = true }
+
+# Async
+pollster.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+[features]
+default = []
+windowed = ["winit"]
