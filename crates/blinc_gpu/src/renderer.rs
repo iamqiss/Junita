@@ -5,6 +5,8 @@
 
 use std::sync::Arc;
 
+use wgpu::util::DeviceExt;
+
 use crate::path::PathVertex;
 use crate::primitives::{
     GlassUniforms, GpuGlassPrimitive, GpuGlyph, GpuPrimitive, PathUniforms, PrimitiveBatch,
@@ -78,9 +80,11 @@ struct Pipelines {
     text: wgpu::RenderPipeline,
     /// Pipeline for text rendering on top of existing content (1x sampled)
     text_overlay: wgpu::RenderPipeline,
-    /// Pipeline for final compositing
+    /// Pipeline for final compositing (MSAA)
     #[allow(dead_code)]
     composite: wgpu::RenderPipeline,
+    /// Pipeline for final compositing (1x sampled, for overlay blending)
+    composite_overlay: wgpu::RenderPipeline,
     /// Pipeline for tessellated path rendering
     path: wgpu::RenderPipeline,
     /// Pipeline for tessellated path overlay (1x sampled)
@@ -614,7 +618,7 @@ impl GpuRenderer {
             cache: None,
         });
 
-        // SDF overlay pipeline - uses sample_count=1 for rendering on resolved textures
+        // Overlay pipelines use sample_count=1 for rendering on resolved textures
         let overlay_multisample_state = wgpu::MultisampleState {
             count: 1,
             mask: !0,
@@ -760,6 +764,29 @@ impl GpuRenderer {
             cache: None,
         });
 
+        // Composite overlay pipeline - single-sampled for blending onto resolved textures
+        let composite_overlay = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Composite Overlay Pipeline"),
+            layout: Some(&composite_layout),
+            vertex: wgpu::VertexState {
+                module: composite_shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: composite_shader,
+                entry_point: Some("fs_main"),
+                targets: color_targets,
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: primitive_state,
+            depth_stencil: None,
+            multisample: overlay_multisample_state,
+            multiview: None,
+            cache: None,
+        });
+
         // Path pipeline - uses vertex buffers for tessellated geometry
         let path_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Path Pipeline Layout"),
@@ -775,7 +802,8 @@ impl GpuRenderer {
         //   uv: [f32; 2]             - 8 bytes, offset 40
         //   gradient_params: [f32;4] - 16 bytes, offset 48
         //   gradient_type: u32       - 4 bytes, offset 64
-        //   _padding: [u32; 3]       - 12 bytes, offset 68
+        //   edge_distance: f32       - 4 bytes, offset 68
+        //   _padding: [u32; 2]       - 8 bytes, offset 72
         let path_vertex_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<PathVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -815,6 +843,12 @@ impl GpuRenderer {
                     format: wgpu::VertexFormat::Uint32,
                     offset: 64,
                     shader_location: 5,
+                },
+                // edge_distance: f32 (for anti-aliasing)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32,
+                    offset: 68,
+                    shader_location: 6,
                 },
             ],
         };
@@ -871,6 +905,7 @@ impl GpuRenderer {
             text,
             text_overlay,
             composite,
+            composite_overlay,
             path,
             path_overlay,
         }
@@ -1420,6 +1455,206 @@ impl GpuRenderer {
         }
 
         // Submit commands
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Render overlay primitives with MSAA anti-aliasing
+    ///
+    /// This method renders paths/primitives to a temporary MSAA texture,
+    /// resolves it, and then blends onto the target. This provides smooth
+    /// edges for tessellated paths that don't have shader-based AA.
+    ///
+    /// # Arguments
+    /// * `target` - The single-sampled texture view to render to (existing content is preserved)
+    /// * `batch` - The primitive batch to render
+    /// * `sample_count` - MSAA sample count (typically 4)
+    pub fn render_overlay_msaa(
+        &mut self,
+        target: &wgpu::TextureView,
+        batch: &PrimitiveBatch,
+        sample_count: u32,
+    ) {
+        if batch.paths.vertices.is_empty() && batch.primitives.is_empty() {
+            return;
+        }
+
+        let (width, height) = self.viewport_size;
+
+        // Create temporary MSAA texture for rendering
+        let msaa_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Overlay MSAA Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let msaa_view = msaa_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Create temporary resolve texture
+        let resolve_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Overlay Resolve Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let resolve_view = resolve_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Update uniforms
+        let uniforms = Uniforms {
+            viewport_size: [width as f32, height as f32],
+            _padding: [0.0; 2],
+        };
+        self.queue
+            .write_buffer(&self.buffers.uniforms, 0, bytemuck::bytes_of(&uniforms));
+
+        // Update primitives buffer
+        if !batch.primitives.is_empty() {
+            self.queue.write_buffer(
+                &self.buffers.primitives,
+                0,
+                bytemuck::cast_slice(&batch.primitives),
+            );
+        }
+
+        // Update path buffers
+        let has_paths = !batch.paths.vertices.is_empty() && !batch.paths.indices.is_empty();
+        if has_paths {
+            self.update_path_buffers(batch);
+        }
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Overlay MSAA Render Encoder"),
+            });
+
+        // Pass 1: Render to MSAA texture with resolve
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Overlay MSAA Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &msaa_view,
+                    resolve_target: Some(&resolve_view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Discard, // MSAA texture discarded after resolve
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            // Render paths using MSAA pipeline
+            if has_paths {
+                if let (Some(vb), Some(ib)) =
+                    (&self.buffers.path_vertices, &self.buffers.path_indices)
+                {
+                    render_pass.set_pipeline(&self.pipelines.path);
+                    render_pass.set_bind_group(0, &self.bind_groups.path, &[]);
+                    render_pass.set_vertex_buffer(0, vb.slice(..));
+                    render_pass.set_index_buffer(ib.slice(..), wgpu::IndexFormat::Uint32);
+                    render_pass.draw_indexed(0..batch.paths.indices.len() as u32, 0, 0..1);
+                }
+            }
+
+            // Render SDF primitives using MSAA pipeline
+            if !batch.primitives.is_empty() {
+                render_pass.set_pipeline(&self.pipelines.sdf);
+                render_pass.set_bind_group(0, &self.bind_groups.sdf, &[]);
+                render_pass.draw(0..6, 0..batch.primitives.len() as u32);
+            }
+        }
+
+        // Pass 2: Blend resolved texture onto target
+        // Create composite uniforms buffer (opacity=1.0, blend_mode=normal)
+        #[repr(C)]
+        #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+        struct CompositeUniforms {
+            opacity: f32,
+            blend_mode: u32,
+            _padding: [f32; 2],
+        }
+
+        let composite_uniforms = CompositeUniforms {
+            opacity: 1.0,
+            blend_mode: 0, // BLEND_NORMAL
+            _padding: [0.0; 2],
+        };
+
+        let composite_uniform_buffer =
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Composite Uniforms Buffer"),
+                    contents: bytemuck::bytes_of(&composite_uniforms),
+                    usage: wgpu::BufferUsages::UNIFORM,
+                });
+
+        // Create a sampler for the resolved texture
+        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Overlay Blend Sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        // Create bind group for compositing
+        let composite_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Overlay Composite Bind Group"),
+            layout: &self.bind_group_layouts.composite,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: composite_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&resolve_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+
+        // Blend pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Overlay Blend Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load, // Keep existing content
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.pipelines.composite_overlay);
+            render_pass.set_bind_group(0, &composite_bind_group, &[]);
+            render_pass.draw(0..3, 0..1); // Fullscreen triangle
+        }
+
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 

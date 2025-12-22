@@ -608,11 +608,13 @@ pub fn suite() -> TestSuite {
         let player_h = 140.0;
         let player_radius = 28.0;
 
-        // Progress bar
-        let bar_x = player_x + 20.0;
+        // Progress bar (slider) - iOS style with no knob
+        // Leave space for time labels on both sides
+        let time_label_width = 35.0;
+        let bar_x = player_x + 20.0 + time_label_width;
         let bar_y = player_y + 50.0;
-        let bar_w = player_w - 40.0;
-        let bar_h = 4.0;
+        let bar_w = player_w - 40.0 - (time_label_width * 2.0);
+        let bar_h = 7.0; // Track thickness
         let progress = 0.08; // ~0:10 of 3:34
 
         // Control buttons layout
@@ -690,28 +692,27 @@ pub fn suite() -> TestSuite {
             .with_shadow_offset(20.0, 0.35, 0.0, 10.0);
         ctx.add_glass(player_glass);
 
+        // Slider track as glass element (for refraction effect)
+        let slider_track_glass = GpuGlassPrimitive::new(bar_x, bar_y, bar_w, bar_h)
+            .with_corner_radius(bar_h / 2.0)
+            .with_blur(25.0)  // Higher blur for more frosted effect
+            .with_tint(1.0, 1.0, 1.0, 0.65)  // More opaque white tint
+            .with_saturation(0.3)  // Very low saturation for whiter appearance
+            .with_brightness(1.3)  // Brighter
+            .with_border_thickness(0.0);
+        ctx.add_glass(slider_track_glass);
+
 
         // Draw foreground elements ON TOP of glass (not blurred)
         {
             let fg = ctx.foreground();
 
-            // Progress bar track (dark, semi-transparent)
-            fg.fill_rect(
-                Rect::new(bar_x, bar_y, bar_w, bar_h),
-                2.0.into(),
-                Color::rgba(0.25, 0.25, 0.28, 0.5).into(),
-            );
-
-            // Progress fill (white)
+            // Progress fill (white, full opacity) - on top of glass slider track
             fg.fill_rect(
                 Rect::new(bar_x, bar_y, bar_w * progress, bar_h),
-                2.0.into(),
-                Color::rgba(1.0, 1.0, 1.0, 0.95).into(),
+                (bar_h / 2.0).into(),
+                Color::rgba(1.0, 1.0, 1.0, 1.0).into(),
             );
-
-            // Scrubber knob (circular)
-            let knob_x = bar_x + bar_w * progress;
-            fg.fill_circle(Point::new(knob_x, bar_y + 2.0), 6.0, Color::WHITE.into());
 
             // Rewind button (SVG icon - mirrored forward)
             let rewind_svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
@@ -776,8 +777,35 @@ pub fn suite() -> TestSuite {
                 4.0,
                 Color::rgba(1.0, 1.0, 1.0, 0.9).into(),
             );
-
         }
+
+        // Time labels (rendered as text on top of everything)
+        let font_size = 11.0;
+        // Text y coordinate is the baseline position.
+        // For vertical centering with the slider:
+        // - Slider center = bar_y + bar_h / 2
+        // - Text visual center ≈ baseline - cap_height / 2
+        // - Cap height ≈ font_size * 0.7 (typical for most fonts)
+        // Move text up (reduce label_y) to align with slider center
+        let slider_center_y = bar_y + bar_h / 2.0;
+        let cap_height = font_size * 0.7;
+        let label_y = slider_center_y + cap_height / 2.0 - 2.0;
+        // Left time label (elapsed)
+        ctx.draw_text(
+            "0:10",
+            player_x + 20.0,
+            label_y,
+            font_size,
+            [1.0, 1.0, 1.0, 0.85],
+        );
+        // Right time label (remaining)
+        ctx.draw_text(
+            "-3:24",
+            player_x + player_w - 20.0 - 28.0,
+            label_y,
+            font_size,
+            [1.0, 1.0, 1.0, 0.85],
+        );
     });
 
     suite

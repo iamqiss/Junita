@@ -20,7 +20,8 @@ pub struct PathVertex {
     pub uv: [f32; 2], // 8 bytes, offset 40, UV coordinates for gradient sampling (0-1 range)
     pub gradient_params: [f32; 4], // 16 bytes, offset 48, gradient parameters (linear: x1,y1,x2,y2; radial: cx,cy,r,0)
     pub gradient_type: u32,        // 4 bytes, offset 64, 0 = solid, 1 = linear, 2 = radial
-    pub _padding: [u32; 3],        // 12 bytes, offset 68, Padding for 16-byte alignment
+    pub edge_distance: f32,        // 4 bytes, offset 68, distance to nearest edge for AA
+    pub _padding: [u32; 2],        // 8 bytes, offset 72, Padding for 16-byte alignment
 }
 // Total: 80 bytes
 
@@ -44,6 +45,200 @@ impl TessellatedPath {
         self.vertices.clear();
         self.indices.clear();
     }
+}
+
+// ============================================================================
+// Edge Distance Infrastructure for Anti-Aliasing
+// ============================================================================
+
+/// A line segment representing a flattened path edge
+#[derive(Clone, Copy, Debug)]
+struct EdgeSegment {
+    start: Point,
+    end: Point,
+}
+
+/// Collection of edge segments from a flattened path
+struct PathEdges {
+    segments: Vec<EdgeSegment>,
+}
+
+impl PathEdges {
+    /// Build edge segments from a path, flattening curves to the given tolerance
+    fn from_path(path: &Path, tolerance: f32) -> Self {
+        let mut segments = Vec::new();
+        let mut current = Point::new(0.0, 0.0);
+        let mut first_point: Option<Point> = None;
+
+        for cmd in path.commands() {
+            match cmd {
+                PathCommand::MoveTo(p) => {
+                    current = *p;
+                    first_point = Some(*p);
+                }
+                PathCommand::LineTo(p) => {
+                    segments.push(EdgeSegment {
+                        start: current,
+                        end: *p,
+                    });
+                    current = *p;
+                }
+                PathCommand::QuadTo { control, end } => {
+                    flatten_quad(current, *control, *end, tolerance, &mut segments);
+                    current = *end;
+                }
+                PathCommand::CubicTo {
+                    control1,
+                    control2,
+                    end,
+                } => {
+                    flatten_cubic(
+                        current,
+                        *control1,
+                        *control2,
+                        *end,
+                        tolerance,
+                        &mut segments,
+                    );
+                    current = *end;
+                }
+                PathCommand::ArcTo {
+                    radii,
+                    rotation,
+                    large_arc,
+                    sweep,
+                    end,
+                } => {
+                    // Convert arc to cubic beziers, then flatten
+                    let cubics =
+                        arc_to_cubics(current, *radii, *rotation, *large_arc, *sweep, *end);
+                    let mut prev = current;
+                    for (ctrl1, ctrl2, end_pt) in cubics {
+                        flatten_cubic(prev, ctrl1, ctrl2, end_pt, tolerance, &mut segments);
+                        prev = end_pt;
+                    }
+                    current = *end;
+                }
+                PathCommand::Close => {
+                    if let Some(first) = first_point {
+                        if (current.x - first.x).abs() > 0.001
+                            || (current.y - first.y).abs() > 0.001
+                        {
+                            segments.push(EdgeSegment {
+                                start: current,
+                                end: first,
+                            });
+                        }
+                        current = first;
+                    }
+                    first_point = None;
+                }
+            }
+        }
+
+        Self { segments }
+    }
+
+    /// Compute minimum distance from a point to any edge segment
+    fn distance_to_edges(&self, p: Point) -> f32 {
+        self.segments
+            .iter()
+            .map(|seg| point_to_segment_distance(p, seg.start, seg.end))
+            .fold(f32::MAX, f32::min)
+    }
+}
+
+/// Compute perpendicular distance from point p to line segment a-b
+fn point_to_segment_distance(p: Point, a: Point, b: Point) -> f32 {
+    let ab_x = b.x - a.x;
+    let ab_y = b.y - a.y;
+    let ap_x = p.x - a.x;
+    let ap_y = p.y - a.y;
+
+    let len_sq = ab_x * ab_x + ab_y * ab_y;
+    if len_sq < 0.0001 {
+        // Degenerate segment - return distance to point a
+        return (ap_x * ap_x + ap_y * ap_y).sqrt();
+    }
+
+    // Project p onto line ab, clamped to segment
+    let t = ((ap_x * ab_x + ap_y * ab_y) / len_sq).clamp(0.0, 1.0);
+
+    // Closest point on segment
+    let closest_x = a.x + t * ab_x;
+    let closest_y = a.y + t * ab_y;
+
+    let dx = p.x - closest_x;
+    let dy = p.y - closest_y;
+    (dx * dx + dy * dy).sqrt()
+}
+
+/// Flatten a quadratic bezier curve into line segments
+fn flatten_quad(p0: Point, p1: Point, p2: Point, tolerance: f32, out: &mut Vec<EdgeSegment>) {
+    // Check if chord distance is within tolerance
+    let mid = Point::new(
+        0.25 * p0.x + 0.5 * p1.x + 0.25 * p2.x,
+        0.25 * p0.y + 0.5 * p1.y + 0.25 * p2.y,
+    );
+    let chord_mid = Point::new((p0.x + p2.x) * 0.5, (p0.y + p2.y) * 0.5);
+    let dist = ((mid.x - chord_mid.x).powi(2) + (mid.y - chord_mid.y).powi(2)).sqrt();
+
+    if dist <= tolerance {
+        out.push(EdgeSegment { start: p0, end: p2 });
+    } else {
+        // Subdivide at t=0.5 using de Casteljau
+        let p01 = Point::new((p0.x + p1.x) * 0.5, (p0.y + p1.y) * 0.5);
+        let p12 = Point::new((p1.x + p2.x) * 0.5, (p1.y + p2.y) * 0.5);
+        let p012 = Point::new((p01.x + p12.x) * 0.5, (p01.y + p12.y) * 0.5);
+
+        flatten_quad(p0, p01, p012, tolerance, out);
+        flatten_quad(p012, p12, p2, tolerance, out);
+    }
+}
+
+/// Flatten a cubic bezier curve into line segments
+fn flatten_cubic(
+    p0: Point,
+    p1: Point,
+    p2: Point,
+    p3: Point,
+    tolerance: f32,
+    out: &mut Vec<EdgeSegment>,
+) {
+    // Check convex hull distance for flatness
+    let d1 = point_to_line_distance(p1, p0, p3);
+    let d2 = point_to_line_distance(p2, p0, p3);
+
+    if d1 <= tolerance && d2 <= tolerance {
+        out.push(EdgeSegment { start: p0, end: p3 });
+    } else {
+        // De Casteljau subdivision at t=0.5
+        let p01 = midpoint(p0, p1);
+        let p12 = midpoint(p1, p2);
+        let p23 = midpoint(p2, p3);
+        let p012 = midpoint(p01, p12);
+        let p123 = midpoint(p12, p23);
+        let p0123 = midpoint(p012, p123);
+
+        flatten_cubic(p0, p01, p012, p0123, tolerance, out);
+        flatten_cubic(p0123, p123, p23, p3, tolerance, out);
+    }
+}
+
+/// Compute midpoint of two points
+fn midpoint(a: Point, b: Point) -> Point {
+    Point::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
+}
+
+/// Compute perpendicular distance from point p to infinite line through a and b
+fn point_to_line_distance(p: Point, a: Point, b: Point) -> f32 {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len < 0.0001 {
+        return ((p.x - a.x).powi(2) + (p.y - a.y).powi(2)).sqrt();
+    }
+    ((p.x - a.x) * dy - (p.y - a.y) * dx).abs() / len
 }
 
 /// Convert an SVG arc to cubic bezier curves
@@ -420,16 +615,23 @@ pub fn tessellate_fill(path: &Path, brush: &Brush) -> TessellatedPath {
     let bounds_width = (max_x - min_x).max(1.0);
     let bounds_height = (max_y - min_y).max(1.0);
 
+    // Build edge segments for anti-aliasing edge distance computation
+    let edges = PathEdges::from_path(path, 0.1);
+
     let mut geometry: VertexBuffers<PathVertex, u32> = VertexBuffers::new();
     let mut tessellator = FillTessellator::new();
 
-    let options = FillOptions::default().with_tolerance(0.1);
+    // Lower tolerance = more triangles = smoother curves (at cost of more vertices)
+    let options = FillOptions::default().with_tolerance(0.025);
 
     let result = tessellator.tessellate(
         events.iter().cloned(),
         &options,
         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
             let pos = vertex.position();
+
+            // Compute edge distance for anti-aliasing
+            let edge_distance = edges.distance_to_edges(Point::new(pos.x, pos.y));
 
             // Compute UV based on position in bounding box
             // For ObjectBoundingBox gradients, UV is used directly as gradient parameter
@@ -445,7 +647,8 @@ pub fn tessellate_fill(path: &Path, brush: &Brush) -> TessellatedPath {
                 uv: [u, v],
                 gradient_params,
                 gradient_type,
-                _padding: [0, 0, 0],
+                edge_distance,
+                _padding: [0, 0],
             }
         }),
     );
@@ -477,9 +680,11 @@ pub fn tessellate_stroke(path: &Path, stroke: &Stroke, brush: &Brush) -> Tessell
     let mut geometry: VertexBuffers<PathVertex, u32> = VertexBuffers::new();
     let mut tessellator = StrokeTessellator::new();
 
+    let half_width = stroke.width * 0.5;
+
     let mut options = StrokeOptions::default()
         .with_line_width(stroke.width)
-        .with_tolerance(0.1);
+        .with_tolerance(0.025);
 
     // Convert line cap
     options = options.with_line_cap(match stroke.cap {
@@ -502,6 +707,16 @@ pub fn tessellate_stroke(path: &Path, stroke: &Stroke, brush: &Brush) -> Tessell
         &options,
         &mut BuffersBuilder::new(&mut geometry, |vertex: StrokeVertex| {
             let pos = vertex.position();
+            let pos_on_path = vertex.position_on_path();
+
+            // Compute edge distance: distance from vertex to stroke edge
+            // Lyon gives us the position on the centerline path, so we can
+            // compute how far this vertex is from the center
+            let dx = pos.x - pos_on_path.x;
+            let dy = pos.y - pos_on_path.y;
+            let dist_from_center = (dx * dx + dy * dy).sqrt();
+            // Edge distance is how far we are from the edge (positive = inside)
+            let edge_distance = half_width - dist_from_center;
 
             // Compute UV based on position in bounding box
             let u = (pos.x - min_x) / bounds_width;
@@ -515,7 +730,8 @@ pub fn tessellate_stroke(path: &Path, stroke: &Stroke, brush: &Brush) -> Tessell
                 uv: [u, v],
                 gradient_params,
                 gradient_type,
-                _padding: [0, 0, 0],
+                edge_distance,
+                _padding: [0, 0],
             }
         }),
     );

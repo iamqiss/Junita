@@ -1135,6 +1135,7 @@ pub const PATH_SHADER: &str = r#"
 //
 // Renders tessellated vector paths as colored triangles.
 // Supports solid colors and gradients via per-vertex UV coordinates.
+// Uses edge-distance anti-aliasing for smooth edges.
 
 struct Uniforms {
     // viewport_size (vec2) + padding (vec2) = 16 bytes, offset 0
@@ -1157,6 +1158,7 @@ struct VertexInput {
     @location(3) uv: vec2<f32>,
     @location(4) gradient_params: vec4<f32>, // linear: (x1,y1,x2,y2); radial: (cx,cy,r,0)
     @location(5) gradient_type: u32,
+    @location(6) edge_distance: f32,         // distance to nearest edge (for AA)
 }
 
 struct VertexOutput {
@@ -1166,6 +1168,7 @@ struct VertexOutput {
     @location(2) uv: vec2<f32>,
     @location(3) @interpolate(flat) gradient_params: vec4<f32>,
     @location(4) @interpolate(flat) gradient_type: u32,
+    @location(5) edge_distance: f32,
 }
 
 @vertex
@@ -1192,6 +1195,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.uv = in.uv;
     out.gradient_params = in.gradient_params;
     out.gradient_type = in.gradient_type;
+    out.edge_distance = in.edge_distance;
 
     return out;
 }

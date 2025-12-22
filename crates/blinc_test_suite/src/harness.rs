@@ -455,6 +455,7 @@ impl TestHarness {
         &self,
         batch: &PrimitiveBatch,
         foreground: Option<&PrimitiveBatch>,
+        glyphs: Option<&[GpuGlyph]>,
         width: u32,
         height: u32,
         path: &Path,
@@ -539,16 +540,23 @@ impl TestHarness {
             }
         }
 
-        // Step 4: Render foreground primitives on top of glass (no blur)
-        // Uses the overlay pipeline which is configured for 1x sampling
+        // Step 4: Render foreground primitives on top of glass with MSAA
+        // Use MSAA overlay rendering for smooth edges on tessellated paths (SVG icons)
         if let Some(fg_batch) = foreground {
             if fg_batch.primitive_count() > 0 {
                 let mut renderer = self.renderer.borrow_mut();
-                renderer.render_overlay(&resolve_view, fg_batch);
+                renderer.render_overlay_msaa(&resolve_view, fg_batch, self.sample_count);
             }
         }
 
-        // Step 5: Read back to PNG
+        // Step 5: Render text on top of everything
+        if let Some(text_glyphs) = glyphs {
+            if !text_glyphs.is_empty() {
+                self.render_text(&resolve_view, text_glyphs);
+            }
+        }
+
+        // Step 6: Read back to PNG
         let buffer = self.create_readback_buffer(width, height);
         let bytes_per_row = Self::padded_bytes_per_row(width);
 
@@ -822,16 +830,27 @@ impl TestHarness {
 
         let batch = ctx.take_batch();
         let foreground_batch = ctx.take_foreground_batch();
+        let text_commands = ctx.take_text_commands();
         let output_path = self.output_path(name);
         let reference_path = self.reference_path(name);
 
+        // Prepare text glyphs if any
+        let mut all_glyphs = Vec::new();
+        for cmd in &text_commands {
+            if let Ok(glyphs) = self.prepare_text(&cmd.text, cmd.x, cmd.y, cmd.font_size, cmd.color)
+            {
+                all_glyphs.extend(glyphs);
+            }
+        }
+
         tracing::info!(
-            "Glass test '{}': {} primitives, {} glass, {} glyphs, {} foreground",
+            "Glass test '{}': {} primitives, {} glass, {} glyphs, {} foreground, {} text glyphs",
             name,
             batch.primitive_count(),
             batch.glass_count(),
             batch.glyph_count(),
-            foreground_batch.primitive_count()
+            foreground_batch.primitive_count(),
+            all_glyphs.len()
         );
 
         // Render with glass to PNG (foreground renders on top of glass)
@@ -840,7 +859,12 @@ impl TestHarness {
         } else {
             None
         };
-        self.render_with_glass_to_png(&batch, fg, width as u32, height as u32, &output_path)?;
+        let glyphs = if all_glyphs.is_empty() {
+            None
+        } else {
+            Some(all_glyphs.as_slice())
+        };
+        self.render_with_glass_to_png(&batch, fg, glyphs, width as u32, height as u32, &output_path)?;
         tracing::info!("Rendered glass test '{}' to {:?}", name, output_path);
 
         // Compare with reference if it exists
