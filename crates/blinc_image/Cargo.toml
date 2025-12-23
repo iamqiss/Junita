@@ -22,6 +22,10 @@ thiserror = "2"
 # Tracing
 tracing = "0.1"
 
+# Platform asset loading (optional)
+blinc_platform = { path = "../blinc_platform", optional = true }
+
 [features]
-default = []
+default = ["platform"]
 network = ["reqwest", "tokio"]
+platform = ["blinc_platform"]

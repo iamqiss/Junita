@@ -50,9 +50,10 @@ pub use fsm::{FsmId, FsmRuntime, StateId, StateMachine, Transition};
 pub use layer::{
     Affine2D, BillboardFacing, BlendMode, Brush, CachePolicy, Camera, CameraProjection,
     Canvas2DCommand, Canvas2DCommands, ClipShape, Color, CornerRadius, Environment, GlassStyle,
-    Gradient, GradientSpace, GradientSpread, GradientStop, Layer, LayerId, LayerIdGenerator,
-    LayerProperties, Light, Mat4, Point, PointerEvents, PostEffect, Rect, Scene3DCommand,
-    Scene3DCommands, SceneGraph, Shadow, Size, TextureFormat, UiNode, Vec2, Vec3,
+    Gradient, GradientSpace, GradientSpread, GradientStop, ImageBrush, ImageFit, ImagePosition,
+    Layer, LayerId, LayerIdGenerator, LayerProperties, Light, Mat4, Point, PointerEvents,
+    PostEffect, Rect, Scene3DCommand, Scene3DCommands, SceneGraph, Shadow, Size, TextureFormat,
+    UiNode, Vec2, Vec3,
 };
 pub use reactive::{Derived, DerivedId, Effect, EffectId, ReactiveGraph, Signal, SignalId};
 pub use runtime::BlincReactiveRuntime;

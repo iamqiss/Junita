@@ -556,6 +556,11 @@ fn extract_gradient_info(brush: &Brush) -> (u32, Color, Color, [f32; 4]) {
             // Return the tint color as a fallback
             (0, style.tint, style.tint, [0.0, 0.0, 1.0, 1.0])
         }
+        Brush::Image(img) => {
+            // Image backgrounds are not supported on tessellated paths
+            // Return the tint color as a fallback
+            (0, img.tint, img.tint, [0.0, 0.0, 1.0, 1.0])
+        }
         Brush::Gradient(gradient) => {
             let start_color = gradient.first_color();
             let end_color = gradient.last_color();
@@ -760,6 +765,11 @@ fn brush_to_color(brush: &Brush) -> Color {
             // Glass effects are not supported on tessellated paths
             // Return the tint color as a fallback
             style.tint
+        }
+        Brush::Image(img) => {
+            // Image backgrounds are not supported on tessellated paths
+            // Return the tint color as a fallback
+            img.tint
         }
         Brush::Gradient(gradient) => {
             // Use first stop color as fallback

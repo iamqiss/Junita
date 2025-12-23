@@ -42,6 +42,7 @@
 //! }
 //! ```
 
+pub mod assets;
 mod error;
 mod event;
 mod input;
@@ -57,8 +58,14 @@ pub use input::{
 pub use platform::Platform;
 pub use window::{Cursor, Window, WindowConfig};
 
+// Re-export commonly used asset types
+pub use assets::{AssetLoader, AssetPath, FilesystemAssetLoader};
+
 /// Prelude module for convenient imports
 pub mod prelude {
+    pub use crate::assets::{
+        asset_exists, load_asset, load_asset_string, AssetLoader, AssetPath, FilesystemAssetLoader,
+    };
     pub use crate::error::{PlatformError, Result};
     pub use crate::event::{ControlFlow, Event, EventLoop, LifecycleEvent, WindowEvent};
     pub use crate::input::{

@@ -63,6 +63,21 @@ impl WindowedContext {
 pub struct WindowedApp;
 
 impl WindowedApp {
+    /// Initialize the platform asset loader
+    ///
+    /// On desktop, this sets up a filesystem-based loader.
+    /// On Android, this would use the NDK AssetManager.
+    #[cfg(all(feature = "windowed", not(target_os = "android")))]
+    fn init_asset_loader() {
+        use blinc_platform::assets::{set_global_asset_loader, FilesystemAssetLoader};
+
+        // Create a filesystem loader (uses current directory as base)
+        let loader = FilesystemAssetLoader::new();
+
+        // Try to set the global loader (ignore error if already set)
+        let _ = set_global_asset_loader(Box::new(loader));
+    }
+
     /// Run a windowed Blinc application on desktop platforms
     ///
     /// This is the main entry point for desktop applications. It creates
@@ -102,6 +117,9 @@ impl WindowedApp {
         F: FnMut(&WindowedContext) -> E + 'static,
         E: ElementBuilder,
     {
+        // Initialize the platform asset loader for cross-platform asset loading
+        Self::init_asset_loader();
+
         let platform = DesktopPlatform::new().map_err(|e| BlincError::Platform(e.to_string()))?;
         let event_loop = platform
             .create_event_loop_with_config(config)

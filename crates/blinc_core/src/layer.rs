@@ -647,6 +647,122 @@ impl Gradient {
     }
 }
 
+/// Image fill mode for background images
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ImageFit {
+    /// Scale image to fill container, cropping if necessary (CSS: cover)
+    #[default]
+    Cover,
+    /// Scale image to fit within container (CSS: contain)
+    Contain,
+    /// Stretch image to fill container exactly (CSS: fill)
+    Fill,
+    /// Tile the image to fill the container
+    Tile,
+}
+
+/// Image alignment within container
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ImagePosition {
+    /// Horizontal position (0.0 = left, 0.5 = center, 1.0 = right)
+    pub x: f32,
+    /// Vertical position (0.0 = top, 0.5 = center, 1.0 = bottom)
+    pub y: f32,
+}
+
+impl ImagePosition {
+    pub const CENTER: Self = Self { x: 0.5, y: 0.5 };
+    pub const TOP_LEFT: Self = Self { x: 0.0, y: 0.0 };
+    pub const TOP_CENTER: Self = Self { x: 0.5, y: 0.0 };
+    pub const TOP_RIGHT: Self = Self { x: 1.0, y: 0.0 };
+    pub const CENTER_LEFT: Self = Self { x: 0.0, y: 0.5 };
+    pub const CENTER_RIGHT: Self = Self { x: 1.0, y: 0.5 };
+    pub const BOTTOM_LEFT: Self = Self { x: 0.0, y: 1.0 };
+    pub const BOTTOM_CENTER: Self = Self { x: 0.5, y: 1.0 };
+    pub const BOTTOM_RIGHT: Self = Self { x: 1.0, y: 1.0 };
+
+    pub fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+}
+
+/// Image brush for background fills
+#[derive(Clone, Debug)]
+pub struct ImageBrush {
+    /// Path to the image (relative to assets root or absolute)
+    pub source: String,
+    /// How to fit the image in the container
+    pub fit: ImageFit,
+    /// Position of the image within the container
+    pub position: ImagePosition,
+    /// Opacity (0.0 = transparent, 1.0 = opaque)
+    pub opacity: f32,
+    /// Tint color (multiplied with image)
+    pub tint: Color,
+}
+
+impl ImageBrush {
+    /// Create a new image brush with default settings
+    pub fn new(source: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            fit: ImageFit::Cover,
+            position: ImagePosition::CENTER,
+            opacity: 1.0,
+            tint: Color::WHITE,
+        }
+    }
+
+    /// Set the fit mode
+    pub fn fit(mut self, fit: ImageFit) -> Self {
+        self.fit = fit;
+        self
+    }
+
+    /// Set cover fit (scales to fill, may crop)
+    pub fn cover(self) -> Self {
+        self.fit(ImageFit::Cover)
+    }
+
+    /// Set contain fit (scales to fit, may letterbox)
+    pub fn contain(self) -> Self {
+        self.fit(ImageFit::Contain)
+    }
+
+    /// Set fill fit (stretches to fill exactly)
+    pub fn fill(self) -> Self {
+        self.fit(ImageFit::Fill)
+    }
+
+    /// Set tile fit (repeats the image)
+    pub fn tile(self) -> Self {
+        self.fit(ImageFit::Tile)
+    }
+
+    /// Set the position
+    pub fn position(mut self, position: ImagePosition) -> Self {
+        self.position = position;
+        self
+    }
+
+    /// Center the image
+    pub fn center(self) -> Self {
+        self.position(ImagePosition::CENTER)
+    }
+
+    /// Set opacity
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self
+    }
+
+    /// Set tint color
+    pub fn tint(mut self, color: Color) -> Self {
+        self.tint = color;
+        self
+    }
+}
+
 /// Brush for filling shapes
 #[derive(Clone, Debug)]
 pub enum Brush {
@@ -654,7 +770,8 @@ pub enum Brush {
     Gradient(Gradient),
     /// Glass/frosted blur effect - blurs content behind the shape
     Glass(GlassStyle),
-    // Future: Image, Pattern
+    /// Image fill for backgrounds
+    Image(ImageBrush),
 }
 
 impl From<Color> for Brush {
@@ -666,6 +783,12 @@ impl From<Color> for Brush {
 impl From<GlassStyle> for Brush {
     fn from(style: GlassStyle) -> Self {
         Brush::Glass(style)
+    }
+}
+
+impl From<ImageBrush> for Brush {
+    fn from(brush: ImageBrush) -> Self {
+        Brush::Image(brush)
     }
 }
 

@@ -327,6 +327,11 @@ impl GpuPaintContext {
                 // Return transparent as a fallback (should never be used)
                 ([0.0; 4], [0.0; 4], [0.0, 0.0, 1.0, 0.0], FillType::Solid)
             }
+            Brush::Image(_) => {
+                // Image backgrounds are handled separately via the image pipeline
+                // Return transparent as a fallback
+                ([0.0; 4], [0.0; 4], [0.0, 0.0, 1.0, 0.0], FillType::Solid)
+            }
             Brush::Gradient(gradient) => {
                 let (stops, fill_type, gradient_params) = match gradient {
                     blinc_core::Gradient::Linear {

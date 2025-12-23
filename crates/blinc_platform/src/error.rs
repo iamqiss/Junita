@@ -28,6 +28,10 @@ pub enum PlatformError {
     /// Generic platform error
     #[error("Platform error: {0}")]
     Other(String),
+
+    /// Failed to load asset
+    #[error("Asset load failed: {0}")]
+    AssetLoad(String),
 }
 
 /// Result type for platform operations

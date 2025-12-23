@@ -29,10 +29,12 @@
 //! ```
 
 pub mod activity;
+pub mod assets;
 pub mod event_loop;
 pub mod input;
 pub mod window;
 
+pub use assets::AndroidAssetLoader;
 pub use event_loop::AndroidEventLoop;
 pub use window::AndroidWindow;
 

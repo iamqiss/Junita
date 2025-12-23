@@ -4,7 +4,6 @@ use crate::error::{ImageError, Result};
 use crate::source::ImageSource;
 use base64::Engine;
 use image::{DynamicImage, GenericImageView};
-use std::fs;
 
 /// Decoded image data ready for GPU upload
 #[derive(Debug, Clone)]
@@ -37,12 +36,34 @@ impl ImageData {
 
     /// Load an image from a source (synchronous)
     ///
+    /// This method uses the platform asset loader when available (via the "platform" feature),
+    /// falling back to direct filesystem access on desktop.
+    ///
     /// Note: URL sources require the "network" feature and will fail
     /// without it. Use `load_async` for URL sources.
     pub fn load(source: ImageSource) -> Result<Self> {
         match source {
             ImageSource::File(path) => {
-                let data = fs::read(&path).map_err(|e| {
+                // Try platform asset loader first (works cross-platform)
+                #[cfg(feature = "platform")]
+                {
+                    if let Some(loader) = blinc_platform::assets::global_asset_loader() {
+                        let asset_path =
+                            blinc_platform::AssetPath::from(path.to_string_lossy().to_string());
+                        match loader.load(&asset_path) {
+                            Ok(data) => return Self::from_bytes(&data),
+                            Err(e) => {
+                                tracing::debug!(
+                                    "Platform asset loader failed, trying filesystem: {}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Fallback to direct filesystem access (desktop only)
+                let data = std::fs::read(&path).map_err(|e| {
                     ImageError::FileLoad(format!("{}: {}", path.display(), e))
                 })?;
                 Self::from_bytes(&data)
@@ -68,6 +89,26 @@ impl ImageData {
                 }
             }
         }
+    }
+
+    /// Load an image from a path using the platform asset loader
+    ///
+    /// This is the preferred way to load images in cross-platform code.
+    /// On desktop, paths are filesystem paths. On Android, paths refer to
+    /// assets in the APK. On iOS, paths refer to app bundle resources.
+    #[cfg(feature = "platform")]
+    pub fn load_asset(path: impl Into<String>) -> Result<Self> {
+        let path_str = path.into();
+        let asset_path = blinc_platform::AssetPath::from(path_str.clone());
+
+        let loader = blinc_platform::assets::global_asset_loader()
+            .ok_or_else(|| ImageError::FileLoad("No asset loader configured".to_string()))?;
+
+        let data = loader
+            .load(&asset_path)
+            .map_err(|e| ImageError::FileLoad(format!("{}: {}", path_str, e)))?;
+
+        Self::from_bytes(&data)
     }
 
     /// Load an image from a source (asynchronous)
