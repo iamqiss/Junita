@@ -22,6 +22,14 @@ pub mod event_types {
     pub const KEY_UP: EventType = 21;
     pub const SCROLL: EventType = 30;
     pub const RESIZE: EventType = 40;
+
+    // Window lifecycle events
+    pub const WINDOW_FOCUS: EventType = 50;
+    pub const WINDOW_BLUR: EventType = 51;
+
+    // Element lifecycle events
+    pub const MOUNT: EventType = 60;
+    pub const UNMOUNT: EventType = 61;
 }
 
 /// A UI event with associated data

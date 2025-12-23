@@ -204,7 +204,26 @@ impl WindowedApp {
                                 config.height = height;
                                 surf.configure(&blinc_app.device(), config);
                                 needs_rebuild = true;
+
+                                // Dispatch RESIZE event to elements
+                                if let (Some(ref mut windowed_ctx), Some(ref tree)) =
+                                    (&mut ctx, &render_tree)
+                                {
+                                    windowed_ctx
+                                        .event_router
+                                        .on_window_resize(tree, width as f32, height as f32);
+                                }
                             }
+                        }
+                    }
+
+                    Event::Window(WindowEvent::Focused(focused)) => {
+                        // Update context focus state
+                        if let Some(ref mut windowed_ctx) = ctx {
+                            windowed_ctx.focused = focused;
+
+                            // Dispatch WINDOW_FOCUS or WINDOW_BLUR to the focused element
+                            windowed_ctx.event_router.on_window_focus(focused);
                         }
                     }
 
