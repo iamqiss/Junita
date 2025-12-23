@@ -5,6 +5,7 @@ members = [
     "crates/blinc_cli",
     "crates/blinc_core",
     "crates/blinc_animation",
+    "crates/blinc_image",
     "crates/blinc_layout",
     "crates/blinc_gpu",
     "crates/blinc_paint",

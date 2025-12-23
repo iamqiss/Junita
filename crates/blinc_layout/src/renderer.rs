@@ -45,6 +45,8 @@ pub enum ElementType {
     Text(TextData),
     /// An SVG element
     Svg(SvgData),
+    /// An image element
+    Image(ImageData),
 }
 
 /// Text data for rendering
@@ -62,6 +64,25 @@ pub struct TextData {
 pub struct SvgData {
     pub source: String,
     pub tint: Option<Color>,
+}
+
+/// Image data for rendering
+#[derive(Clone)]
+pub struct ImageData {
+    /// Image source (file path, URL, or base64 data)
+    pub source: String,
+    /// Object-fit mode (0=cover, 1=contain, 2=fill, 3=scale-down, 4=none)
+    pub object_fit: u8,
+    /// Object position (x: 0.0-1.0, y: 0.0-1.0)
+    pub object_position: [f32; 2],
+    /// Opacity (0.0 - 1.0)
+    pub opacity: f32,
+    /// Border radius for rounded corners
+    pub border_radius: f32,
+    /// Tint color [r, g, b, a]
+    pub tint: [f32; 4],
+    /// Filter: [grayscale, sepia, brightness, contrast, saturate, hue_rotate, invert, blur]
+    pub filter: [f32; 8],
 }
 
 /// Node data for rendering
@@ -244,6 +265,21 @@ impl RenderTree {
                     ElementType::Div
                 }
             }
+            ElementTypeId::Image => {
+                if let Some(info) = element.image_render_info() {
+                    ElementType::Image(ImageData {
+                        source: info.source,
+                        object_fit: info.object_fit,
+                        object_position: info.object_position,
+                        opacity: info.opacity,
+                        border_radius: info.border_radius,
+                        tint: info.tint,
+                        filter: info.filter,
+                    })
+                } else {
+                    ElementType::Div
+                }
+            }
             ElementTypeId::Div => ElementType::Div,
         };
 
@@ -286,6 +322,21 @@ impl RenderTree {
                     ElementType::Svg(SvgData {
                         source: info.source,
                         tint: info.tint,
+                    })
+                } else {
+                    ElementType::Div
+                }
+            }
+            ElementTypeId::Image => {
+                if let Some(info) = element.image_render_info() {
+                    ElementType::Image(ImageData {
+                        source: info.source,
+                        object_fit: info.object_fit,
+                        object_position: info.object_position,
+                        opacity: info.opacity,
+                        border_radius: info.border_radius,
+                        tint: info.tint,
+                        filter: info.filter,
                     })
                 } else {
                     ElementType::Div

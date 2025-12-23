@@ -158,7 +158,7 @@ fn build_content(ctx: &WindowedContext) -> impl ElementBuilder {
                 .items_center()
                 .justify_center()
                 .gap(16.0)
-                .child(text("Welcome to Blinc").text_center().size(64.0).color(Color::WHITE))
+                .child(text("Welcome to Blinc").weight(FontWeight::ExtraBold).text_center().size(64.0).color(Color::WHITE))
                 .child(
                     text("A modern UI framework for Rust")
                     .text_center()
@@ -201,6 +201,32 @@ fn build_content(ctx: &WindowedContext) -> impl ElementBuilder {
                     Color::rgba(0.6, 0.3, 0.9, 0.8),
                 )),
         )
+        // Image showcase card
+        .child(
+            div()
+                .glass()
+                .shadow_xl()
+                .rounded(40.0)
+                .p(16.0)
+                .flex_row()
+                .items_center()
+                .gap(16.0)
+                .child(
+                    // Image with rounded corners and cover fit
+                    img("crates/blinc_app/examples/assets/original-c4197a5bf25a4356aa2bac6f82073eb2.webp")
+                        .w(120.0 * 4.0)
+                        .h(80.0 * 4.0)
+                        .cover()
+                        .rounded(12.0)
+                )
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(4.0)
+                        .child(text("Image Support").bold().size(40.0).color(Color::WHITE))
+                        .child(text("CSS-style object-fit").size(30.0).color(Color::rgba(1.0, 1.0, 1.0, 0.7)))
+                ),
+        )
 }
 
 /// Create an info item with label and value
@@ -210,13 +236,13 @@ fn info_item(label: &str, value: &str) -> impl ElementBuilder {
         .items_center()
         .gap(4.0)
         .child(
-            text(label)
+            text(label).bold()
                 .size(24.0)
                 .color(Color::WHITE),
         )
         .child(
             text(value)
-                .size(32.0)
+                .size(30.0)
                 .color(Color::WHITE),
         )
 }

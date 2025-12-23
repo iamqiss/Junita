@@ -780,6 +780,7 @@ pub enum ElementTypeId {
     Div,
     Text,
     Svg,
+    Image,
 }
 
 /// Text alignment options
@@ -852,6 +853,39 @@ pub struct SvgRenderInfo {
     pub tint: Option<blinc_core::Color>,
 }
 
+/// Image render data extracted from element
+#[derive(Clone)]
+pub struct ImageRenderInfo {
+    /// Image source (file path, URL, or base64 data)
+    pub source: String,
+    /// Object-fit mode (cover, contain, fill, scale-down, none)
+    pub object_fit: u8,
+    /// Object position (x: 0.0-1.0, y: 0.0-1.0)
+    pub object_position: [f32; 2],
+    /// Opacity (0.0 - 1.0)
+    pub opacity: f32,
+    /// Border radius for rounded corners
+    pub border_radius: f32,
+    /// Tint color [r, g, b, a]
+    pub tint: [f32; 4],
+    /// Filter: [grayscale, sepia, brightness, contrast, saturate, hue_rotate, invert, blur]
+    pub filter: [f32; 8],
+}
+
+impl Default for ImageRenderInfo {
+    fn default() -> Self {
+        Self {
+            source: String::new(),
+            object_fit: 0, // Cover
+            object_position: [0.5, 0.5], // Center
+            opacity: 1.0,
+            border_radius: 0.0,
+            tint: [1.0, 1.0, 1.0, 1.0],
+            filter: [0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], // identity filter
+        }
+    }
+}
+
 /// Trait for types that can build into layout elements
 pub trait ElementBuilder: Send {
     /// Build this element into a layout tree, returning the node ID
@@ -875,6 +909,11 @@ pub trait ElementBuilder: Send {
 
     /// Get SVG render info if this is an SVG element
     fn svg_render_info(&self) -> Option<SvgRenderInfo> {
+        None
+    }
+
+    /// Get image render info if this is an image element
+    fn image_render_info(&self) -> Option<ImageRenderInfo> {
         None
     }
 }

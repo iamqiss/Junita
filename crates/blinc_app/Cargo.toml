@@ -13,6 +13,7 @@ blinc_layout = { path = "../blinc_layout" }
 blinc_gpu = { path = "../blinc_gpu" }
 blinc_svg = { path = "../blinc_svg" }
 blinc_text = { path = "../blinc_text" }
+blinc_image = { path = "../blinc_image" }
 blinc_platform = { path = "../blinc_platform" }
 
 # GPU

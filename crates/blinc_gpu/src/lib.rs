@@ -15,6 +15,7 @@
 //! - **Path Rendering**: Vector path tessellation via lyon
 
 pub mod backbuffer;
+pub mod image;
 pub mod paint;
 pub mod path;
 pub mod primitives;
@@ -30,8 +31,9 @@ pub use primitives::{
     GpuPrimitive, PathBatch, PathUniforms, PrimitiveBatch, PrimitiveType, Uniforms,
 };
 pub use renderer::{GpuRenderer, RendererConfig};
-pub use shaders::{COMPOSITE_SHADER, GLASS_SHADER, PATH_SHADER, SDF_SHADER, TEXT_SHADER};
+pub use shaders::{COMPOSITE_SHADER, GLASS_SHADER, IMAGE_SHADER, PATH_SHADER, SDF_SHADER, TEXT_SHADER};
 pub use text::TextRenderingContext;
+pub use image::{GpuImage, GpuImageInstance, ImageRenderingContext};
 
 // Re-export text types for convenience
 pub use blinc_text::{TextAlignment, TextAnchor};

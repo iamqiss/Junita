@@ -1,0 +1,27 @@
+[package]
+name = "blinc_image"
+version = "0.1.0"
+edition = "2021"
+description = "Image loading and rendering for Blinc UI"
+license = "Apache-2.0"
+
+[dependencies]
+# Image decoding
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+
+# Async/networking for URL loading
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"], optional = true }
+tokio = { version = "1", features = ["rt"], optional = true }
+
+# Base64 decoding
+base64 = "0.22"
+
+# Error handling
+thiserror = "2"
+
+# Tracing
+tracing = "0.1"
+
+[features]
+default = []
+network = ["reqwest", "tokio"]

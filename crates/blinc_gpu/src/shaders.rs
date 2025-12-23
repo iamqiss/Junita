@@ -1250,3 +1250,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return color;
 }
 "#;
+
+/// Shader for image rendering
+///
+/// Renders images with:
+/// - UV cropping for box-fit modes
+/// - Tinting and opacity
+/// - Optional rounded corners
+pub const IMAGE_SHADER: &str = include_str!("shaders/image.wgsl");

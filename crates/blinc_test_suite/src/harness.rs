@@ -286,6 +286,9 @@ impl TestContext {
                     ));
                 }
                 ElementType::Div => {}
+                ElementType::Image(_) => {
+                    // Images are handled separately in the render context
+                }
             }
         }
 
