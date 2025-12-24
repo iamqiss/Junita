@@ -20,6 +20,7 @@ use std::sync::{
 
 use blinc_core::{Brush, Color, CornerRadius, Shadow, Transform};
 use taffy::prelude::*;
+use taffy::Overflow;
 
 use crate::element::{
     GlassMaterial, Material, MetallicMaterial, RenderLayer, RenderProps, WoodMaterial,
@@ -317,6 +318,7 @@ pub struct Div {
     material: Option<Material>,
     shadow: Option<Shadow>,
     transform: Option<Transform>,
+    opacity: f32,
     event_handlers: crate::event_handler::EventHandlers,
 }
 
@@ -338,6 +340,7 @@ impl Div {
             material: None,
             shadow: None,
             transform: None,
+            opacity: 1.0,
             event_handlers: crate::event_handler::EventHandlers::new(),
         }
     }
@@ -874,6 +877,36 @@ impl Div {
     }
 
     // =========================================================================
+    // Overflow
+    // =========================================================================
+
+    /// Set overflow to hidden (clip content)
+    ///
+    /// Content that extends beyond the element's bounds will be clipped.
+    /// This is essential for scroll containers.
+    pub fn overflow_clip(mut self) -> Self {
+        self.style.overflow.x = Overflow::Clip;
+        self.style.overflow.y = Overflow::Clip;
+        self
+    }
+
+    /// Set overflow to visible (default, content can extend beyond bounds)
+    pub fn overflow_visible(mut self) -> Self {
+        self.style.overflow.x = Overflow::Visible;
+        self.style.overflow.y = Overflow::Visible;
+        self
+    }
+
+    /// Set overflow to scroll (enable scrolling)
+    ///
+    /// Note: For custom scroll behavior with spring physics, use the `scroll()` element instead.
+    pub fn overflow_scroll(mut self) -> Self {
+        self.style.overflow.x = Overflow::Scroll;
+        self.style.overflow.y = Overflow::Scroll;
+        self
+    }
+
+    // =========================================================================
     // Visual Properties
     // =========================================================================
 
@@ -1054,6 +1087,31 @@ impl Div {
     /// Rotate this element by the given angle in degrees
     pub fn rotate_deg(self, degrees: f32) -> Self {
         self.rotate(degrees * std::f32::consts::PI / 180.0)
+    }
+
+    // =========================================================================
+    // Opacity
+    // =========================================================================
+
+    /// Set opacity (0.0 = transparent, 1.0 = opaque)
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Fully opaque (opacity = 1.0)
+    pub fn opaque(self) -> Self {
+        self.opacity(1.0)
+    }
+
+    /// Semi-transparent (opacity = 0.5)
+    pub fn translucent(self) -> Self {
+        self.opacity(0.5)
+    }
+
+    /// Invisible (opacity = 0.0)
+    pub fn invisible(self) -> Self {
+        self.opacity(0.0)
     }
 
     // =========================================================================
@@ -1405,6 +1463,11 @@ pub trait ElementBuilder: Send {
     fn event_handlers(&self) -> Option<&crate::event_handler::EventHandlers> {
         None
     }
+
+    /// Get scroll render info if this is a scroll element
+    fn scroll_info(&self) -> Option<crate::scroll::ScrollRenderInfo> {
+        None
+    }
 }
 
 impl ElementBuilder for Div {
@@ -1429,6 +1492,7 @@ impl ElementBuilder for Div {
             node_id: None,
             shadow: self.shadow,
             transform: self.transform.clone(),
+            opacity: self.opacity,
         }
     }
 

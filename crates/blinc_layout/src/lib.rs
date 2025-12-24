@@ -28,6 +28,7 @@
 //! tree.compute_layout(800.0, 600.0);
 //! ```
 
+pub mod animated;
 pub mod div;
 pub mod element;
 pub mod element_style;
@@ -36,6 +37,7 @@ pub mod event_router;
 pub mod image;
 pub mod interactive;
 pub mod renderer;
+pub mod scroll;
 pub mod stateful;
 pub mod style;
 pub mod svg;
@@ -69,6 +71,9 @@ pub use renderer::{GlassPanel, ImageData, LayoutRenderer, RenderTree, SvgData, T
 // Stateful elements
 pub use stateful::{SharedState, StateTransitions, StatefulInner};
 
+// Animation integration
+pub use animated::{AnimatedProperties, AnimationBuilder};
+
 /// Prelude module - import everything commonly needed
 pub mod prelude {
     pub use crate::div::{
@@ -92,9 +97,11 @@ pub mod prelude {
         // Core generic type
         BoundStateful, SharedState, Stateful, StatefulInner, StateTransitions,
         // Built-in state types
-        ButtonState, CheckboxState, TextFieldState, ToggleState,
+        ButtonState, CheckboxState, ScrollState, TextFieldState, ToggleState,
+        // Internal scroll events for FSM transitions
+        scroll_events,
         // Type aliases
-        StatefulButton, StatefulCheckbox, StatefulTextField, StatefulToggle,
+        StatefulButton, StatefulCheckbox, StatefulScroll, StatefulTextField, StatefulToggle,
         // Constructor functions
         stateful, stateful_button, stateful_checkbox, stateful_text_field, stateful_toggle,
     };
@@ -106,10 +113,20 @@ pub mod prelude {
     pub use crate::renderer::{
         GlassPanel, ImageData, LayoutRenderer, RenderTree, SvgData, TextData,
     };
+    // Scroll container
+    pub use crate::scroll::{scroll, scroll_no_bounce, Scroll, ScrollConfig, ScrollRenderInfo};
     pub use crate::svg::{svg, Svg};
     pub use crate::text::{text, Text};
     pub use crate::tree::{LayoutNodeId, LayoutTree};
 
     // Re-export Shadow and Transform from blinc_core for convenience
     pub use blinc_core::{Shadow, Transform};
+
+    // Animation integration
+    pub use crate::animated::{AnimatedProperties, AnimationBuilder};
+
+    // Re-export animation types from blinc_animation for convenience
+    pub use blinc_animation::{
+        AnimatedKeyframe, AnimatedTimeline, AnimatedValue, Easing, SchedulerHandle, SpringConfig,
+    };
 }

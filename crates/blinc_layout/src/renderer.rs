@@ -449,6 +449,33 @@ impl RenderTree {
         }
     }
 
+    /// Dispatch a scroll event with scroll delta
+    ///
+    /// This automatically marks the tree as dirty after dispatching.
+    pub fn dispatch_scroll_event(
+        &mut self,
+        node_id: LayoutNodeId,
+        mouse_x: f32,
+        mouse_y: f32,
+        scroll_delta_x: f32,
+        scroll_delta_y: f32,
+    ) {
+        let ctx = crate::event_handler::EventContext::new(
+            blinc_core::events::event_types::SCROLL,
+            node_id,
+        )
+        .with_mouse_pos(mouse_x, mouse_y)
+        .with_scroll_delta(scroll_delta_x, scroll_delta_y);
+
+        if self
+            .handler_registry
+            .has_handler(node_id, blinc_core::events::event_types::SCROLL)
+        {
+            self.handler_registry.dispatch(&ctx);
+            self.dirty_tracker.mark(node_id);
+        }
+    }
+
     /// Check if the tree has any dirty nodes (needs rebuild)
     pub fn needs_rebuild(&self) -> bool {
         self.dirty_tracker.has_dirty()

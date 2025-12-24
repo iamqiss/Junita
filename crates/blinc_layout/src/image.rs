@@ -574,6 +574,7 @@ impl ElementBuilder for Image {
             node_id: None,
             shadow: self.shadow,
             transform: self.transform.clone(),
+            opacity: self.opacity,
         }
     }
 

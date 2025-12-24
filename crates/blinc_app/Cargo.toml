@@ -15,6 +15,7 @@ blinc_svg = { path = "../blinc_svg" }
 blinc_text = { path = "../blinc_text" }
 blinc_image = { path = "../blinc_image" }
 blinc_platform = { path = "../blinc_platform" }
+blinc_animation = { path = "../blinc_animation" }
 
 # GPU
 wgpu.workspace = true

@@ -29,6 +29,7 @@ use std::sync::{
     Arc, Mutex,
 };
 
+use blinc_animation::{AnimationScheduler, SchedulerHandle};
 use blinc_core::reactive::{Derived, ReactiveGraph, Signal};
 use blinc_layout::prelude::*;
 use blinc_platform::{
@@ -38,6 +39,9 @@ use blinc_platform::{
 
 use crate::app::BlincApp;
 use crate::error::{BlincError, Result};
+
+/// Shared animation scheduler for the application (thread-safe)
+pub type SharedAnimationScheduler = Arc<Mutex<AnimationScheduler>>;
 
 #[cfg(all(feature = "windowed", not(target_os = "android")))]
 use blinc_platform_desktop::DesktopPlatform;
@@ -159,6 +163,8 @@ pub struct WindowedContext {
     pub focused: bool,
     /// Event router for input event handling
     pub event_router: EventRouter,
+    /// Animation scheduler for spring/keyframe animations
+    pub animations: SharedAnimationScheduler,
     /// Shared dirty flag for element refs - when set, triggers UI rebuild
     ref_dirty_flag: RefDirtyFlag,
     /// Reactive graph for signal-based state management
@@ -171,6 +177,7 @@ impl WindowedContext {
     fn from_window<W: Window>(
         window: &W,
         event_router: EventRouter,
+        animations: SharedAnimationScheduler,
         ref_dirty_flag: RefDirtyFlag,
         reactive: SharedReactiveGraph,
         hooks: SharedHookState,
@@ -184,6 +191,7 @@ impl WindowedContext {
             scale_factor: window.scale_factor(),
             focused: window.is_focused(),
             event_router,
+            animations,
             ref_dirty_flag,
             reactive,
             hooks,
@@ -450,6 +458,25 @@ impl WindowedContext {
         Arc::clone(&self.ref_dirty_flag)
     }
 
+    /// Get a handle to the animation scheduler for creating animated values
+    ///
+    /// Components use this handle to create `AnimatedValue`s that automatically
+    /// register with the scheduler. The scheduler ticks all animations each frame
+    /// and triggers UI rebuilds while animations are active.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_animation::{AnimatedValue, SpringConfig};
+    ///
+    /// let opacity = AnimatedValue::new(ctx.animations(), 1.0, SpringConfig::stiff());
+    /// opacity.set_target(0.5); // Auto-registers and animates
+    /// let current = opacity.get(); // Get interpolated value
+    /// ```
+    pub fn animation_handle(&self) -> SchedulerHandle {
+        self.animations.lock().unwrap().handle()
+    }
+
     /// Create a persistent state for stateful UI elements
     ///
     /// This creates a `SharedState<S>` that survives across UI rebuilds.
@@ -623,6 +650,8 @@ impl WindowedApp {
         let reactive: SharedReactiveGraph = Arc::new(Mutex::new(ReactiveGraph::new()));
         // Shared hook state for use_state persistence
         let hooks: SharedHookState = Arc::new(Mutex::new(HookState::new()));
+        // Shared animation scheduler for spring/keyframe animations
+        let animations: SharedAnimationScheduler = Arc::new(Mutex::new(AnimationScheduler::new()));
 
         event_loop
             .run(move |event, window| {
@@ -653,10 +682,11 @@ impl WindowedApp {
                                     surface_config = Some(config);
                                     app = Some(blinc_app);
 
-                                    // Initialize context with event router, dirty flag, reactive graph, and hooks
+                                    // Initialize context with event router, animations, dirty flag, reactive graph, and hooks
                                     ctx = Some(WindowedContext::from_window(
                                         window,
                                         EventRouter::new(),
+                                        Arc::clone(&animations),
                                         Arc::clone(&ref_dirty_flag),
                                         Arc::clone(&reactive),
                                         Arc::clone(&hooks),
@@ -717,15 +747,16 @@ impl WindowedApp {
                             let router = &mut windowed_ctx.event_router;
 
                             // Collect events from router
-                            let mut pending_events: Vec<(LayoutNodeId, u32, f32, f32)> = Vec::new();
+                            // Tuple: (node_id, event_type, mouse_x, mouse_y, scroll_delta_x, scroll_delta_y)
+                            let mut pending_events: Vec<(LayoutNodeId, u32, f32, f32, f32, f32)> = Vec::new();
 
                             // Set up callback to collect events
                             router.set_event_callback({
-                                let events = &mut pending_events as *mut Vec<(LayoutNodeId, u32, f32, f32)>;
+                                let events = &mut pending_events as *mut Vec<(LayoutNodeId, u32, f32, f32, f32, f32)>;
                                 move |node, event_type| {
                                     // SAFETY: This callback is only used within this scope
                                     unsafe {
-                                        (*events).push((node, event_type, 0.0, 0.0));
+                                        (*events).push((node, event_type, 0.0, 0.0, 0.0, 0.0));
                                     }
                                 }
                             });
@@ -807,6 +838,9 @@ impl WindowedApp {
                                     for event in pending_events.iter_mut() {
                                         event.2 = mx;
                                         event.3 = my;
+                                        // Set scroll delta for scroll events
+                                        event.4 = delta_x;
+                                        event.5 = delta_y;
                                     }
                                 }
                             }
@@ -820,8 +854,13 @@ impl WindowedApp {
                         // Second phase: dispatch events with mutable borrow
                         // This automatically marks the tree dirty when handlers fire
                         if let Some(ref mut tree) = render_tree {
-                            for (node, event_type, mouse_x, mouse_y) in pending_events {
-                                tree.dispatch_event(node, event_type, mouse_x, mouse_y);
+                            for (node, event_type, mouse_x, mouse_y, scroll_dx, scroll_dy) in pending_events {
+                                // Use scroll-specific dispatch for scroll events to pass delta
+                                if event_type == blinc_core::events::event_types::SCROLL {
+                                    tree.dispatch_scroll_event(node, mouse_x, mouse_y, scroll_dx, scroll_dy);
+                                } else {
+                                    tree.dispatch_event(node, event_type, mouse_x, mouse_y);
+                                }
                             }
                         }
                     }
@@ -867,6 +906,11 @@ impl WindowedApp {
 
                             // Check if element refs were modified (triggers rebuild)
                             if ref_dirty_flag.swap(false, Ordering::SeqCst) {
+                                needs_rebuild = true;
+                            }
+
+                            // Tick animations and trigger rebuild if any are still active
+                            if windowed_ctx.animations.lock().unwrap().tick() {
                                 needs_rebuild = true;
                             }
 

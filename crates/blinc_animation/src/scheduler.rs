@@ -1,91 +1,929 @@
 //! Animation scheduler
 //!
 //! Manages all active animations and updates them each frame.
+//! Animations are implicitly registered when created through wrapper types:
+//! - `AnimatedValue` - Spring-based physics animations
+//! - `AnimatedKeyframe` - Keyframe-based timed animations
+//! - `AnimatedTimeline` - Timeline orchestration of multiple animations
 
-use crate::spring::Spring;
+use crate::easing::Easing;
+use crate::keyframe::{Keyframe, KeyframeAnimation};
+use crate::spring::{Spring, SpringConfig};
+use crate::timeline::Timeline;
 use slotmap::{new_key_type, SlotMap};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Instant;
 
 new_key_type! {
+    /// Handle to a registered spring animation
     pub struct SpringId;
+    /// Handle to a registered keyframe animation
     pub struct KeyframeId;
+    /// Handle to a registered timeline
     pub struct TimelineId;
 }
 
-/// The animation scheduler that ticks all active animations
-pub struct AnimationScheduler {
+/// Internal state of the animation scheduler
+struct SchedulerInner {
     springs: SlotMap<SpringId, Spring>,
+    keyframes: SlotMap<KeyframeId, KeyframeAnimation>,
+    timelines: SlotMap<TimelineId, Timeline>,
     last_frame: Instant,
     target_fps: u32,
+}
+
+/// The animation scheduler that ticks all active animations
+///
+/// This is typically held by the application context and shared via `SchedulerHandle`.
+/// Animations register themselves implicitly when created.
+pub struct AnimationScheduler {
+    inner: Arc<Mutex<SchedulerInner>>,
 }
 
 impl AnimationScheduler {
     pub fn new() -> Self {
         Self {
-            springs: SlotMap::with_key(),
-            last_frame: Instant::now(),
-            target_fps: 120,
+            inner: Arc::new(Mutex::new(SchedulerInner {
+                springs: SlotMap::with_key(),
+                keyframes: SlotMap::with_key(),
+                timelines: SlotMap::with_key(),
+                last_frame: Instant::now(),
+                target_fps: 120,
+            })),
+        }
+    }
+
+    /// Get a handle to this scheduler for passing to components
+    pub fn handle(&self) -> SchedulerHandle {
+        SchedulerHandle {
+            inner: Arc::downgrade(&self.inner),
         }
     }
 
     pub fn set_target_fps(&mut self, fps: u32) {
-        self.target_fps = fps;
-    }
-
-    pub fn add_spring(&mut self, spring: Spring) -> SpringId {
-        self.springs.insert(spring)
-    }
-
-    pub fn get_spring(&self, id: SpringId) -> Option<&Spring> {
-        self.springs.get(id)
-    }
-
-    pub fn get_spring_mut(&mut self, id: SpringId) -> Option<&mut Spring> {
-        self.springs.get_mut(id)
-    }
-
-    pub fn remove_spring(&mut self, id: SpringId) -> Option<Spring> {
-        self.springs.remove(id)
+        self.inner.lock().unwrap().target_fps = fps;
     }
 
     /// Tick all animations
-    pub fn tick(&mut self) {
+    ///
+    /// Returns true if any animations are still active (need another tick).
+    pub fn tick(&self) -> bool {
+        let mut inner = self.inner.lock().unwrap();
         let now = Instant::now();
-        let dt = (now - self.last_frame).as_secs_f32();
-        self.last_frame = now;
+        let dt = (now - inner.last_frame).as_secs_f32();
+        let dt_ms = dt * 1000.0;
+        inner.last_frame = now;
 
         // Update all springs
-        for (_, spring) in self.springs.iter_mut() {
+        for (_, spring) in inner.springs.iter_mut() {
             spring.step(dt);
         }
 
-        // TODO: Update keyframe animations
-        // TODO: Update timelines
+        // Update all keyframe animations
+        for (_, keyframe) in inner.keyframes.iter_mut() {
+            keyframe.tick(dt_ms);
+        }
+
+        // Update all timelines
+        for (_, timeline) in inner.timelines.iter_mut() {
+            timeline.tick(dt_ms);
+        }
+
+        // Remove settled springs
+        inner.springs.retain(|_, s| !s.is_settled());
+
+        // Remove finished keyframe animations
+        inner.keyframes.retain(|_, k| k.is_playing());
+
+        // Remove finished timelines
+        inner.timelines.retain(|_, t| t.is_playing());
+
+        // Return true if there are still active animations
+        !inner.springs.is_empty() || !inner.keyframes.is_empty() || !inner.timelines.is_empty()
     }
 
     /// Check if any animations are still active
     pub fn has_active_animations(&self) -> bool {
-        self.springs.iter().any(|(_, s)| !s.is_settled())
+        let inner = self.inner.lock().unwrap();
+        inner.springs.iter().any(|(_, s)| !s.is_settled())
+            || inner.keyframes.iter().any(|(_, k)| k.is_playing())
+            || inner.timelines.iter().any(|(_, t)| t.is_playing())
     }
 
-    /// Iterate over all springs (immutable)
-    pub fn springs_iter(&self) -> impl Iterator<Item = (SpringId, &Spring)> {
-        self.springs.iter()
-    }
-
-    /// Iterate over all springs (mutable)
-    pub fn springs_iter_mut(&mut self) -> impl Iterator<Item = (SpringId, &mut Spring)> {
-        self.springs.iter_mut()
-    }
-
-    /// Get the number of springs in the scheduler
+    /// Get the number of active springs
     pub fn spring_count(&self) -> usize {
-        self.springs.len()
+        self.inner.lock().unwrap().springs.len()
+    }
+
+    /// Get the number of active keyframe animations
+    pub fn keyframe_count(&self) -> usize {
+        self.inner.lock().unwrap().keyframes.len()
+    }
+
+    /// Get the number of active timelines
+    pub fn timeline_count(&self) -> usize {
+        self.inner.lock().unwrap().timelines.len()
+    }
+
+    // =========================================================================
+    // Direct Spring Access (for advanced use cases)
+    // =========================================================================
+
+    pub fn add_spring(&self, spring: Spring) -> SpringId {
+        self.inner.lock().unwrap().springs.insert(spring)
+    }
+
+    pub fn get_spring(&self, id: SpringId) -> Option<Spring> {
+        self.inner.lock().unwrap().springs.get(id).copied()
+    }
+
+    pub fn get_spring_value(&self, id: SpringId) -> Option<f32> {
+        self.inner
+            .lock()
+            .unwrap()
+            .springs
+            .get(id)
+            .map(|s| s.value())
+    }
+
+    pub fn set_spring_target(&self, id: SpringId, target: f32) {
+        if let Some(spring) = self.inner.lock().unwrap().springs.get_mut(id) {
+            spring.set_target(target);
+        }
+    }
+
+    pub fn remove_spring(&self, id: SpringId) -> Option<Spring> {
+        self.inner.lock().unwrap().springs.remove(id)
+    }
+
+    // =========================================================================
+    // Direct Keyframe Access (for advanced use cases)
+    // =========================================================================
+
+    pub fn add_keyframe(&self, keyframe: KeyframeAnimation) -> KeyframeId {
+        self.inner.lock().unwrap().keyframes.insert(keyframe)
+    }
+
+    pub fn get_keyframe_value(&self, id: KeyframeId) -> Option<f32> {
+        self.inner
+            .lock()
+            .unwrap()
+            .keyframes
+            .get(id)
+            .map(|k| k.value())
+    }
+
+    pub fn start_keyframe(&self, id: KeyframeId) {
+        if let Some(keyframe) = self.inner.lock().unwrap().keyframes.get_mut(id) {
+            keyframe.start();
+        }
+    }
+
+    pub fn stop_keyframe(&self, id: KeyframeId) {
+        if let Some(keyframe) = self.inner.lock().unwrap().keyframes.get_mut(id) {
+            keyframe.stop();
+        }
+    }
+
+    pub fn remove_keyframe(&self, id: KeyframeId) -> Option<KeyframeAnimation> {
+        self.inner.lock().unwrap().keyframes.remove(id)
+    }
+
+    // =========================================================================
+    // Direct Timeline Access (for advanced use cases)
+    // =========================================================================
+
+    pub fn add_timeline(&self, timeline: Timeline) -> TimelineId {
+        self.inner.lock().unwrap().timelines.insert(timeline)
+    }
+
+    pub fn start_timeline(&self, id: TimelineId) {
+        if let Some(timeline) = self.inner.lock().unwrap().timelines.get_mut(id) {
+            timeline.start();
+        }
+    }
+
+    pub fn stop_timeline(&self, id: TimelineId) {
+        if let Some(timeline) = self.inner.lock().unwrap().timelines.get_mut(id) {
+            timeline.stop();
+        }
+    }
+
+    pub fn remove_timeline(&self, id: TimelineId) -> Option<Timeline> {
+        self.inner.lock().unwrap().timelines.remove(id)
     }
 }
 
 impl Default for AnimationScheduler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for AnimationScheduler {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+/// A weak handle to the animation scheduler
+///
+/// This is passed to components that need to register animations.
+/// It won't prevent the scheduler from being dropped.
+#[derive(Clone)]
+pub struct SchedulerHandle {
+    inner: Weak<Mutex<SchedulerInner>>,
+}
+
+impl SchedulerHandle {
+    // =========================================================================
+    // Spring Operations
+    // =========================================================================
+
+    /// Register a spring and return its ID
+    pub fn register_spring(&self, spring: Spring) -> Option<SpringId> {
+        self.inner
+            .upgrade()
+            .map(|inner| inner.lock().unwrap().springs.insert(spring))
+    }
+
+    /// Update a spring's target
+    pub fn set_spring_target(&self, id: SpringId, target: f32) {
+        if let Some(inner) = self.inner.upgrade() {
+            if let Some(spring) = inner.lock().unwrap().springs.get_mut(id) {
+                spring.set_target(target);
+            }
+        }
+    }
+
+    /// Get current spring value
+    pub fn get_spring_value(&self, id: SpringId) -> Option<f32> {
+        self.inner
+            .upgrade()
+            .and_then(|inner| inner.lock().unwrap().springs.get(id).map(|s| s.value()))
+    }
+
+    /// Remove a spring
+    pub fn remove_spring(&self, id: SpringId) {
+        if let Some(inner) = self.inner.upgrade() {
+            inner.lock().unwrap().springs.remove(id);
+        }
+    }
+
+    // =========================================================================
+    // Keyframe Operations
+    // =========================================================================
+
+    /// Register a keyframe animation and return its ID
+    pub fn register_keyframe(&self, keyframe: KeyframeAnimation) -> Option<KeyframeId> {
+        self.inner
+            .upgrade()
+            .map(|inner| inner.lock().unwrap().keyframes.insert(keyframe))
+    }
+
+    /// Get current keyframe animation value
+    pub fn get_keyframe_value(&self, id: KeyframeId) -> Option<f32> {
+        self.inner
+            .upgrade()
+            .and_then(|inner| inner.lock().unwrap().keyframes.get(id).map(|k| k.value()))
+    }
+
+    /// Get keyframe animation progress (0.0 to 1.0)
+    pub fn get_keyframe_progress(&self, id: KeyframeId) -> Option<f32> {
+        self.inner.upgrade().and_then(|inner| {
+            inner
+                .lock()
+                .unwrap()
+                .keyframes
+                .get(id)
+                .map(|k| k.progress())
+        })
+    }
+
+    /// Check if keyframe animation is playing
+    pub fn is_keyframe_playing(&self, id: KeyframeId) -> bool {
+        self.inner
+            .upgrade()
+            .and_then(|inner| {
+                inner
+                    .lock()
+                    .unwrap()
+                    .keyframes
+                    .get(id)
+                    .map(|k| k.is_playing())
+            })
+            .unwrap_or(false)
+    }
+
+    /// Start a keyframe animation
+    pub fn start_keyframe(&self, id: KeyframeId) {
+        if let Some(inner) = self.inner.upgrade() {
+            if let Some(keyframe) = inner.lock().unwrap().keyframes.get_mut(id) {
+                keyframe.start();
+            }
+        }
+    }
+
+    /// Stop a keyframe animation
+    pub fn stop_keyframe(&self, id: KeyframeId) {
+        if let Some(inner) = self.inner.upgrade() {
+            if let Some(keyframe) = inner.lock().unwrap().keyframes.get_mut(id) {
+                keyframe.stop();
+            }
+        }
+    }
+
+    /// Remove a keyframe animation
+    pub fn remove_keyframe(&self, id: KeyframeId) {
+        if let Some(inner) = self.inner.upgrade() {
+            inner.lock().unwrap().keyframes.remove(id);
+        }
+    }
+
+    // =========================================================================
+    // Timeline Operations
+    // =========================================================================
+
+    /// Register a timeline and return its ID
+    pub fn register_timeline(&self, timeline: Timeline) -> Option<TimelineId> {
+        self.inner
+            .upgrade()
+            .map(|inner| inner.lock().unwrap().timelines.insert(timeline))
+    }
+
+    /// Check if timeline is playing
+    pub fn is_timeline_playing(&self, id: TimelineId) -> bool {
+        self.inner
+            .upgrade()
+            .and_then(|inner| {
+                inner
+                    .lock()
+                    .unwrap()
+                    .timelines
+                    .get(id)
+                    .map(|t| t.is_playing())
+            })
+            .unwrap_or(false)
+    }
+
+    /// Start a timeline
+    pub fn start_timeline(&self, id: TimelineId) {
+        if let Some(inner) = self.inner.upgrade() {
+            if let Some(timeline) = inner.lock().unwrap().timelines.get_mut(id) {
+                timeline.start();
+            }
+        }
+    }
+
+    /// Stop a timeline
+    pub fn stop_timeline(&self, id: TimelineId) {
+        if let Some(inner) = self.inner.upgrade() {
+            if let Some(timeline) = inner.lock().unwrap().timelines.get_mut(id) {
+                timeline.stop();
+            }
+        }
+    }
+
+    /// Remove a timeline
+    pub fn remove_timeline(&self, id: TimelineId) {
+        if let Some(inner) = self.inner.upgrade() {
+            inner.lock().unwrap().timelines.remove(id);
+        }
+    }
+
+    /// Access a timeline to add entries or get values
+    ///
+    /// The closure receives a mutable reference to the timeline.
+    /// Returns None if the scheduler is dropped or timeline doesn't exist.
+    pub fn with_timeline<F, R>(&self, id: TimelineId, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut Timeline) -> R,
+    {
+        self.inner.upgrade().and_then(|inner| {
+            inner
+                .lock()
+                .unwrap()
+                .timelines
+                .get_mut(id)
+                .map(|timeline| f(timeline))
+        })
+    }
+
+    /// Check if the scheduler is still alive
+    pub fn is_alive(&self) -> bool {
+        self.inner.strong_count() > 0
+    }
+}
+
+// ============================================================================
+// Animated Value (Spring-based)
+// ============================================================================
+
+/// An animated value that automatically registers with the scheduler
+///
+/// When the target changes, the value smoothly animates to it using spring physics.
+/// The animation is automatically registered with the scheduler and ticked each frame.
+///
+/// # Example
+///
+/// ```ignore
+/// // Create an animated value (auto-registers with scheduler)
+/// let opacity = AnimatedValue::new(ctx.animation_handle(), 1.0, SpringConfig::stiff());
+///
+/// // Change target - automatically animates
+/// opacity.set_target(0.5);
+///
+/// // Get current animated value (interpolated)
+/// let current = opacity.get();
+/// ```
+#[derive(Clone)]
+pub struct AnimatedValue {
+    handle: SchedulerHandle,
+    spring_id: Option<SpringId>,
+    config: SpringConfig,
+    current: f32,
+}
+
+impl AnimatedValue {
+    /// Create a new animated value with the given initial value
+    pub fn new(handle: SchedulerHandle, initial: f32, config: SpringConfig) -> Self {
+        // Don't register immediately - only when we have a target change
+        Self {
+            handle,
+            spring_id: None,
+            config,
+            current: initial,
+        }
+    }
+
+    /// Create with default spring config (stiff)
+    pub fn with_default(handle: SchedulerHandle, initial: f32) -> Self {
+        Self::new(handle, initial, SpringConfig::stiff())
+    }
+
+    /// Set the target value - starts animation if different from current
+    pub fn set_target(&mut self, target: f32) {
+        // If we already have a spring, update its target
+        if let Some(id) = self.spring_id {
+            self.handle.set_spring_target(id, target);
+        } else if (target - self.current).abs() > 0.001 {
+            // Create and register a new spring
+            let spring = Spring::new(self.config, self.current);
+            if let Some(id) = self.handle.register_spring(spring) {
+                self.spring_id = Some(id);
+                self.handle.set_spring_target(id, target);
+            }
+        }
+    }
+
+    /// Get the current animated value
+    pub fn get(&self) -> f32 {
+        if let Some(id) = self.spring_id {
+            self.handle.get_spring_value(id).unwrap_or(self.current)
+        } else {
+            self.current
+        }
+    }
+
+    /// Set value immediately without animation
+    pub fn set_immediate(&mut self, value: f32) {
+        // Remove any active spring
+        if let Some(id) = self.spring_id.take() {
+            self.handle.remove_spring(id);
+        }
+        self.current = value;
+    }
+
+    /// Check if currently animating
+    pub fn is_animating(&self) -> bool {
+        self.spring_id.is_some()
+    }
+}
+
+impl Drop for AnimatedValue {
+    fn drop(&mut self) {
+        // Clean up spring when value is dropped
+        if let Some(id) = self.spring_id {
+            self.handle.remove_spring(id);
+        }
+    }
+}
+
+// ============================================================================
+// Animated Keyframe
+// ============================================================================
+
+/// A keyframe animation that automatically registers with the scheduler
+///
+/// Provides timed animations with easing functions between keyframes.
+/// The animation is automatically registered and ticked by the scheduler.
+///
+/// # Example
+///
+/// ```ignore
+/// use blinc_animation::{AnimatedKeyframe, Keyframe, Easing};
+///
+/// // Create a keyframe animation
+/// let mut anim = AnimatedKeyframe::new(ctx.animation_handle(), 1000); // 1 second
+///
+/// // Add keyframes
+/// anim.keyframe(0.0, 0.0, Easing::Linear);      // Start at 0
+/// anim.keyframe(0.5, 100.0, Easing::EaseOut);   // Middle at 100
+/// anim.keyframe(1.0, 50.0, Easing::EaseInOut);  // End at 50
+///
+/// // Start the animation
+/// anim.start();
+///
+/// // Get current value (updated by scheduler)
+/// let value = anim.get();
+/// ```
+#[derive(Clone)]
+pub struct AnimatedKeyframe {
+    handle: SchedulerHandle,
+    keyframe_id: Option<KeyframeId>,
+    duration_ms: u32,
+    keyframes: Vec<Keyframe>,
+    auto_start: bool,
+}
+
+impl AnimatedKeyframe {
+    /// Create a new keyframe animation with the given duration
+    pub fn new(handle: SchedulerHandle, duration_ms: u32) -> Self {
+        Self {
+            handle,
+            keyframe_id: None,
+            duration_ms,
+            keyframes: Vec::new(),
+            auto_start: false,
+        }
+    }
+
+    /// Add a keyframe at the given time position (0.0 to 1.0)
+    pub fn keyframe(mut self, time: f32, value: f32, easing: Easing) -> Self {
+        self.keyframes.push(Keyframe {
+            time,
+            value,
+            easing,
+        });
+        self
+    }
+
+    /// Set whether to auto-start when registered
+    pub fn auto_start(mut self, auto: bool) -> Self {
+        self.auto_start = auto;
+        self
+    }
+
+    /// Build and register the animation, returning self for chaining
+    pub fn build(mut self) -> Self {
+        // Sort keyframes by time
+        self.keyframes.sort_by(|a, b| {
+            a.time
+                .partial_cmp(&b.time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let mut animation = KeyframeAnimation::new(self.duration_ms, self.keyframes.clone());
+
+        if self.auto_start {
+            animation.start();
+        }
+
+        if let Some(id) = self.handle.register_keyframe(animation) {
+            self.keyframe_id = Some(id);
+        }
+
+        self
+    }
+
+    /// Start the animation
+    pub fn start(&mut self) {
+        if let Some(id) = self.keyframe_id {
+            self.handle.start_keyframe(id);
+        } else {
+            // Not yet registered - register now and start
+            self.keyframes.sort_by(|a, b| {
+                a.time
+                    .partial_cmp(&b.time)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            let mut animation = KeyframeAnimation::new(self.duration_ms, self.keyframes.clone());
+            animation.start();
+
+            if let Some(id) = self.handle.register_keyframe(animation) {
+                self.keyframe_id = Some(id);
+            }
+        }
+    }
+
+    /// Stop the animation
+    pub fn stop(&self) {
+        if let Some(id) = self.keyframe_id {
+            self.handle.stop_keyframe(id);
+        }
+    }
+
+    /// Get the current animated value
+    pub fn get(&self) -> f32 {
+        if let Some(id) = self.keyframe_id {
+            self.handle.get_keyframe_value(id).unwrap_or(0.0)
+        } else if !self.keyframes.is_empty() {
+            self.keyframes[0].value
+        } else {
+            0.0
+        }
+    }
+
+    /// Get the current progress (0.0 to 1.0)
+    pub fn progress(&self) -> f32 {
+        if let Some(id) = self.keyframe_id {
+            self.handle.get_keyframe_progress(id).unwrap_or(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Check if the animation is playing
+    pub fn is_playing(&self) -> bool {
+        if let Some(id) = self.keyframe_id {
+            self.handle.is_keyframe_playing(id)
+        } else {
+            false
+        }
+    }
+}
+
+impl Drop for AnimatedKeyframe {
+    fn drop(&mut self) {
+        if let Some(id) = self.keyframe_id {
+            self.handle.remove_keyframe(id);
+        }
+    }
+}
+
+// ============================================================================
+// Animated Timeline
+// ============================================================================
+
+/// A timeline animation that automatically registers with the scheduler
+///
+/// Orchestrates multiple animations with offsets and looping support.
+/// The timeline is automatically registered and ticked by the scheduler.
+///
+/// # Example
+///
+/// ```ignore
+/// use blinc_animation::AnimatedTimeline;
+///
+/// // Create a timeline
+/// let mut timeline = AnimatedTimeline::new(ctx.animation_handle());
+///
+/// // Add animations at different offsets
+/// let opacity_id = timeline.add(0, 500, 0.0, 1.0);      // Fade in from 0-500ms
+/// let scale_id = timeline.add(250, 500, 0.8, 1.0);      // Scale up from 250-750ms
+/// let slide_id = timeline.add(0, 750, -100.0, 0.0);     // Slide in from 0-750ms
+///
+/// // Configure looping
+/// timeline.set_loop(-1); // Infinite loop
+///
+/// // Start the timeline
+/// timeline.start();
+///
+/// // Get values for each animation
+/// let opacity = timeline.get(opacity_id);
+/// let scale = timeline.get(scale_id);
+/// let slide = timeline.get(slide_id);
+/// ```
+pub struct AnimatedTimeline {
+    handle: SchedulerHandle,
+    timeline_id: Option<TimelineId>,
+}
+
+impl AnimatedTimeline {
+    /// Create a new timeline animation
+    pub fn new(handle: SchedulerHandle) -> Self {
+        // Register an empty timeline immediately
+        let timeline = Timeline::new();
+        let timeline_id = handle.register_timeline(timeline);
+
+        Self {
+            handle,
+            timeline_id,
+        }
+    }
+
+    /// Add an animation to the timeline
+    ///
+    /// Returns an entry ID that can be used to get the current value.
+    pub fn add(
+        &mut self,
+        offset_ms: i32,
+        duration_ms: u32,
+        start_value: f32,
+        end_value: f32,
+    ) -> crate::timeline::TimelineEntryId {
+        if let Some(id) = self.timeline_id {
+            self.handle
+                .with_timeline(id, |timeline| {
+                    timeline.add(offset_ms, duration_ms, start_value, end_value)
+                })
+                .expect("Timeline should exist")
+        } else {
+            panic!("Timeline not registered - scheduler may have been dropped")
+        }
+    }
+
+    /// Set loop count (-1 for infinite)
+    pub fn set_loop(&mut self, count: i32) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.set_loop(count);
+            });
+        }
+    }
+
+    /// Start the timeline
+    pub fn start(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.start_timeline(id);
+        }
+    }
+
+    /// Stop the timeline
+    pub fn stop(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.stop_timeline(id);
+        }
+    }
+
+    /// Get the current value for a timeline entry
+    pub fn get(&self, entry_id: crate::timeline::TimelineEntryId) -> f32 {
+        if let Some(id) = self.timeline_id {
+            self.handle
+                .with_timeline(id, |timeline| timeline.value(entry_id))
+                .flatten()
+                .unwrap_or(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Check if the timeline is playing
+    pub fn is_playing(&self) -> bool {
+        if let Some(id) = self.timeline_id {
+            self.handle.is_timeline_playing(id)
+        } else {
+            false
+        }
+    }
+}
+
+impl Drop for AnimatedTimeline {
+    fn drop(&mut self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.remove_timeline(id);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scheduler_tick() {
+        let scheduler = AnimationScheduler::new();
+
+        // Add a spring
+        let spring = Spring::new(SpringConfig::stiff(), 0.0);
+        let id = scheduler.add_spring(spring);
+        scheduler.set_spring_target(id, 100.0);
+
+        // Tick
+        assert!(scheduler.tick());
+
+        // Value should have moved
+        let value = scheduler.get_spring_value(id).unwrap();
+        assert!(value > 0.0);
+    }
+
+    #[test]
+    fn test_animated_value() {
+        let scheduler = AnimationScheduler::new();
+        let handle = scheduler.handle();
+
+        let mut value = AnimatedValue::new(handle, 0.0, SpringConfig::stiff());
+
+        assert_eq!(value.get(), 0.0);
+        assert!(!value.is_animating());
+
+        // Set target
+        value.set_target(100.0);
+        assert!(value.is_animating());
+
+        // Tick scheduler
+        scheduler.tick();
+
+        // Value should have moved
+        assert!(value.get() > 0.0);
+    }
+
+    #[test]
+    fn test_animated_keyframe() {
+        let scheduler = AnimationScheduler::new();
+        let handle = scheduler.handle();
+
+        let mut anim = AnimatedKeyframe::new(handle, 1000)
+            .keyframe(0.0, 0.0, Easing::Linear)
+            .keyframe(1.0, 100.0, Easing::Linear);
+
+        // Start animation
+        anim.start();
+        assert!(anim.is_playing());
+
+        // Initial value should be 0
+        assert_eq!(anim.get(), 0.0);
+
+        // Tick scheduler (simulates time passing)
+        scheduler.tick();
+
+        // Animation should still be playing
+        assert!(anim.is_playing());
+    }
+
+    #[test]
+    fn test_animated_timeline() {
+        let scheduler = AnimationScheduler::new();
+        let handle = scheduler.handle();
+
+        let mut timeline = AnimatedTimeline::new(handle);
+
+        // Add an animation
+        let entry = timeline.add(0, 1000, 0.0, 100.0);
+
+        // Start timeline
+        timeline.start();
+        assert!(timeline.is_playing());
+
+        // Initial value should be 0
+        assert_eq!(timeline.get(entry), 0.0);
+
+        // Tick scheduler
+        scheduler.tick();
+
+        // Timeline should still be playing
+        assert!(timeline.is_playing());
+    }
+
+    #[test]
+    fn test_handle_weak_reference() {
+        let handle = {
+            let scheduler = AnimationScheduler::new();
+            scheduler.handle()
+        };
+
+        // Scheduler is dropped, handle should not be alive
+        assert!(!handle.is_alive());
+
+        // Operations should safely no-op
+        assert!(handle
+            .register_spring(Spring::new(SpringConfig::stiff(), 0.0))
+            .is_none());
+    }
+
+    #[test]
+    fn test_scheduler_counts() {
+        let scheduler = AnimationScheduler::new();
+
+        assert_eq!(scheduler.spring_count(), 0);
+        assert_eq!(scheduler.keyframe_count(), 0);
+        assert_eq!(scheduler.timeline_count(), 0);
+
+        // Add animations
+        let spring = Spring::new(SpringConfig::stiff(), 0.0);
+        scheduler.add_spring(spring);
+
+        let mut keyframe = KeyframeAnimation::new(
+            1000,
+            vec![Keyframe {
+                time: 0.0,
+                value: 0.0,
+                easing: Easing::Linear,
+            }],
+        );
+        keyframe.start();
+        scheduler.add_keyframe(keyframe);
+
+        let mut timeline = Timeline::new();
+        timeline.add(0, 1000, 0.0, 100.0);
+        timeline.start();
+        scheduler.add_timeline(timeline);
+
+        assert_eq!(scheduler.spring_count(), 1);
+        assert_eq!(scheduler.keyframe_count(), 1);
+        assert_eq!(scheduler.timeline_count(), 1);
     }
 }

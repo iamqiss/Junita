@@ -247,6 +247,7 @@ impl ElementBuilder for Svg {
             node_id: None,
             shadow: self.shadow,
             transform: self.transform.clone(),
+            opacity: 1.0,
         }
     }
 

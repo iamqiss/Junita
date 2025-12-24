@@ -21,6 +21,8 @@ pub mod event_types {
     pub const KEY_DOWN: EventType = 20;
     pub const KEY_UP: EventType = 21;
     pub const SCROLL: EventType = 30;
+    /// Scroll gesture ended (for deceleration/momentum)
+    pub const SCROLL_END: EventType = 31;
     pub const RESIZE: EventType = 40;
 
     // Window lifecycle events

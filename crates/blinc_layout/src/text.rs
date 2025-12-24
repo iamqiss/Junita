@@ -287,6 +287,7 @@ impl ElementBuilder for Text {
             node_id: None,
             shadow: self.shadow,
             transform: self.transform.clone(),
+            opacity: 1.0,
         }
     }
 

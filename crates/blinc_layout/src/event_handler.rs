@@ -56,6 +56,9 @@ pub struct EventContext {
     /// Position relative to element bounds
     pub local_x: f32,
     pub local_y: f32,
+    /// Scroll delta for SCROLL events (pixels scrolled)
+    pub scroll_delta_x: f32,
+    pub scroll_delta_y: f32,
 }
 
 impl EventContext {
@@ -68,6 +71,8 @@ impl EventContext {
             mouse_y: 0.0,
             local_x: 0.0,
             local_y: 0.0,
+            scroll_delta_x: 0.0,
+            scroll_delta_y: 0.0,
         }
     }
 
@@ -82,6 +87,13 @@ impl EventContext {
     pub fn with_local_pos(mut self, x: f32, y: f32) -> Self {
         self.local_x = x;
         self.local_y = y;
+        self
+    }
+
+    /// Set scroll delta (for SCROLL events)
+    pub fn with_scroll_delta(mut self, dx: f32, dy: f32) -> Self {
+        self.scroll_delta_x = dx;
+        self.scroll_delta_y = dy;
         self
     }
 }

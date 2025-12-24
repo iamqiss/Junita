@@ -13,6 +13,7 @@ default = []
 
 [dependencies]
 blinc_core = { path = "../blinc_core" }
+blinc_animation = { path = "../blinc_animation" }
 
 # Layout
 taffy.workspace = true

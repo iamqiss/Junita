@@ -629,6 +629,10 @@ struct GlassPrimitive {
     params2: vec4<f32>,
     // Type info (glass_type, shadow_offset_x_bits, shadow_offset_y_bits, 0)
     type_info: vec4<u32>,
+    // Clip bounds (x, y, width, height) for clamping blur samples
+    clip_bounds: vec4<f32>,
+    // Clip corner radii (for rounded rect clips)
+    clip_radius: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: GlassUniforms;
@@ -820,6 +824,63 @@ fn blur_backdrop(uv: vec2<f32>, blur_radius: f32) -> vec4<f32> {
     return color / total_weight;
 }
 
+// High quality blur with clip bounds for scroll containers
+// Samples are clamped to the clip region to prevent blur bleeding
+fn blur_backdrop_clipped(uv: vec2<f32>, blur_radius: f32, clip_bounds: vec4<f32>) -> vec4<f32> {
+    // Convert clip bounds from (x, y, width, height) to (min_x, min_y, max_x, max_y) in UV space
+    let clip_min = clip_bounds.xy / uniforms.viewport_size;
+    let clip_max = (clip_bounds.xy + clip_bounds.zw) / uniforms.viewport_size;
+
+    // Check if clipping is active (default bounds are very large)
+    let has_clip = clip_bounds.x > -5000.0;
+
+    if blur_radius < 0.5 {
+        let clamped_uv = select(uv, clamp(uv, clip_min, clip_max), has_clip);
+        return textureSample(backdrop_texture, backdrop_sampler, clamped_uv);
+    }
+
+    let texel_size = 1.0 / uniforms.viewport_size;
+    let sigma = blur_radius * 0.5;
+
+    // Start with center sample (highest weight)
+    let center_uv = select(uv, clamp(uv, clip_min, clip_max), has_clip);
+    var color = textureSample(backdrop_texture, backdrop_sampler, center_uv);
+    var total_weight = 1.0;
+
+    // Golden angle spiral for optimal sample distribution
+    let golden_angle = 2.39996323; // radians (137.5 degrees)
+
+    // More samples for smoother blur - 5 rings with 12 samples each = 60 samples
+    let num_rings = 5;
+    let samples_per_ring = 12;
+
+    for (var ring = 1; ring <= num_rings; ring++) {
+        // Non-linear ring spacing - more samples near center
+        let ring_t = f32(ring) / f32(num_rings);
+        let ring_radius = blur_radius * ring_t * ring_t; // Quadratic falloff
+        let ring_offset = ring_radius * texel_size;
+
+        for (var i = 0; i < samples_per_ring; i++) {
+            // Golden angle rotation + ring offset for spiral pattern
+            let angle = f32(i) * (6.283185 / f32(samples_per_ring)) + f32(ring) * golden_angle;
+            let offset = vec2<f32>(cos(angle), sin(angle)) * ring_offset;
+
+            var sample_pos = uv + offset;
+
+            // Clamp sample position to clip bounds if clipping is active
+            if has_clip {
+                sample_pos = clamp(sample_pos, clip_min, clip_max);
+            }
+
+            let weight = gaussian_weight(ring_radius, sigma);
+            color += textureSample(backdrop_texture, backdrop_sampler, sample_pos) * weight;
+            total_weight += weight;
+        }
+    }
+
+    return color / total_weight;
+}
+
 // Apply saturation adjustment
 fn adjust_saturation(color: vec3<f32>, saturation: f32) -> vec3<f32> {
     let luminance = dot(color, vec3<f32>(0.299, 0.587, 0.114));
@@ -970,7 +1031,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Use blur_radius directly - user controls the blur amount
     // The blur is applied to the interior, edges remain clear due to refraction
     let effective_blur = blur_radius; // Direct control - user sets exact blur amount
-    var backdrop = blur_backdrop(refracted_uv, effective_blur);
+    // Use clipped blur to prevent sampling outside scroll containers
+    var backdrop = blur_backdrop_clipped(refracted_uv, effective_blur, prim.clip_bounds);
     backdrop = vec4<f32>(adjust_saturation(backdrop.rgb, saturation), 1.0);
     backdrop = vec4<f32>(backdrop.rgb * brightness, 1.0);
 

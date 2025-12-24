@@ -94,6 +94,7 @@ impl Default for SpringConfig {
 }
 
 /// A spring-based animator
+#[derive(Clone, Copy, Debug)]
 pub struct Spring {
     config: SpringConfig,
     value: f32,

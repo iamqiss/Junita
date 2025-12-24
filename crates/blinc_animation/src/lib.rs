@@ -17,6 +17,9 @@ pub mod timeline;
 
 pub use easing::Easing;
 pub use keyframe::{Keyframe, KeyframeAnimation};
-pub use scheduler::AnimationScheduler;
+pub use scheduler::{
+    AnimatedKeyframe, AnimatedTimeline, AnimatedValue, AnimationScheduler, KeyframeId,
+    SchedulerHandle, SpringId, TimelineId,
+};
 pub use spring::{Spring, SpringConfig};
-pub use timeline::Timeline;
+pub use timeline::{Timeline, TimelineEntryId};

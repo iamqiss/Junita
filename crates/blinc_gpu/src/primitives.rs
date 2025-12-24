@@ -278,7 +278,9 @@ impl GpuPrimitive {
 /// - params: `vec4<f32>`        (16 bytes)
 /// - params2: `vec4<f32>`       (16 bytes)
 /// - type_info: `vec4<u32>`     (16 bytes)
-/// Total: 96 bytes
+/// - clip_bounds: `vec4<f32>`   (16 bytes)
+/// - clip_radius: `vec4<f32>`   (16 bytes)
+/// Total: 128 bytes
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct GpuGlassPrimitive {
@@ -296,8 +298,12 @@ pub struct GpuGlassPrimitive {
     /// - shadow_blur: blur radius for drop shadow (default 0 = no shadow)
     /// - shadow_opacity: opacity of the drop shadow (default 0 = no shadow)
     pub params2: [f32; 4],
-    /// Type info (glass_type, 0, 0, 0)
+    /// Type info (glass_type, shadow_offset_x_bits, shadow_offset_y_bits, clip_type)
     pub type_info: [u32; 4],
+    /// Clip bounds (x, y, width, height) for clipping blur samples
+    pub clip_bounds: [f32; 4],
+    /// Clip corner radii (for rounded rect clips)
+    pub clip_radius: [f32; 4],
 }
 
 impl Default for GpuGlassPrimitive {
@@ -309,7 +315,10 @@ impl Default for GpuGlassPrimitive {
             params: [20.0, 1.0, 1.0, 0.0],    // blur=20, saturation=1, brightness=1, noise=0
             // border_thickness=0.8, light_angle=-PI/4 (top-left, -45 degrees)
             params2: [0.8, -std::f32::consts::FRAC_PI_4, 0.0, 0.0],
-            type_info: [GlassType::Regular as u32, 0, 0, 0],
+            type_info: [GlassType::Regular as u32, 0, 0, ClipType::None as u32],
+            // No clip by default (very large bounds)
+            clip_bounds: [-10000.0, -10000.0, 100000.0, 100000.0],
+            clip_radius: [0.0; 4],
         }
     }
 }
@@ -477,6 +486,54 @@ impl GpuGlassPrimitive {
     pub fn flat(mut self) -> Self {
         // Store -0.0 which has sign bit set but value 0
         self.type_info[3] = (-0.0_f32).to_bits();
+        self
+    }
+
+    /// Set rectangular clip region for blur sampling
+    ///
+    /// Blur samples outside this region will be clamped to the edge,
+    /// preventing blur from bleeding outside scroll containers.
+    pub fn with_clip_rect(mut self, x: f32, y: f32, width: f32, height: f32) -> Self {
+        self.clip_bounds = [x, y, width, height];
+        self.clip_radius = [0.0; 4];
+        self
+    }
+
+    /// Set rounded rectangular clip region
+    pub fn with_clip_rounded_rect(
+        mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        radius: f32,
+    ) -> Self {
+        self.clip_bounds = [x, y, width, height];
+        self.clip_radius = [radius; 4];
+        self
+    }
+
+    /// Set rounded rectangular clip region with per-corner radii
+    pub fn with_clip_rounded_rect_per_corner(
+        mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        tl: f32,
+        tr: f32,
+        br: f32,
+        bl: f32,
+    ) -> Self {
+        self.clip_bounds = [x, y, width, height];
+        self.clip_radius = [tl, tr, br, bl];
+        self
+    }
+
+    /// Clear clip region (no clipping)
+    pub fn with_no_clip(mut self) -> Self {
+        self.clip_bounds = [-10000.0, -10000.0, 100000.0, 100000.0];
+        self.clip_radius = [0.0; 4];
         self
     }
 }

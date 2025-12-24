@@ -572,7 +572,7 @@ pub enum RenderLayer {
 }
 
 /// Visual properties for rendering an element
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct RenderProps {
     /// Background fill (solid color or gradient)
     pub background: Option<Brush>,
@@ -588,6 +588,23 @@ pub struct RenderProps {
     pub shadow: Option<Shadow>,
     /// Transform applied to this element (translate, scale, rotate)
     pub transform: Option<Transform>,
+    /// Opacity (0.0 = transparent, 1.0 = opaque)
+    pub opacity: f32,
+}
+
+impl Default for RenderProps {
+    fn default() -> Self {
+        Self {
+            background: None,
+            border_radius: CornerRadius::default(),
+            layer: RenderLayer::default(),
+            material: None,
+            node_id: None,
+            shadow: None,
+            transform: None,
+            opacity: 1.0,
+        }
+    }
 }
 
 impl RenderProps {
@@ -660,6 +677,12 @@ impl RenderProps {
     /// Set transform
     pub fn with_transform(mut self, transform: Transform) -> Self {
         self.transform = Some(transform);
+        self
+    }
+
+    /// Set opacity (0.0 = transparent, 1.0 = opaque)
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity.clamp(0.0, 1.0);
         self
     }
 }

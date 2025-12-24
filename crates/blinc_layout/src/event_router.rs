@@ -74,6 +74,7 @@ pub type EventCallback = Box<dyn FnMut(LayoutNodeId, u32)>;
 /// - Currently hovered elements (for enter/leave detection)
 /// - Currently pressed elements (for proper release targeting)
 /// - Focused element (for keyboard events)
+/// - Last scroll delta (for scroll event dispatch)
 pub struct EventRouter {
     /// Current mouse position
     mouse_x: f32,
@@ -90,6 +91,10 @@ pub struct EventRouter {
 
     /// Callback for routing events to elements
     event_callback: Option<EventCallback>,
+
+    /// Last scroll delta (for passing to event handlers)
+    scroll_delta_x: f32,
+    scroll_delta_y: f32,
 }
 
 impl Default for EventRouter {
@@ -108,6 +113,8 @@ impl EventRouter {
             pressed_target: None,
             focused: None,
             event_callback: None,
+            scroll_delta_x: 0.0,
+            scroll_delta_y: 0.0,
         }
     }
 
@@ -305,18 +312,30 @@ impl EventRouter {
     /// Handle scroll event
     ///
     /// Emits SCROLL to the element under the pointer.
+    /// Returns the target node and stores the scroll delta for event handlers.
     pub fn on_scroll(
         &mut self,
         tree: &RenderTree,
-        _delta_x: f32,
-        _delta_y: f32,
+        delta_x: f32,
+        delta_y: f32,
     ) -> Option<(LayoutNodeId, u32)> {
+        // Store delta for event dispatch
+        self.scroll_delta_x = delta_x;
+        self.scroll_delta_y = delta_y;
+
         if let Some(hit) = self.hit_test(tree, self.mouse_x, self.mouse_y) {
             self.emit_event(hit.node, event_types::SCROLL);
             Some((hit.node, event_types::SCROLL))
         } else {
             None
         }
+    }
+
+    /// Get the last scroll delta
+    ///
+    /// Use this to retrieve scroll delta when dispatching scroll events.
+    pub fn scroll_delta(&self) -> (f32, f32) {
+        (self.scroll_delta_x, self.scroll_delta_y)
     }
 
     // =========================================================================

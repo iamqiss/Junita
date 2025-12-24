@@ -223,6 +223,112 @@ pub enum TextFieldState {
     Disabled,
 }
 
+/// Scroll container states for webkit-style bounce scroll
+///
+/// State machine for handling scroll behavior with inertia and spring bounce:
+///
+/// ```text
+///                    SCROLL
+///     Idle ─────────────────────► Scrolling
+///       ▲                            │
+///       │                            │ SCROLL_END (velocity > 0)
+///       │ settled                    ▼
+///       └───────────── Decelerating ─┘
+///       │                   │
+///       │ settled           │ hit edge
+///       │                   ▼
+///       └───────────── Bouncing
+/// ```
+///
+/// # Events
+///
+/// - `SCROLL` (30): Active scroll input (wheel/trackpad)
+/// - `SCROLL_END` (31): User stopped scrolling, begin deceleration
+/// - `ANIMATION_TICK` (internal): Spring/deceleration update
+///
+/// # Bounce Physics
+///
+/// When content scrolls past edges, enters `Bouncing` state with spring
+/// animation that pulls content back to bounds. Uses `blinc_animation::Spring`
+/// with webkit-style wobbly configuration for natural feel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum ScrollState {
+    /// No scrolling, content at rest
+    #[default]
+    Idle,
+    /// Active user scrolling (receiving scroll events)
+    Scrolling,
+    /// Momentum scrolling after user release (inertia)
+    Decelerating,
+    /// Overscroll spring animation (bouncing back to bounds)
+    Bouncing,
+}
+
+impl ScrollState {
+    /// Returns true if the scroll is actively moving (not idle)
+    pub fn is_active(&self) -> bool {
+        !matches!(self, ScrollState::Idle)
+    }
+
+    /// Returns true if spring bounce animation is active
+    pub fn is_bouncing(&self) -> bool {
+        matches!(self, ScrollState::Bouncing)
+    }
+
+    /// Returns true if decelerating with momentum
+    pub fn is_decelerating(&self) -> bool {
+        matches!(self, ScrollState::Decelerating)
+    }
+}
+
+/// Internal events for scroll animation (not exposed to users)
+pub mod scroll_events {
+    /// Animation tick (spring/deceleration update)
+    pub const ANIMATION_TICK: u32 = 10000;
+    /// Velocity has settled to zero
+    pub const SETTLED: u32 = 10001;
+    /// Scroll hit content edge (overscroll)
+    pub const HIT_EDGE: u32 = 10002;
+}
+
+impl StateTransitions for ScrollState {
+    fn on_event(&self, event: u32) -> Option<Self> {
+        use blinc_core::events::event_types::*;
+        use scroll_events::*;
+
+        match (self, event) {
+            // Idle -> Scrolling: User starts scrolling
+            (ScrollState::Idle, SCROLL) => Some(ScrollState::Scrolling),
+
+            // Scrolling -> Scrolling: Continue receiving scroll events (no change)
+            (ScrollState::Scrolling, SCROLL) => None,
+
+            // Scrolling -> Decelerating: User released, start momentum
+            (ScrollState::Scrolling, SCROLL_END) => Some(ScrollState::Decelerating),
+
+            // Scrolling -> Bouncing: Hit edge while scrolling
+            (ScrollState::Scrolling, HIT_EDGE) => Some(ScrollState::Bouncing),
+
+            // Decelerating -> Idle: Velocity settled
+            (ScrollState::Decelerating, SETTLED) => Some(ScrollState::Idle),
+
+            // Decelerating -> Bouncing: Hit edge during momentum
+            (ScrollState::Decelerating, HIT_EDGE) => Some(ScrollState::Bouncing),
+
+            // Decelerating -> Scrolling: User scrolls during deceleration
+            (ScrollState::Decelerating, SCROLL) => Some(ScrollState::Scrolling),
+
+            // Bouncing -> Idle: Spring settled
+            (ScrollState::Bouncing, SETTLED) => Some(ScrollState::Idle),
+
+            // Bouncing -> Scrolling: User scrolls during bounce
+            (ScrollState::Bouncing, SCROLL) => Some(ScrollState::Scrolling),
+
+            _ => None,
+        }
+    }
+}
+
 impl TextFieldState {
     /// Returns true if the text field is focused
     pub fn is_focused(&self) -> bool {
@@ -1208,6 +1314,9 @@ pub type StatefulCheckbox = Stateful<CheckboxState>;
 
 /// A stateful text field element
 pub type StatefulTextField = Stateful<TextFieldState>;
+
+/// A stateful scroll container element
+pub type StatefulScroll = Stateful<ScrollState>;
 
 // =========================================================================
 // Convenience Constructors
