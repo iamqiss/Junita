@@ -2,13 +2,14 @@
 //!
 //! Wraps the GPU rendering pipeline with a clean API.
 
-use blinc_core::Rect;
+use blinc_core::{Brush, Color, CornerRadius, DrawCommand, Rect, Stroke};
 use blinc_gpu::{
     GpuGlyph, GpuImage, GpuImageInstance, GpuPaintContext, GpuRenderer, ImageRenderingContext,
     TextAlignment, TextAnchor, TextRenderingContext,
 };
 use blinc_layout::div::{FontWeight, TextAlign, TextVerticalAlign};
 use blinc_layout::prelude::*;
+use blinc_layout::render_state::Overlay;
 use blinc_layout::renderer::ElementType;
 use blinc_svg::SvgDocument;
 use std::collections::HashMap;
@@ -111,14 +112,24 @@ impl RenderContext {
         height: u32,
         target: &wgpu::TextureView,
     ) -> Result<()> {
-        // Create paint contexts for each layer
-        let mut bg_ctx = GpuPaintContext::new(width as f32, height as f32);
-        let mut fg_ctx = GpuPaintContext::new(width as f32, height as f32);
+        // Create paint contexts for each layer with text rendering support
+        let mut bg_ctx =
+            GpuPaintContext::with_text_context(width as f32, height as f32, &mut self.text_ctx);
 
-        // Render layout layers
+        // Render layout layers (background and glass go to bg_ctx)
         tree.render_to_layer(&mut bg_ctx, RenderLayer::Background);
         tree.render_to_layer(&mut bg_ctx, RenderLayer::Glass);
+
+        // Take the batch from bg_ctx before we can reuse text_ctx for fg_ctx
+        let bg_batch = bg_ctx.take_batch();
+
+        // Create foreground context with text rendering support
+        let mut fg_ctx =
+            GpuPaintContext::with_text_context(width as f32, height as f32, &mut self.text_ctx);
         tree.render_to_layer(&mut fg_ctx, RenderLayer::Foreground);
+
+        // Take the batch from fg_ctx before reusing text_ctx for text elements
+        let fg_batch = fg_ctx.take_batch();
 
         // Collect text, SVG, and image elements
         let (texts, svgs, images) = self.collect_render_elements(tree);
@@ -198,16 +209,18 @@ impl RenderContext {
             }
         }
 
-        // Render SVGs to foreground context
+        // Render SVGs to a new foreground context (svg_ctx)
+        // We need a fresh context since fg_ctx's batch was already taken
+        let mut svg_ctx = GpuPaintContext::new(width as f32, height as f32);
         for (source, x, y, w, h) in &svgs {
             if let Ok(doc) = SvgDocument::from_str(source) {
-                doc.render_fit(&mut fg_ctx, Rect::new(*x, *y, *w, *h));
+                doc.render_fit(&mut svg_ctx, Rect::new(*x, *y, *w, *h));
             }
         }
 
-        // Take batches
-        let bg_batch = bg_ctx.take_batch();
-        let fg_batch = fg_ctx.take_batch();
+        // Merge SVG batch into foreground batch
+        let mut fg_batch = fg_batch;
+        fg_batch.merge(svg_ctx.take_batch());
 
         self.renderer.resize(width, height);
         self.ensure_textures(width, height);
@@ -735,6 +748,8 @@ impl RenderContext {
                         layer: effective_layer,
                     });
                 }
+                // Canvas elements are rendered inline during tree traversal (in render_layer)
+                ElementType::Canvas(_) => {}
                 ElementType::Div => {}
             }
         }
@@ -769,5 +784,97 @@ impl RenderContext {
     /// Get the texture format used by the renderer
     pub fn texture_format(&self) -> wgpu::TextureFormat {
         self.renderer.texture_format()
+    }
+
+    /// Render a layout tree with dynamic render state overlays
+    ///
+    /// This method renders:
+    /// 1. The stable RenderTree (element hierarchy and layout)
+    /// 2. RenderState overlays (cursors, selections, focus rings)
+    ///
+    /// The RenderState overlays are drawn on top of the tree without requiring
+    /// tree rebuilds. This enables smooth cursor blinking and animations.
+    pub fn render_tree_with_state(
+        &mut self,
+        tree: &RenderTree,
+        render_state: &blinc_layout::RenderState,
+        width: u32,
+        height: u32,
+        target: &wgpu::TextureView,
+    ) -> Result<()> {
+        // First render the tree as normal
+        self.render_tree(tree, width, height, target)?;
+
+        // Then render overlays from RenderState
+        self.render_overlays(render_state, width, height, target);
+
+        Ok(())
+    }
+
+    /// Render overlays from RenderState (cursors, selections, focus rings)
+    fn render_overlays(
+        &mut self,
+        render_state: &blinc_layout::RenderState,
+        width: u32,
+        height: u32,
+        target: &wgpu::TextureView,
+    ) {
+        let overlays = render_state.overlays();
+        if overlays.is_empty() {
+            return;
+        }
+
+        // Create a paint context for overlays
+        let mut overlay_ctx = GpuPaintContext::new(width as f32, height as f32);
+
+        for overlay in overlays {
+            match overlay {
+                Overlay::Cursor {
+                    position,
+                    size,
+                    color,
+                    opacity,
+                } => {
+                    if *opacity > 0.0 {
+                        // Apply opacity to cursor color
+                        let cursor_color = Color::rgba(color.r, color.g, color.b, color.a * opacity);
+                        overlay_ctx.execute_command(&DrawCommand::FillRect {
+                            rect: Rect::new(position.0, position.1, size.0, size.1),
+                            corner_radius: CornerRadius::default(),
+                            brush: Brush::Solid(cursor_color),
+                        });
+                    }
+                }
+                Overlay::Selection { rects, color } => {
+                    for (x, y, w, h) in rects {
+                        overlay_ctx.execute_command(&DrawCommand::FillRect {
+                            rect: Rect::new(*x, *y, *w, *h),
+                            corner_radius: CornerRadius::default(),
+                            brush: Brush::Solid(*color),
+                        });
+                    }
+                }
+                Overlay::FocusRing {
+                    position,
+                    size,
+                    radius,
+                    color,
+                    thickness,
+                } => {
+                    overlay_ctx.execute_command(&DrawCommand::StrokeRect {
+                        rect: Rect::new(position.0, position.1, size.0, size.1),
+                        corner_radius: CornerRadius::uniform(*radius),
+                        stroke: Stroke::new(*thickness),
+                        brush: Brush::Solid(*color),
+                    });
+                }
+            }
+        }
+
+        // Render overlays as an overlay pass (on top of existing content)
+        let overlay_batch = overlay_ctx.take_batch();
+        if !overlay_batch.is_empty() {
+            self.renderer.render_overlay(target, &overlay_batch);
+        }
     }
 }

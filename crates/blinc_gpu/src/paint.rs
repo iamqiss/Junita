@@ -52,6 +52,7 @@ use crate::path::{tessellate_fill, tessellate_stroke};
 use crate::primitives::{
     ClipType, FillType, GpuGlassPrimitive, GpuPrimitive, PrimitiveBatch, PrimitiveType,
 };
+use crate::text::TextRenderingContext;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Transform Stack
@@ -87,7 +88,7 @@ impl Default for TransformState {
 ///
 /// This translates high-level drawing commands into GPU primitives that can
 /// be efficiently rendered by the `GpuRenderer`.
-pub struct GpuPaintContext {
+pub struct GpuPaintContext<'a> {
     /// Batched primitives ready for GPU rendering
     batch: PrimitiveBatch,
     /// Transform stack
@@ -104,9 +105,11 @@ pub struct GpuPaintContext {
     is_3d: bool,
     /// Current camera (for 3D mode)
     camera: Option<Camera>,
+    /// Text rendering context (optional, for draw_text support)
+    text_ctx: Option<&'a mut TextRenderingContext>,
 }
 
-impl GpuPaintContext {
+impl<'a> GpuPaintContext<'a> {
     /// Create a new GPU paint context
     pub fn new(width: f32, height: f32) -> Self {
         Self {
@@ -118,7 +121,32 @@ impl GpuPaintContext {
             viewport: Size::new(width, height),
             is_3d: false,
             camera: None,
+            text_ctx: None,
         }
+    }
+
+    /// Create a new GPU paint context with text rendering support
+    pub fn with_text_context(
+        width: f32,
+        height: f32,
+        text_ctx: &'a mut TextRenderingContext,
+    ) -> Self {
+        Self {
+            batch: PrimitiveBatch::new(),
+            transform_stack: vec![Affine2D::IDENTITY],
+            opacity_stack: vec![1.0],
+            blend_mode_stack: vec![BlendMode::Normal],
+            clip_stack: Vec::new(),
+            viewport: Size::new(width, height),
+            is_3d: false,
+            camera: None,
+            text_ctx: Some(text_ctx),
+        }
+    }
+
+    /// Set the text rendering context
+    pub fn set_text_context(&mut self, text_ctx: &'a mut TextRenderingContext) {
+        self.text_ctx = Some(text_ctx);
     }
 
     /// Get the current transform
@@ -167,6 +195,31 @@ impl GpuPaintContext {
             rect.size.width * scale_x,
             rect.size.height * scale_y,
         )
+    }
+
+    /// Transform gradient parameters by the current transform
+    /// For linear gradients, transforms (x1, y1, x2, y2) to screen space
+    /// For radial gradients, transforms (cx, cy, radius, 0) to screen space
+    fn transform_gradient_params(&self, params: [f32; 4], is_radial: bool) -> [f32; 4] {
+        if is_radial {
+            // Radial gradient: (cx, cy, radius, 0)
+            let center = self.transform_point(Point::new(params[0], params[1]));
+            // Scale radius by average scale factor
+            let affine = self.current_affine();
+            let a = affine.elements[0];
+            let b = affine.elements[1];
+            let c = affine.elements[2];
+            let d = affine.elements[3];
+            let scale_x = (a * a + b * b).sqrt();
+            let scale_y = (c * c + d * d).sqrt();
+            let avg_scale = (scale_x + scale_y) / 2.0;
+            [center.x, center.y, params[2] * avg_scale, params[3]]
+        } else {
+            // Linear gradient: (x1, y1, x2, y2)
+            let start = self.transform_point(Point::new(params[0], params[1]));
+            let end = self.transform_point(Point::new(params[2], params[3]));
+            [start.x, start.y, end.x, end.y]
+        }
     }
 
     /// Transform a clip shape by the current transform
@@ -387,6 +440,9 @@ impl GpuPaintContext {
 
     /// Get clip data from the current clip stack
     /// Returns (clip_bounds, clip_radius, clip_type)
+    ///
+    /// For multiple rect clips, computes the intersection of all clips.
+    /// For mixed clip types, uses the topmost clip (conservative approximation).
     fn get_clip_data(&self) -> ([f32; 4], [f32; 4], ClipType) {
         if self.clip_stack.is_empty() {
             // No clip - use large bounds
@@ -397,9 +453,58 @@ impl GpuPaintContext {
             );
         }
 
-        // Use the topmost clip shape
-        // Note: For multiple clips, a more sophisticated approach would be needed
-        // (e.g., stencil buffer or computing intersection)
+        // Try to compute intersection of all rect clips
+        // Start with very large bounds
+        let mut intersect_min_x = f32::NEG_INFINITY;
+        let mut intersect_min_y = f32::NEG_INFINITY;
+        let mut intersect_max_x = f32::INFINITY;
+        let mut intersect_max_y = f32::INFINITY;
+        let mut has_rect_clips = false;
+        let mut combined_radius = [0.0f32; 4];
+
+        for clip in &self.clip_stack {
+            match clip {
+                ClipShape::Rect(rect) => {
+                    // Intersect with this rect
+                    intersect_min_x = intersect_min_x.max(rect.x());
+                    intersect_min_y = intersect_min_y.max(rect.y());
+                    intersect_max_x = intersect_max_x.min(rect.x() + rect.width());
+                    intersect_max_y = intersect_max_y.min(rect.y() + rect.height());
+                    has_rect_clips = true;
+                }
+                ClipShape::RoundedRect { rect, corner_radius } => {
+                    // Intersect with this rect
+                    intersect_min_x = intersect_min_x.max(rect.x());
+                    intersect_min_y = intersect_min_y.max(rect.y());
+                    intersect_max_x = intersect_max_x.min(rect.x() + rect.width());
+                    intersect_max_y = intersect_max_y.min(rect.y() + rect.height());
+                    // Use the maximum corner radius (conservative)
+                    combined_radius[0] = combined_radius[0].max(corner_radius.top_left);
+                    combined_radius[1] = combined_radius[1].max(corner_radius.top_right);
+                    combined_radius[2] = combined_radius[2].max(corner_radius.bottom_right);
+                    combined_radius[3] = combined_radius[3].max(corner_radius.bottom_left);
+                    has_rect_clips = true;
+                }
+                // For non-rect clips, fall back to topmost-only behavior
+                ClipShape::Circle { .. } | ClipShape::Ellipse { .. } | ClipShape::Path(_) => {
+                    // Can't easily intersect with circles/ellipses/paths
+                    // Fall through to use the topmost clip
+                }
+            }
+        }
+
+        // If we have rect clips, use the intersection
+        if has_rect_clips {
+            let width = (intersect_max_x - intersect_min_x).max(0.0);
+            let height = (intersect_max_y - intersect_min_y).max(0.0);
+            return (
+                [intersect_min_x, intersect_min_y, width, height],
+                combined_radius,
+                ClipType::Rect,
+            );
+        }
+
+        // Fall back to topmost clip for non-rect clips
         let clip = self.clip_stack.last().unwrap();
         match clip {
             ClipShape::Rect(rect) => (
@@ -570,7 +675,7 @@ impl GpuPaintContext {
     }
 }
 
-impl DrawContext for GpuPaintContext {
+impl<'a> DrawContext for GpuPaintContext<'a> {
     fn push_transform(&mut self, transform: Transform) {
         let current = self.current_affine();
         let new_transform = match transform {
@@ -722,6 +827,14 @@ impl DrawContext for GpuPaintContext {
         let (color, color2, gradient_params, fill_type) = self.brush_to_colors(&brush);
         let (clip_bounds, clip_radius, clip_type) = self.get_clip_data();
 
+        // Transform gradient params to screen space
+        let is_radial = fill_type == FillType::RadialGradient;
+        let transformed_gradient_params = if fill_type != FillType::Solid {
+            self.transform_gradient_params(gradient_params, is_radial)
+        } else {
+            gradient_params
+        };
+
         let primitive = GpuPrimitive {
             bounds: [
                 transformed.x(),
@@ -743,7 +856,7 @@ impl DrawContext for GpuPaintContext {
             shadow_color: [0.0; 4],
             clip_bounds,
             clip_radius,
-            gradient_params,
+            gradient_params: transformed_gradient_params,
             type_info: [
                 PrimitiveType::Rect as u32,
                 fill_type as u32,
@@ -829,6 +942,14 @@ impl DrawContext for GpuPaintContext {
         let (color, color2, gradient_params, fill_type) = self.brush_to_colors(&brush);
         let (clip_bounds, clip_radius, clip_type) = self.get_clip_data();
 
+        // Transform gradient params to screen space
+        let is_radial = fill_type == FillType::RadialGradient;
+        let transformed_gradient_params = if fill_type != FillType::Solid {
+            self.transform_gradient_params(gradient_params, is_radial)
+        } else {
+            gradient_params
+        };
+
         let primitive = GpuPrimitive {
             bounds: [
                 transformed_center.x - transformed_radius,
@@ -845,7 +966,7 @@ impl DrawContext for GpuPaintContext {
             shadow_color: [0.0; 4],
             clip_bounds,
             clip_radius,
-            gradient_params,
+            gradient_params: transformed_gradient_params,
             type_info: [
                 PrimitiveType::Circle as u32,
                 fill_type as u32,
@@ -870,6 +991,14 @@ impl DrawContext for GpuPaintContext {
         let (color, _, gradient_params, fill_type) = self.brush_to_colors(&brush);
         let (clip_bounds, clip_radius, clip_type) = self.get_clip_data();
 
+        // Transform gradient params to screen space
+        let is_radial = fill_type == FillType::RadialGradient;
+        let transformed_gradient_params = if fill_type != FillType::Solid {
+            self.transform_gradient_params(gradient_params, is_radial)
+        } else {
+            gradient_params
+        };
+
         let primitive = GpuPrimitive {
             bounds: [
                 transformed_center.x - transformed_radius,
@@ -886,7 +1015,7 @@ impl DrawContext for GpuPaintContext {
             shadow_color: [0.0; 4],
             clip_bounds,
             clip_radius,
-            gradient_params,
+            gradient_params: transformed_gradient_params,
             type_info: [
                 PrimitiveType::Circle as u32,
                 fill_type as u32,
@@ -898,12 +1027,69 @@ impl DrawContext for GpuPaintContext {
         self.batch.push(primitive);
     }
 
-    fn draw_text(&mut self, _text: &str, _origin: Point, _style: &TextStyle) {
-        // Text rendering would require:
-        // 1. Font loading and glyph rasterization
-        // 2. Glyph atlas management
-        // 3. Text layout (shaping, line breaking)
-        // This is a placeholder for now
+    fn draw_text(&mut self, text: &str, origin: Point, style: &TextStyle) {
+        use blinc_core::{TextAlign, TextBaseline};
+        use blinc_text::{TextAlignment, TextAnchor};
+
+        // Check if text context is available
+        if self.text_ctx.is_none() {
+            return;
+        }
+
+        // Transform origin by current transform
+        let transformed_origin = self.transform_point(origin);
+
+        // Get current opacity
+        let opacity = self.combined_opacity();
+
+        // Get clip data before borrowing text_ctx
+        let (clip_bounds, _, _) = self.get_clip_data();
+
+        // Convert TextStyle color to [f32; 4] with opacity applied
+        let color = [
+            style.color.r,
+            style.color.g,
+            style.color.b,
+            style.color.a * opacity,
+        ];
+
+        // Map TextAlign to TextAlignment
+        let alignment = match style.align {
+            TextAlign::Left => TextAlignment::Left,
+            TextAlign::Center => TextAlignment::Center,
+            TextAlign::Right => TextAlignment::Right,
+        };
+
+        // Map TextBaseline to TextAnchor
+        let anchor = match style.baseline {
+            TextBaseline::Top => TextAnchor::Top,
+            TextBaseline::Middle => TextAnchor::Center,
+            TextBaseline::Alphabetic => TextAnchor::Baseline,
+            TextBaseline::Bottom => TextAnchor::Baseline, // Approximate with baseline
+        };
+
+        // Now borrow text_ctx and prepare glyphs
+        let text_ctx = self.text_ctx.as_mut().unwrap();
+        if let Ok(mut glyphs) = text_ctx.prepare_text_with_options(
+            text,
+            transformed_origin.x,
+            transformed_origin.y,
+            style.size,
+            color,
+            anchor,
+            alignment,
+            None, // No width constraint
+        ) {
+            // Apply current clip bounds to all glyphs
+            for glyph in &mut glyphs {
+                glyph.clip_bounds = clip_bounds;
+            }
+
+            // Add glyphs to batch
+            for glyph in glyphs {
+                self.batch.push_glyph(glyph);
+            }
+        }
     }
 
     fn draw_image(&mut self, _image: ImageId, _rect: Rect, _options: &ImageOptions) {
@@ -1174,8 +1360,8 @@ impl DrawContext for GpuPaintContext {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// SDF builder that directly emits GPU primitives
-struct GpuSdfBuilder<'a> {
-    ctx: &'a mut GpuPaintContext,
+struct GpuSdfBuilder<'a, 'b> {
+    ctx: &'a mut GpuPaintContext<'b>,
     shapes: Vec<SdfShapeData>,
 }
 
@@ -1195,8 +1381,8 @@ enum SdfShapeData {
     },
 }
 
-impl<'a> GpuSdfBuilder<'a> {
-    fn new(ctx: &'a mut GpuPaintContext) -> Self {
+impl<'a, 'b> GpuSdfBuilder<'a, 'b> {
+    fn new(ctx: &'a mut GpuPaintContext<'b>) -> Self {
         Self {
             ctx,
             shapes: Vec::new(),
@@ -1210,7 +1396,7 @@ impl<'a> GpuSdfBuilder<'a> {
     }
 }
 
-impl<'a> SdfBuilder for GpuSdfBuilder<'a> {
+impl<'a, 'b> SdfBuilder for GpuSdfBuilder<'a, 'b> {
     fn rect(&mut self, rect: Rect, corner_radius: CornerRadius) -> ShapeId {
         self.add_shape(SdfShapeData::Rect {
             rect,

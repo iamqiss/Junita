@@ -1229,7 +1229,7 @@ impl Div {
     /// ```
     pub fn on_click<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_click(handler);
         self
@@ -1238,7 +1238,7 @@ impl Div {
     /// Register a mouse down handler
     pub fn on_mouse_down<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_mouse_down(handler);
         self
@@ -1247,7 +1247,7 @@ impl Div {
     /// Register a mouse up handler
     pub fn on_mouse_up<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_mouse_up(handler);
         self
@@ -1264,7 +1264,7 @@ impl Div {
     /// ```
     pub fn on_hover_enter<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_hover_enter(handler);
         self
@@ -1273,7 +1273,7 @@ impl Div {
     /// Register a hover leave handler
     pub fn on_hover_leave<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_hover_leave(handler);
         self
@@ -1282,7 +1282,7 @@ impl Div {
     /// Register a focus handler
     pub fn on_focus<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_focus(handler);
         self
@@ -1291,7 +1291,7 @@ impl Div {
     /// Register a blur handler
     pub fn on_blur<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_blur(handler);
         self
@@ -1300,7 +1300,7 @@ impl Div {
     /// Register a mount handler (element added to tree)
     pub fn on_mount<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_mount(handler);
         self
@@ -1309,7 +1309,7 @@ impl Div {
     /// Register an unmount handler (element removed from tree)
     pub fn on_unmount<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_unmount(handler);
         self
@@ -1318,7 +1318,7 @@ impl Div {
     /// Register a key down handler (requires focus)
     pub fn on_key_down<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_key_down(handler);
         self
@@ -1327,7 +1327,7 @@ impl Div {
     /// Register a key up handler (requires focus)
     pub fn on_key_up<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_key_up(handler);
         self
@@ -1336,7 +1336,7 @@ impl Div {
     /// Register a scroll handler
     pub fn on_scroll<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_scroll(handler);
         self
@@ -1345,7 +1345,7 @@ impl Div {
     /// Register a text input handler (receives character input when focused)
     pub fn on_text_input<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_text_input(handler);
         self
@@ -1354,7 +1354,7 @@ impl Div {
     /// Register a resize handler
     pub fn on_resize<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on_resize(handler);
         self
@@ -1375,7 +1375,7 @@ impl Div {
     /// ```
     pub fn on_event<F>(mut self, event_type: blinc_core::events::EventType, handler: F) -> Self
     where
-        F: Fn(&crate::event_handler::EventContext) + Send + Sync + 'static,
+        F: Fn(&crate::event_handler::EventContext) + 'static,
     {
         self.event_handlers.on(event_type, handler);
         self
@@ -1389,6 +1389,7 @@ pub enum ElementTypeId {
     Text,
     Svg,
     Image,
+    Canvas,
 }
 
 /// Text alignment options
@@ -1507,7 +1508,9 @@ impl Default for ImageRenderInfo {
 }
 
 /// Trait for types that can build into layout elements
-pub trait ElementBuilder: Send {
+///
+/// Note: No Send/Sync requirement - UI is single-threaded.
+pub trait ElementBuilder {
     /// Build this element into a layout tree, returning the node ID
     fn build(&self, tree: &mut LayoutTree) -> LayoutNodeId;
 
@@ -1534,6 +1537,11 @@ pub trait ElementBuilder: Send {
 
     /// Get image render info if this is an image element
     fn image_render_info(&self) -> Option<ImageRenderInfo> {
+        None
+    }
+
+    /// Get canvas render info if this is a canvas element
+    fn canvas_render_info(&self) -> Option<crate::canvas::CanvasRenderFn> {
         None
     }
 
@@ -1570,6 +1578,11 @@ impl ElementBuilder for Div {
     }
 
     fn render_props(&self) -> RenderProps {
+        // Check if overflow is set to clip content (Clip or Scroll)
+        // Overflow::Visible is the only mode that doesn't clip
+        let clips_content = !matches!(self.style.overflow.x, Overflow::Visible)
+            || !matches!(self.style.overflow.y, Overflow::Visible);
+
         RenderProps {
             background: self.background.clone(),
             border_radius: self.border_radius,
@@ -1579,7 +1592,7 @@ impl ElementBuilder for Div {
             shadow: self.shadow,
             transform: self.transform.clone(),
             opacity: self.opacity,
-            clips_content: false,
+            clips_content,
         }
     }
 

@@ -32,9 +32,7 @@ fn main() -> Result<()> {
 
     // Run the windowed application
     // Note: State is managed at the component level using keyed use_state
-    WindowedApp::run(config, |ctx| {
-        build_ui(ctx)
-    })
+    WindowedApp::run(config, |ctx| build_ui(ctx))
 }
 
 /// Build the UI based on the current window context
@@ -170,10 +168,16 @@ fn build_content(ctx: &WindowedContext) -> impl ElementBuilder {
                 .items_center()
                 .justify_center()
                 .gap(16.0)
-                .child(text("Welcome to Blinc").weight(FontWeight::ExtraBold).text_center().size(64.0).color(Color::WHITE))
+                .child(
+                    text("Welcome to Blinc")
+                        .weight(FontWeight::ExtraBold)
+                        .text_center()
+                        .size(64.0)
+                        .color(Color::WHITE),
+                )
                 .child(
                     text("A modern UI framework for Rust")
-                    .text_center()
+                        .text_center()
                         .size(32.0)
                         .color(Color::WHITE),
                 ),
@@ -186,16 +190,33 @@ fn build_content(ctx: &WindowedContext) -> impl ElementBuilder {
                 .flex_row()
                 .gap(16.0)
                 .items_center()
-                .child(feature_card(ctx, "Glass Effects", Color::rgba(1.0, 0.4, 0.6, 0.8)))
-                .child(feature_card(ctx, "Flexbox Layout", Color::rgba(0.3, 0.5, 1.0, 0.8)))
-                .child(feature_card(ctx, "GPU Rendered", Color::rgba(0.6, 0.3, 0.9, 0.8))),
+                .child(feature_card(
+                    ctx,
+                    "Glass Effects",
+                    Color::rgba(1.0, 0.4, 0.6, 0.8),
+                ))
+                .child(feature_card(
+                    ctx,
+                    "Flexbox Layout",
+                    Color::rgba(0.3, 0.5, 1.0, 0.8),
+                ))
+                .child(feature_card(
+                    ctx,
+                    "GPU Rendered",
+                    Color::rgba(0.6, 0.3, 0.9, 0.8),
+                )),
         )
         // Image showcase card with hover effect
         .child(build_image_showcase(ctx))
 }
 
 /// Build the info panel with window state (responds to resize/focus events)
-fn build_info_panel(width: f32, height: f32, scale_factor: f64, focused: bool) -> impl ElementBuilder {
+fn build_info_panel(
+    width: f32,
+    height: f32,
+    scale_factor: f64,
+    focused: bool,
+) -> impl ElementBuilder {
     // Focus indicator color changes based on window focus state
     let focus_color = if focused {
         Color::rgba(0.3, 1.0, 0.5, 1.0) // Green when focused
@@ -219,7 +240,11 @@ fn build_info_panel(width: f32, height: f32, scale_factor: f64, focused: bool) -
                 .items_center()
                 .gap(4.0)
                 .child(text("Size").bold().size(24.0).color(Color::WHITE))
-                .child(text(&format!("{}x{}", width as u32, height as u32)).size(30.0).color(Color::WHITE)),
+                .child(
+                    text(&format!("{}x{}", width as u32, height as u32))
+                        .size(30.0)
+                        .color(Color::WHITE),
+                ),
         )
         // Scale info
         .child(info_item("Scale", &format!("{:.1}x", scale_factor)))
@@ -237,13 +262,9 @@ fn build_info_panel(width: f32, height: f32, scale_factor: f64, focused: bool) -
                         .gap(8.0)
                         .child(
                             // Focus indicator dot
-                            div()
-                                .w(12.0)
-                                .h(12.0)
-                                .rounded(6.0)
-                                .bg(focus_color)
+                            div().w(12.0).h(12.0).rounded(6.0).bg(focus_color),
                         )
-                        .child(text(focus_text).size(30.0).color(Color::WHITE))
+                        .child(text(focus_text).size(30.0).color(Color::WHITE)),
                 ),
         )
 }
@@ -269,46 +290,46 @@ fn feature_card(ctx: &WindowedContext, label: &str, accent: Color) -> impl Eleme
     stateful(handle)
         .w_fit()
         .p(4.0)
+        .flex_col()
         .rounded(14.0)
-        .on_state(move |state, div| {
-            match state {
-                ButtonState::Idle => {
-                    *div = div.swap()
-                        .bg(accent)
-                        .shadow(Shadow::new(0.0, 2.0, 4.0, Color::rgba(0.0, 0.0, 0.0, 0.2)))
-                        .rounded(14.0);
-                }
-                ButtonState::Hovered => {
-                    let hover_color = Color::rgba(
-                        (accent.r * 1.15).min(1.0),
-                        (accent.g * 1.15).min(1.0),
-                        (accent.b * 1.15).min(1.0),
-                        accent.a,
-                    );
-                    *div = div.swap()
-                        .bg(hover_color)
-                        .shadow(Shadow::new(0.0, 8.0, 16.0, Color::rgba(0.0, 0.0, 0.0, 0.35)))
-                        .rounded(16.0)
-                        .transform(Transform::scale(1.05, 1.05));
-                }
-                ButtonState::Pressed => {
-                    let press_color = Color::rgba(
-                        accent.r * 0.85,
-                        accent.g * 0.85,
-                        accent.b * 0.85,
-                        accent.a,
-                    );
-                    *div = div.swap()
-                        .bg(press_color)
-                        .shadow(Shadow::new(0.0, 1.0, 2.0, Color::rgba(0.0, 0.0, 0.0, 0.15)))
-                        .rounded(14.0)
-                        .transform(Transform::scale(0.95, 0.95));
-                }
-                ButtonState::Disabled => {
-                    *div = div.swap()
-                        .bg(Color::GRAY)
-                        .rounded(14.0);
-                }
+        .items_center()
+        .justify_center()
+        .on_state(move |state, div| match state {
+            ButtonState::Idle => {
+                div.set_bg(accent);
+                div.set_shadow(Shadow::new(0.0, 2.0, 4.0, Color::rgba(0.0, 0.0, 0.0, 0.2)));
+                div.set_rounded(14.0);
+            }
+            ButtonState::Hovered => {
+                let hover_color = Color::rgba(
+                    (accent.r * 1.15).min(1.0),
+                    (accent.g * 1.15).min(1.0),
+                    (accent.b * 1.15).min(1.0),
+                    accent.a,
+                );
+
+                div.set_bg(hover_color);
+                div.set_shadow(Shadow::new(
+                    0.0,
+                    8.0,
+                    16.0,
+                    Color::rgba(0.0, 0.0, 0.0, 0.35),
+                ));
+                div.set_rounded(16.0);
+                div.set_transform(Transform::scale(1.05, 1.05));
+            }
+            ButtonState::Pressed => {
+                let press_color =
+                    Color::rgba(accent.r * 0.85, accent.g * 0.85, accent.b * 0.85, accent.a);
+
+                div.set_bg(press_color);
+                div.set_shadow(Shadow::new(0.0, 1.0, 2.0, Color::rgba(0.0, 0.0, 0.0, 0.15)));
+                div.set_rounded(14.0);
+                div.set_transform(Transform::scale(0.95, 0.95));
+            }
+            ButtonState::Disabled => {
+                div.set_bg(Color::GRAY);
+                div.set_rounded(14.0);
             }
         })
         .on_click({
@@ -317,9 +338,10 @@ fn feature_card(ctx: &WindowedContext, label: &str, accent: Color) -> impl Eleme
         })
         .child(
             text(label)
-                .align(TextAlign::Center)
+                .text_center()
                 .size(24.0)
-                .color(Color::WHITE),
+                .color(Color::WHITE)
+                .v_center(),
         )
 }
 

@@ -134,13 +134,41 @@ impl<T: Clone + Send + 'static> State<T> {
     }
 
     /// Set a new value
+    ///
+    /// This updates the value without triggering a tree rebuild.
+    /// The renderer reads values at render time, so changes are
+    /// reflected on the next frame automatically.
+    ///
+    /// Use `set_rebuild()` only when the change affects tree structure
+    /// (adding/removing elements, changing text content, etc.)
     pub fn set(&self, value: T) {
+        self.reactive.lock().unwrap().set(self.signal, value);
+        // No rebuild by default - values are read at render time
+    }
+
+    /// Set a new value AND trigger a UI tree rebuild
+    ///
+    /// Only use this when the state change affects tree structure:
+    /// - Adding or removing elements
+    /// - Changing text content
+    /// - Changing layout-affecting properties (size, padding, etc.)
+    ///
+    /// For visual-only changes (colors, opacity, animations), use `set()`.
+    pub fn set_rebuild(&self, value: T) {
         self.reactive.lock().unwrap().set(self.signal, value);
         self.dirty_flag.store(true, Ordering::SeqCst);
     }
 
     /// Update the value using a function
+    ///
+    /// Does not trigger rebuild. Use `update_rebuild()` for structural changes.
     pub fn update(&self, f: impl FnOnce(T) -> T) {
+        self.reactive.lock().unwrap().update(self.signal, f);
+        // No rebuild by default
+    }
+
+    /// Update the value AND trigger a UI tree rebuild
+    pub fn update_rebuild(&self, f: impl FnOnce(T) -> T) {
         self.reactive.lock().unwrap().update(self.signal, f);
         self.dirty_flag.store(true, Ordering::SeqCst);
     }
@@ -654,7 +682,14 @@ impl WindowedApp {
         // Shared hook state for use_state persistence
         let hooks: SharedHookState = Arc::new(Mutex::new(HookState::new()));
         // Shared animation scheduler for spring/keyframe animations
-        let animations: SharedAnimationScheduler = Arc::new(Mutex::new(AnimationScheduler::new()));
+        // Runs on background thread so animations continue even when window loses focus
+        let mut scheduler = AnimationScheduler::new();
+        scheduler.start_background();
+        let animations: SharedAnimationScheduler = Arc::new(Mutex::new(scheduler));
+
+        // Render state: dynamic properties that update every frame without tree rebuild
+        // This includes cursor blink, animated colors, hover states, etc.
+        let mut render_state: Option<blinc_layout::RenderState> = None;
 
         event_loop
             .run(move |event, window| {
@@ -694,6 +729,11 @@ impl WindowedApp {
                                         Arc::clone(&reactive),
                                         Arc::clone(&hooks),
                                     ));
+
+                                    // Initialize render state with the shared animation scheduler
+                                    // RenderState handles dynamic properties (cursor blink, animations)
+                                    // independently from tree structure changes
+                                    render_state = Some(blinc_layout::RenderState::new(Arc::clone(&animations)));
 
                                     tracing::info!("Blinc windowed app initialized");
                                 }
@@ -750,6 +790,9 @@ impl WindowedApp {
                             event_type: u32,
                             mouse_x: f32,
                             mouse_y: f32,
+                            /// Local coordinates relative to element bounds
+                            local_x: f32,
+                            local_y: f32,
                             scroll_delta_x: f32,
                             scroll_delta_y: f32,
                             key_char: Option<char>,
@@ -769,6 +812,8 @@ impl WindowedApp {
                                     event_type: 0,
                                     mouse_x: 0.0,
                                     mouse_y: 0.0,
+                                    local_x: 0.0,
+                                    local_y: 0.0,
                                     scroll_delta_x: 0.0,
                                     scroll_delta_y: 0.0,
                                     key_char: None,
@@ -820,9 +865,12 @@ impl WindowedApp {
                                     MouseEvent::ButtonPressed { button, x, y } => {
                                         let btn = convert_mouse_button(button);
                                         router.on_mouse_down(tree, x, y, btn);
+                                        let (local_x, local_y) = router.last_hit_local();
                                         for event in pending_events.iter_mut() {
                                             event.mouse_x = x;
                                             event.mouse_y = y;
+                                            event.local_x = local_x;
+                                            event.local_y = local_y;
                                         }
                                     }
                                     MouseEvent::ButtonReleased { button, x, y } => {
@@ -973,9 +1021,12 @@ impl WindowedApp {
                                 InputEvent::Touch(touch_event) => match touch_event {
                                     TouchEvent::Started { x, y, .. } => {
                                         router.on_mouse_down(tree, x, y, MouseButton::Left);
+                                        let (local_x, local_y) = router.last_hit_local();
                                         for event in pending_events.iter_mut() {
                                             event.mouse_x = x;
                                             event.mouse_y = y;
+                                            event.local_x = local_x;
+                                            event.local_y = local_y;
                                         }
                                     }
                                     TouchEvent::Moved { x, y, .. } => {
@@ -1028,7 +1079,14 @@ impl WindowedApp {
                                         event.scroll_delta_y,
                                     );
                                 } else {
-                                    tree.dispatch_event(event.node_id, event.event_type, event.mouse_x, event.mouse_y);
+                                    tree.dispatch_event_with_local(
+                                        event.node_id,
+                                        event.event_type,
+                                        event.mouse_x,
+                                        event.mouse_y,
+                                        event.local_x,
+                                        event.local_y,
+                                    );
                                 }
                             }
 
@@ -1068,7 +1126,8 @@ impl WindowedApp {
                             Some(ref surf),
                             Some(ref config),
                             Some(ref mut windowed_ctx),
-                        ) = (&mut app, &surface, &surface_config, &mut ctx)
+                            Some(ref mut rs),
+                        ) = (&mut app, &surface, &surface_config, &mut ctx, &mut render_state)
                         {
                             // Get current frame
                             let frame = match surf.get_current_texture() {
@@ -1094,25 +1153,46 @@ impl WindowedApp {
                             // Update context from window
                             windowed_ctx.update_from_window(window);
 
+                            // =========================================================
+                            // PHASE 1: Check if tree structure needs rebuild
+                            // Only structural changes require tree rebuild
+                            // =========================================================
+
                             // Check if event handlers marked anything dirty (auto-rebuild)
                             if let Some(ref tree) = render_tree {
                                 if tree.needs_rebuild() {
+                                    tracing::debug!("Rebuild triggered by: dirty_tracker");
                                     needs_rebuild = true;
                                 }
                             }
 
                             // Check if element refs were modified (triggers rebuild)
                             if ref_dirty_flag.swap(false, Ordering::SeqCst) {
+                                tracing::debug!("Rebuild triggered by: ref_dirty_flag (State::set)");
                                 needs_rebuild = true;
                             }
 
-                            // Tick animations and trigger rebuild if any are still active
-                            if windowed_ctx.animations.lock().unwrap().tick() {
-                                needs_rebuild = true;
-                            }
+                            // =========================================================
+                            // PHASE 2: Tick animations and dynamic render state
+                            // This does NOT require tree rebuild
+                            // =========================================================
 
-                            // Build/rebuild render tree only when needed
-                            // The tree persists across frames for stable node IDs and event handling
+                            // Tick render state (handles cursor blink, color animations, etc.)
+                            // This updates dynamic properties without touching tree structure
+                            let current_time = elapsed_ms();
+                            let _animations_active = rs.tick(current_time);
+
+                            // Reset cursor blink when user types or focus changes
+                            // (This would be called from event handlers, not here)
+
+                            // Note: We no longer trigger rebuilds for cursor blink!
+                            // The cursor visibility is now in RenderState and will be
+                            // read during rendering without needing tree rebuild.
+
+                            // =========================================================
+                            // PHASE 3: Build/rebuild tree only for structural changes
+                            // =========================================================
+
                             if needs_rebuild || render_tree.is_none() {
                                 // Build UI and create render tree
                                 let ui = ui_builder(windowed_ctx);
@@ -1132,8 +1212,15 @@ impl WindowedApp {
                                 needs_rebuild = false;
                             }
 
-                            // Render from the cached tree
+                            // =========================================================
+                            // PHASE 4: Render
+                            // Combines stable tree structure with dynamic render state
+                            // =========================================================
+
                             if let Some(ref tree) = render_tree {
+                                // TODO: Pass render_state to renderer for cursor overlays
+                                // and animated properties. For now, we still use tree-based
+                                // cursor rendering until the renderer is updated.
                                 if let Err(e) =
                                     blinc_app.render_tree(tree, &view, windowed_ctx.width as u32, windowed_ctx.height as u32)
                                 {

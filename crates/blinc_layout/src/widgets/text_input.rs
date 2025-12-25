@@ -3,20 +3,198 @@
 //! Single-line text input with:
 //! - Input types: text, number, integer, email, password, url, tel, search
 //! - Validation support with constraints
-//! - Cursor and selection
+//! - Cursor and selection with blinking
 //! - Visual states: idle, hovered, focused
 //! - Built-in styling that just works
 //! - Inherits ALL Div methods for full layout control via Deref
 
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use blinc_core::Color;
+
+/// Get elapsed time in milliseconds since app start (for cursor blinking)
+///
+/// This is a globally consistent time source used for cursor blinking.
+/// It uses the same epoch across all text inputs.
+pub fn elapsed_ms() -> u64 {
+    static START_TIME: OnceLock<Instant> = OnceLock::new();
+    let start = START_TIME.get_or_init(Instant::now);
+    start.elapsed().as_millis() as u64
+}
+
+/// Standard cursor blink interval in milliseconds
+/// 400ms provides a responsive feel (vs. 530ms which can feel sluggish)
+pub const CURSOR_BLINK_INTERVAL_MS: u64 = 400;
+
+// =============================================================================
+// Global focus tracking - tracks focused text inputs independent of node IDs
+// This survives tree rebuilds and ensures proper blur handling
+// =============================================================================
+
+use std::sync::Weak;
+
+/// Global counter of focused text inputs
+/// Incremented when a text input gains focus, decremented when it loses focus
+static GLOBAL_FOCUS_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Global reference to the currently focused text input state
+/// Used to forcibly blur the previous input when a new one gains focus
+static FOCUSED_TEXT_INPUT: Mutex<Option<Weak<Mutex<TextInputState>>>> = Mutex::new(None);
+
+/// Global reference to the currently focused text area state
+/// Stored separately since TextAreaState is a different type
+static FOCUSED_TEXT_AREA: Mutex<Option<Weak<Mutex<crate::widgets::text_area::TextAreaState>>>> = Mutex::new(None);
+
+/// Check if any text input is currently focused
+/// This is used by the windowed app to trigger cursor blink rebuilds
+pub fn has_focused_text_input() -> bool {
+    GLOBAL_FOCUS_COUNT.load(Ordering::Relaxed) > 0
+}
+
+/// Called when a text input gains focus (internal use by text widgets)
+pub(crate) fn increment_focus_count() {
+    GLOBAL_FOCUS_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Called when a text input loses focus (internal use by text widgets)
+pub(crate) fn decrement_focus_count() {
+    // Saturating subtract to prevent underflow
+    let _ = GLOBAL_FOCUS_COUNT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+        Some(v.saturating_sub(1))
+    });
+}
+
+/// Set the currently focused text input state (called when gaining focus)
+/// This will forcibly blur any previously focused text input
+pub(crate) fn set_focused_text_input(state: &SharedTextInputState) {
+    use blinc_core::events::event_types;
+    use crate::stateful::StateTransitions;
+
+    let mut focused = FOCUSED_TEXT_INPUT.lock().unwrap();
+
+    // First, blur any previously focused text input
+    if let Some(weak) = focused.take() {
+        if let Some(prev_state) = weak.upgrade() {
+            if !Arc::ptr_eq(&prev_state, state) {
+                if let Ok(mut s) = prev_state.lock() {
+                    if s.visual.is_focused() {
+                        if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
+                            s.visual = new_state;
+                            decrement_focus_count();
+                            tracing::info!("TextInput forcibly blurred previous input");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Also blur any focused text area
+    blur_focused_text_area();
+
+    // Set new focused input
+    *focused = Some(Arc::downgrade(state));
+}
+
+/// Clear the focused text input reference (called when losing focus)
+pub(crate) fn clear_focused_text_input(state: &SharedTextInputState) {
+    let mut focused = FOCUSED_TEXT_INPUT.lock().unwrap();
+    if let Some(weak) = focused.as_ref() {
+        if let Some(prev_state) = weak.upgrade() {
+            if Arc::ptr_eq(&prev_state, state) {
+                *focused = None;
+            }
+        }
+    }
+}
+
+/// Set the currently focused text area state (called when gaining focus)
+/// This will forcibly blur any previously focused text input or area
+pub(crate) fn set_focused_text_area(state: &crate::widgets::text_area::SharedTextAreaState) {
+    use blinc_core::events::event_types;
+    use crate::stateful::StateTransitions;
+
+    // First, blur any focused text input
+    {
+        let mut focused = FOCUSED_TEXT_INPUT.lock().unwrap();
+        if let Some(weak) = focused.take() {
+            if let Some(prev_state) = weak.upgrade() {
+                if let Ok(mut s) = prev_state.lock() {
+                    if s.visual.is_focused() {
+                        if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
+                            s.visual = new_state;
+                            decrement_focus_count();
+                            tracing::info!("TextInput forcibly blurred for text area focus");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Then blur any previously focused text area
+    let mut focused = FOCUSED_TEXT_AREA.lock().unwrap();
+    if let Some(weak) = focused.take() {
+        if let Some(prev_state) = weak.upgrade() {
+            if !Arc::ptr_eq(&prev_state, state) {
+                if let Ok(mut s) = prev_state.lock() {
+                    if s.visual.is_focused() {
+                        if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
+                            s.visual = new_state;
+                            decrement_focus_count();
+                            tracing::info!("TextArea forcibly blurred previous area");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Set new focused area
+    *focused = Some(Arc::downgrade(state));
+}
+
+/// Clear the focused text area reference (called when losing focus)
+pub(crate) fn clear_focused_text_area(state: &crate::widgets::text_area::SharedTextAreaState) {
+    let mut focused = FOCUSED_TEXT_AREA.lock().unwrap();
+    if let Some(weak) = focused.as_ref() {
+        if let Some(prev_state) = weak.upgrade() {
+            if Arc::ptr_eq(&prev_state, state) {
+                *focused = None;
+            }
+        }
+    }
+}
+
+/// Helper to blur focused text area (called from set_focused_text_input)
+fn blur_focused_text_area() {
+    use blinc_core::events::event_types;
+    use crate::stateful::StateTransitions;
+
+    let mut focused = FOCUSED_TEXT_AREA.lock().unwrap();
+    if let Some(weak) = focused.take() {
+        if let Some(prev_state) = weak.upgrade() {
+            if let Ok(mut s) = prev_state.lock() {
+                if s.visual.is_focused() {
+                    if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
+                        s.visual = new_state;
+                        decrement_focus_count();
+                        tracing::info!("TextArea forcibly blurred for text input focus");
+                    }
+                }
+            }
+        }
+    }
+}
 
 use crate::div::{div, Div, ElementBuilder};
 use crate::element::RenderProps;
 use crate::stateful::TextFieldState;
 use crate::text::text;
+use crate::text_selection::{set_selection, clear_selection, SelectionSource};
 use crate::tree::{LayoutNodeId, LayoutTree};
 
 /// Input type enum similar to HTML input types
@@ -233,6 +411,11 @@ pub struct TextInputState {
     pub validation_error: Option<String>,
     /// Whether currently valid
     pub is_valid: bool,
+    /// Time when focus was gained (for cursor blinking)
+    /// Stored as milliseconds since some epoch (e.g., app start)
+    pub focus_time_ms: u64,
+    /// Cursor blink interval in milliseconds
+    pub cursor_blink_interval_ms: u64,
 }
 
 impl Default for TextInputState {
@@ -250,6 +433,8 @@ impl Default for TextInputState {
             required: false,
             validation_error: None,
             is_valid: true,
+            focus_time_ms: 0,
+            cursor_blink_interval_ms: 530, // Standard cursor blink rate (~530ms)
         }
     }
 }
@@ -277,6 +462,31 @@ impl TextInputState {
             placeholder: placeholder.into(),
             ..Default::default()
         }
+    }
+
+    /// Check if cursor should be visible based on current time
+    /// Returns true if cursor is in the "on" phase of blinking
+    pub fn is_cursor_visible(&self, current_time_ms: u64) -> bool {
+        if self.cursor_blink_interval_ms == 0 {
+            return true; // No blinking, always visible
+        }
+        let elapsed = current_time_ms.saturating_sub(self.focus_time_ms);
+        let phase = (elapsed / self.cursor_blink_interval_ms) % 2;
+        phase == 0
+    }
+
+    /// Get the text before the cursor (for measuring cursor position)
+    pub fn text_before_cursor(&self) -> String {
+        if self.masked {
+            "•".repeat(self.cursor)
+        } else {
+            self.value.chars().take(self.cursor).collect()
+        }
+    }
+
+    /// Reset cursor blink (call when focus gained or cursor moved)
+    pub fn reset_cursor_blink(&mut self, current_time_ms: u64) {
+        self.focus_time_ms = current_time_ms;
     }
 
     /// Validate the current value
@@ -477,6 +687,21 @@ impl TextInputState {
         })
     }
 
+    /// Update global selection state based on current selection
+    ///
+    /// Call this after selection changes to keep clipboard operations in sync.
+    pub fn sync_global_selection(&self) {
+        if let Some(selected) = self.selected_text() {
+            if !selected.is_empty() {
+                // Text inputs can be cut (they're editable)
+                set_selection(selected, SelectionSource::TextInput, true);
+                return;
+            }
+        }
+        // No selection - clear global state
+        clear_selection();
+    }
+
     /// Is focused?
     pub fn is_focused(&self) -> bool {
         self.visual.is_focused()
@@ -609,20 +834,131 @@ impl TextInput {
             border
         };
 
+        // Check if cursor should be shown (focused state + blink phase)
+        let is_focused = matches!(state_guard.visual, TextFieldState::Focused | TextFieldState::FocusedHovered);
+        let cursor_color = config.cursor_color;
+        let selection_color = config.selection_color;
+
+        // Check cursor visibility based on blink phase
+        let current_time = elapsed_ms();
+        let cursor_visible = is_focused && state_guard.is_cursor_visible(current_time);
+
+        // Get cursor position and selection state
+        let cursor_pos = state_guard.cursor;
+        let selection_start = state_guard.selection_start;
+
+        // Cursor height is based on font size (slightly taller for visibility)
+        let cursor_height = config.font_size * 1.2;
+        let cursor_width = 2.0; // Standard cursor width
+
+        // Get selection range (sorted: from < to)
+        let selection_range: Option<(usize, usize)> = selection_start.map(|start| {
+            if start < cursor_pos {
+                (start, cursor_pos)
+            } else {
+                (cursor_pos, start)
+            }
+        });
+
         drop(state_guard);
 
-        // Build inner content with raw pixel padding (config.padding_x is already in pixels)
-        let inner_content = div()
+        // Calculate cursor x position using text measurement
+        let cursor_x = if cursor_pos > 0 && !display.is_empty() {
+            let text_before: String = display.chars().take(cursor_pos).collect();
+            crate::text_measure::measure_text(&text_before, config.font_size).width
+        } else {
+            0.0
+        };
+
+        // Build inner content as a relative container for absolute cursor positioning
+        // Use raw pixel padding (config.padding_x is already in pixels)
+        let mut inner_content = div()
             .w_full()
             .h_full()
             .bg(bg)
             .rounded(config.corner_radius - 1.0)
             .padding_x_px(config.padding_x)  // Use raw pixels, not 4x units
+            .relative()  // Enable absolute positioning for children
             .flex_row()
             .justify_start()  // Text starts from left
             .items_center()   // Vertically centered
-            .overflow_clip()
-            .child(text(&display).size(config.font_size).color(text_color).text_left().v_center());
+            .overflow_clip();
+
+        // Always render the full text (if any)
+        if !display.is_empty() {
+            if let Some((sel_start, sel_end)) = selection_range {
+                // Has selection: render in three parts with highlighting
+                let mut text_container = div()
+                    .flex_row()
+                    .items_center();
+
+                // 1. Text before selection (normal)
+                let before_sel: String = display.chars().take(sel_start).collect();
+                if !before_sel.is_empty() {
+                    text_container = text_container.child(
+                        text(&before_sel)
+                            .size(config.font_size)
+                            .color(text_color)
+                            .text_left()
+                            .v_center()
+                    );
+                }
+
+                // 2. Selected text (highlighted)
+                let selected: String = display.chars().skip(sel_start).take(sel_end - sel_start).collect();
+                if !selected.is_empty() {
+                    text_container = text_container.child(
+                        div()
+                            .bg(selection_color)
+                            .rounded(2.0)
+                            .child(
+                                text(&selected)
+                                    .size(config.font_size)
+                                    .color(text_color)
+                                    .text_left()
+                                    .v_center()
+                            )
+                    );
+                }
+
+                // 3. Text after selection (normal)
+                let after_sel: String = display.chars().skip(sel_end).collect();
+                if !after_sel.is_empty() {
+                    text_container = text_container.child(
+                        text(&after_sel)
+                            .size(config.font_size)
+                            .color(text_color)
+                            .text_left()
+                            .v_center()
+                    );
+                }
+
+                inner_content = inner_content.child(text_container);
+            } else {
+                // No selection: render full text as single element
+                let text_element = text(&display)
+                    .size(config.font_size)
+                    .color(text_color)
+                    .text_left()
+                    .v_center();
+                inner_content = inner_content.child(text_element);
+            }
+        }
+
+        // Add cursor as an absolutely positioned overlay (doesn't shift text)
+        if is_focused && cursor_visible && selection_range.is_none() {
+            // Calculate vertical center offset for the cursor
+            let cursor_top = (config.height - config.border_width * 2.0 - cursor_height) / 2.0;
+
+            let cursor_bar = div()
+                .absolute()
+                .left(config.padding_x + cursor_x)
+                .top(cursor_top)
+                .w(cursor_width)
+                .h(cursor_height)
+                .bg(cursor_color);
+            inner_content = inner_content.child(cursor_bar);
+        }
 
         // Build the outer container with size from config
         // Use FSM transitions via StateTransitions::on_event
@@ -630,6 +966,7 @@ impl TextInput {
         use crate::stateful::StateTransitions;
 
         let state_for_click = Arc::clone(state);
+        let config_for_click = config.clone();
         let state_for_blur = Arc::clone(state);
         let state_for_hover_enter = Arc::clone(state);
         let state_for_hover_leave = Arc::clone(state);
@@ -644,17 +981,67 @@ impl TextInput {
             .p(config.border_width)
             .child(inner_content)
             // Wire up event handlers using FSM transitions
-            .on_mouse_down(move |_ctx| {
+            .on_mouse_down(move |ctx| {
+                // First, forcibly blur any previously focused text input/area
+                // This must be done BEFORE we lock our own state to avoid deadlock
+                set_focused_text_input(&state_for_click);
+
                 if let Ok(mut s) = state_for_click.lock() {
                     if !s.disabled {
                         // Try POINTER_DOWN first (Hovered -> Focused)
                         // Then try FOCUS as fallback (Idle -> Focused)
-                        let new_state = s.visual.on_event(event_types::POINTER_DOWN)
-                            .or_else(|| s.visual.on_event(event_types::FOCUS));
-                        if let Some(new_state) = new_state {
+                        let was_focused = s.visual.is_focused();
+                        let old_state = s.visual;
+                        if let Some(new_state) = s.visual.on_event(event_types::POINTER_DOWN)
+                            .or_else(|| s.visual.on_event(event_types::FOCUS))
+                        {
                             s.visual = new_state;
-                            tracing::debug!("TextInput focused, state: {:?}", new_state);
+                            // Track global focus for cursor blink
+                            if !was_focused && new_state.is_focused() {
+                                increment_focus_count();
+                            }
+                            tracing::info!("TextInput mouse_down: {:?} -> {:?}", old_state, new_state);
+                        } else {
+                            tracing::info!("TextInput mouse_down: already focused {:?}", old_state);
                         }
+
+                        // Always position cursor on click (even if already focused)
+                        // local_x is relative to the text input element
+                        // We need to account for padding and border
+                        let click_x = ctx.local_x - config_for_click.padding_x - config_for_click.border_width;
+
+                        if click_x <= 0.0 || s.value.is_empty() {
+                            // Click before text or empty - cursor at start
+                            s.cursor = 0;
+                        } else {
+                            // Measure text widths to find cursor position
+                            let display_text = s.display_text();
+                            let mut cursor_pos = display_text.chars().count();
+
+                            // Find the character position where click_x falls
+                            for (i, _) in display_text.char_indices() {
+                                let text_before: String = display_text.chars().take(i).collect();
+                                let text_at: String = display_text.chars().take(i + 1).collect();
+
+                                let width_before = crate::text_measure::measure_text(&text_before, config_for_click.font_size).width;
+                                let width_at = crate::text_measure::measure_text(&text_at, config_for_click.font_size).width;
+
+                                // Check if click is between these two positions
+                                let char_center = (width_before + width_at) / 2.0;
+                                if click_x < char_center {
+                                    cursor_pos = i;
+                                    break;
+                                }
+                            }
+
+                            s.cursor = cursor_pos;
+                        }
+
+                        // Clear selection when clicking
+                        s.selection_start = None;
+                        s.reset_cursor_blink(elapsed_ms());
+                        s.sync_global_selection();
+                        tracing::debug!("TextInput clicked, was_focused: {}, cursor: {}", was_focused, s.cursor);
                     }
                 }
             })
@@ -662,12 +1049,22 @@ impl TextInput {
                 if let Ok(mut s) = state_for_blur.lock() {
                     if !s.disabled {
                         // Use FSM: BLUR triggers Focused -> Idle
+                        let was_focused = s.visual.is_focused();
+                        let old_state = s.visual;
                         if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
                             s.visual = new_state;
-                            tracing::debug!("TextInput blurred, state: {:?}", new_state);
+                            // Track global focus for cursor blink
+                            if was_focused && !new_state.is_focused() {
+                                decrement_focus_count();
+                            }
+                            tracing::info!("TextInput blur received: {:?} -> {:?}", old_state, new_state);
+                        } else {
+                            tracing::info!("TextInput blur received but no transition from {:?}", old_state);
                         }
                     }
                 }
+                // Clear this as the focused input if it was
+                clear_focused_text_input(&state_for_blur);
             })
             .on_hover_enter(move |_ctx| {
                 if let Ok(mut s) = state_for_hover_enter.lock() {
@@ -696,6 +1093,8 @@ impl TextInput {
                         if let Some(c) = ctx.key_char {
                             // Insert the character
                             s.insert(&c.to_string());
+                            // Reset cursor blink to keep it visible while typing
+                            s.reset_cursor_blink(elapsed_ms());
                             tracing::debug!("TextInput received char: {:?}, value: {}", c, s.value);
                         }
                     }
@@ -705,6 +1104,7 @@ impl TextInput {
             .on_key_down(move |ctx| {
                 if let Ok(mut s) = state_for_key_down.lock() {
                     if !s.disabled && s.visual.is_focused() {
+                        let mut cursor_changed = true;
                         match ctx.key_code {
                             8 => {
                                 // Backspace
@@ -731,7 +1131,19 @@ impl TextInput {
                                 // End
                                 s.move_to_end(ctx.shift);
                             }
-                            _ => {}
+                            65 if ctx.ctrl || ctx.meta => {
+                                // Ctrl+A or Cmd+A - Select all
+                                s.select_all();
+                            }
+                            _ => {
+                                cursor_changed = false;
+                            }
+                        }
+                        // Reset cursor blink to keep it visible during interaction
+                        if cursor_changed {
+                            s.reset_cursor_blink(elapsed_ms());
+                            // Sync selection state with global clipboard state
+                            s.sync_global_selection();
                         }
                     }
                 }

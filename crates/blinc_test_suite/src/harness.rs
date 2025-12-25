@@ -60,11 +60,11 @@ pub struct TextCommand {
 }
 
 /// Context for a single test
-pub struct TestContext {
+pub struct TestContext<'a> {
     /// Paint context for drawing background (behind glass)
-    pub paint_ctx: GpuPaintContext,
+    pub paint_ctx: GpuPaintContext<'a>,
     /// Paint context for drawing foreground (on top of glass)
-    pub foreground_ctx: GpuPaintContext,
+    pub foreground_ctx: GpuPaintContext<'a>,
     /// Text commands to render
     pub text_commands: Vec<TextCommand>,
     /// Viewport size
@@ -75,7 +75,7 @@ pub struct TestContext {
     pub output_dir: PathBuf,
 }
 
-impl TestContext {
+impl<'a> TestContext<'a> {
     /// Create a new test context
     pub fn new(name: &str, width: f32, height: f32) -> Self {
         Self {
@@ -89,12 +89,12 @@ impl TestContext {
     }
 
     /// Get the paint context for drawing background (behind glass)
-    pub fn ctx(&mut self) -> &mut GpuPaintContext {
+    pub fn ctx(&mut self) -> &mut GpuPaintContext<'a> {
         &mut self.paint_ctx
     }
 
     /// Get the foreground paint context for drawing on top of glass
-    pub fn foreground(&mut self) -> &mut GpuPaintContext {
+    pub fn foreground(&mut self) -> &mut GpuPaintContext<'a> {
         &mut self.foreground_ctx
     }
 
@@ -289,6 +289,9 @@ impl TestContext {
                 ElementType::Image(_) => {
                     // Images are handled separately in the render context
                 }
+                ElementType::Canvas(_) => {
+                    // Canvas elements render via their own callback
+                }
             }
         }
 
@@ -378,12 +381,12 @@ impl TestHarness {
     }
 
     /// Create a test context with default size
-    pub fn create_context(&self, name: &str) -> TestContext {
+    pub fn create_context(&self, name: &str) -> TestContext<'static> {
         self.create_context_with_size(name, self.default_size.width, self.default_size.height)
     }
 
     /// Create a test context with custom size
-    pub fn create_context_with_size(&self, name: &str, width: f32, height: f32) -> TestContext {
+    pub fn create_context_with_size(&self, name: &str, width: f32, height: f32) -> TestContext<'static> {
         let mut ctx = TestContext::new(name, width, height);
         ctx.output_dir = self.output_dir.clone();
         ctx

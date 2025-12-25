@@ -18,6 +18,10 @@ use crate::element::RenderProps;
 use crate::stateful::TextFieldState;
 use crate::text::text;
 use crate::tree::{LayoutNodeId, LayoutTree};
+use crate::widgets::text_input::{
+    elapsed_ms, increment_focus_count, decrement_focus_count,
+    set_focused_text_area, clear_focused_text_area,
+};
 
 /// Position in a multi-line text (line and column)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -149,6 +153,11 @@ pub struct TextAreaState {
     pub placeholder: String,
     /// Whether disabled
     pub disabled: bool,
+    /// Time when focus was gained (for cursor blinking)
+    /// Stored as milliseconds since some epoch (e.g., app start)
+    pub focus_time_ms: u64,
+    /// Cursor blink interval in milliseconds
+    pub cursor_blink_interval_ms: u64,
 }
 
 impl Default for TextAreaState {
@@ -160,6 +169,8 @@ impl Default for TextAreaState {
             visual: TextFieldState::Idle,
             placeholder: String::new(),
             disabled: false,
+            focus_time_ms: 0,
+            cursor_blink_interval_ms: 530, // Standard cursor blink rate (~530ms)
         }
     }
 }
@@ -234,6 +245,22 @@ impl TextAreaState {
     /// Is focused?
     pub fn is_focused(&self) -> bool {
         self.visual.is_focused()
+    }
+
+    /// Check if cursor should be visible based on current time
+    /// Returns true if cursor is in the "on" phase of blinking
+    pub fn is_cursor_visible(&self, current_time_ms: u64) -> bool {
+        if self.cursor_blink_interval_ms == 0 {
+            return true; // No blinking, always visible
+        }
+        let elapsed = current_time_ms.saturating_sub(self.focus_time_ms);
+        let phase = (elapsed / self.cursor_blink_interval_ms) % 2;
+        phase == 0
+    }
+
+    /// Reset cursor blink (call when focus gained or cursor moved)
+    pub fn reset_cursor_blink(&mut self, current_time_ms: u64) {
+        self.focus_time_ms = current_time_ms;
     }
 
     /// Insert text at cursor
@@ -611,8 +638,34 @@ impl TextArea {
             config.text_color
         };
 
-        // Build content - left-aligned column of text lines
-        let mut content = div().flex_col().justify_start().items_start().gap(2.0);
+        // Check if cursor should be shown (focused state + blink phase)
+        let is_focused = matches!(state_guard.visual, TextFieldState::Focused | TextFieldState::FocusedHovered);
+        let cursor_color = config.cursor_color;
+
+        // Check cursor visibility based on blink phase
+        let current_time = elapsed_ms();
+        let cursor_visible = is_focused && state_guard.is_cursor_visible(current_time);
+
+        // Get cursor position
+        let cursor_line = state_guard.cursor.line;
+        let cursor_col = state_guard.cursor.column;
+
+        // Cursor dimensions
+        let cursor_height = config.font_size * 1.2;
+        let cursor_width = 2.0;
+        let line_height = config.font_size * config.line_height;
+
+        // Calculate cursor x position using text measurement
+        let cursor_x = if cursor_col > 0 && cursor_line < state_guard.lines.len() {
+            let line_text = &state_guard.lines[cursor_line];
+            let text_before: String = line_text.chars().take(cursor_col).collect();
+            crate::text_measure::measure_text(&text_before, config.font_size).width
+        } else {
+            0.0
+        };
+
+        // Build content - left-aligned column of text lines (cursor added separately)
+        let mut content = div().flex_col().justify_start().items_start();
 
         if state_guard.is_empty() {
             // Use state's placeholder if available, otherwise fall back to config
@@ -621,38 +674,61 @@ impl TextArea {
             } else {
                 &config.placeholder
             };
+
             content = content.child(
-                text(placeholder)
-                    .size(config.font_size)
-                    .color(text_color)
-                    .text_left(),
-            );
-        } else {
-            for line in &state_guard.lines {
-                let line_text = if line.is_empty() { " " } else { line.as_str() };
-                content = content.child(
-                    text(line_text)
+                div().h(line_height).flex_row().items_center().child(
+                    text(placeholder)
                         .size(config.font_size)
                         .color(text_color)
-                        .text_left(),
+                        .text_left()
+                )
+            );
+        } else {
+            for (_line_idx, line) in state_guard.lines.iter().enumerate() {
+                let line_text = if line.is_empty() { " " } else { line.as_str() };
+                // Render all lines normally (cursor is added as overlay)
+                content = content.child(
+                    div().h(line_height).flex_row().items_center().child(
+                        text(line_text)
+                            .size(config.font_size)
+                            .color(text_color)
+                            .text_left()
+                    )
                 );
             }
         }
 
         drop(state_guard);
 
-        let inner_content = div()
+        let mut inner_content = div()
             .w_full()
             .h_full()
             .bg(bg)
             .rounded(config.corner_radius - 1.0)
             .padding_y_px(config.padding_y)  // Use raw pixels, not 4x units
             .padding_x_px(config.padding_x)  // Use raw pixels, not 4x units
+            .relative()  // Enable absolute positioning for cursor overlay
             .flex_col()
             .justify_start()  // Text starts from top
             .items_start()    // Text starts from left
             .overflow_clip()
             .child(content);
+
+        // Add cursor as an absolutely positioned overlay (doesn't shift text)
+        if is_focused && cursor_visible {
+            // Calculate cursor position
+            let cursor_top = config.padding_y + (cursor_line as f32 * line_height) + (line_height - cursor_height) / 2.0;
+            let cursor_left = config.padding_x + cursor_x;
+
+            let cursor_bar = div()
+                .absolute()
+                .left(cursor_left)
+                .top(cursor_top)
+                .w(cursor_width)
+                .h(cursor_height)
+                .bg(cursor_color);
+            inner_content = inner_content.child(cursor_bar);
+        }
 
         // Build the outer container with size from config
         // Use FSM transitions via StateTransitions::on_event
@@ -675,15 +751,25 @@ impl TextArea {
             .child(inner_content)
             // Wire up event handlers using FSM transitions
             .on_mouse_down(move |_ctx| {
+                // First, forcibly blur any previously focused text input/area
+                // This must be done BEFORE we lock our own state to avoid deadlock
+                set_focused_text_area(&state_for_click);
+
                 if let Ok(mut s) = state_for_click.lock() {
                     if !s.disabled {
                         // Try POINTER_DOWN first (Hovered -> Focused)
                         // Then try FOCUS as fallback (Idle -> Focused)
+                        let was_focused = s.visual.is_focused();
                         let new_state = s.visual.on_event(event_types::POINTER_DOWN)
                             .or_else(|| s.visual.on_event(event_types::FOCUS));
                         if let Some(new_state) = new_state {
                             s.visual = new_state;
-                            tracing::debug!("TextArea focused, state: {:?}", new_state);
+                            // Reset cursor blink on focus
+                            s.reset_cursor_blink(elapsed_ms());
+                            // Track focus globally (node-ID-independent)
+                            if !was_focused && new_state.is_focused() {
+                                increment_focus_count();
+                            }
                         }
                     }
                 }
@@ -692,12 +778,18 @@ impl TextArea {
                 if let Ok(mut s) = state_for_blur.lock() {
                     if !s.disabled {
                         // Use FSM: BLUR triggers Focused -> Idle
+                        let was_focused = s.visual.is_focused();
                         if let Some(new_state) = s.visual.on_event(event_types::BLUR) {
                             s.visual = new_state;
-                            tracing::debug!("TextArea blurred, state: {:?}", new_state);
+                            // Track focus globally (node-ID-independent)
+                            if was_focused && !new_state.is_focused() {
+                                decrement_focus_count();
+                            }
                         }
                     }
                 }
+                // Clear this as the focused area if it was
+                clear_focused_text_area(&state_for_blur);
             })
             .on_hover_enter(move |_ctx| {
                 if let Ok(mut s) = state_for_hover_enter.lock() {
@@ -726,6 +818,8 @@ impl TextArea {
                         if let Some(c) = ctx.key_char {
                             // Insert the character
                             s.insert(&c.to_string());
+                            // Reset cursor blink to keep it visible while typing
+                            s.reset_cursor_blink(elapsed_ms());
                             tracing::debug!("TextArea received char: {:?}, value: {}", c, s.value());
                         }
                     }
@@ -735,6 +829,7 @@ impl TextArea {
             .on_key_down(move |ctx| {
                 if let Ok(mut s) = state_for_key_down.lock() {
                     if !s.disabled && s.visual.is_focused() {
+                        let mut cursor_changed = true;
                         match ctx.key_code {
                             8 => {
                                 // Backspace
@@ -774,7 +869,13 @@ impl TextArea {
                                 // End
                                 s.move_to_line_end(ctx.shift);
                             }
-                            _ => {}
+                            _ => {
+                                cursor_changed = false;
+                            }
+                        }
+                        // Reset cursor blink to keep it visible during interaction
+                        if cursor_changed {
+                            s.reset_cursor_blink(elapsed_ms());
                         }
                     }
                 }

@@ -3,7 +3,7 @@
 //! Provides the core abstractions for building layout trees that can be
 //! rendered via the DrawContext API.
 
-use blinc_core::{Brush, Color, CornerRadius, Rect, Shadow, Transform};
+use blinc_core::{Brush, Color, CornerRadius, DynFloat, DynValue, Rect, Shadow, Transform, ValueContext};
 use taffy::Layout;
 
 use crate::tree::LayoutNodeId;
@@ -693,5 +693,181 @@ impl RenderProps {
     pub fn with_clips_content(mut self, clips: bool) -> Self {
         self.clips_content = clips;
         self
+    }
+}
+
+// ============================================================================
+// Dynamic Render Props (Value References)
+// ============================================================================
+
+/// Dynamic render props that can hold references to reactive values
+///
+/// Unlike `RenderProps` which stores resolved values directly, `DynRenderProps`
+/// stores references (signal IDs, spring IDs) that are resolved at render time.
+/// This enables visual property changes without tree rebuilds.
+///
+/// # Architecture
+///
+/// ```text
+/// Build Time:                       Render Time:
+/// ┌────────────┐                   ┌────────────────┐
+/// │ ElementBuilder                │ ValueContext   │
+/// │ .opacity(0.5)  ────────────►  │ .reactive      │
+/// │ .bg_signal(id) ────────────►  │ .animations    │
+/// └────────────┘                   └────────────────┘
+///       │                                │
+///       ▼                                ▼
+/// ┌────────────┐                   ┌────────────────┐
+/// │ DynRenderProps               │ Resolved Values │
+/// │ opacity: DynFloat::Static    │ opacity: 0.5    │
+/// │ background: DynValue::Signal │ background: Red │
+/// └────────────┘                   └────────────────┘
+/// ```
+#[derive(Clone)]
+pub struct DynRenderProps {
+    /// Background fill (can be static or signal-driven)
+    pub background: Option<DynValue<Brush>>,
+    /// Corner radius (typically static)
+    pub border_radius: CornerRadius,
+    /// Which layer this element renders in
+    pub layer: RenderLayer,
+    /// Material applied to this element
+    pub material: Option<Material>,
+    /// Node ID for looking up children
+    pub node_id: Option<LayoutNodeId>,
+    /// Drop shadow (typically static)
+    pub shadow: Option<Shadow>,
+    /// Transform (can be animated)
+    pub transform: Option<Transform>,
+    /// Opacity (can be static, signal, or spring animated)
+    pub opacity: DynFloat,
+    /// Whether this element clips its children
+    pub clips_content: bool,
+}
+
+impl Default for DynRenderProps {
+    fn default() -> Self {
+        Self {
+            background: None,
+            border_radius: CornerRadius::default(),
+            layer: RenderLayer::default(),
+            material: None,
+            node_id: None,
+            shadow: None,
+            transform: None,
+            opacity: DynFloat::Static(1.0),
+            clips_content: false,
+        }
+    }
+}
+
+impl DynRenderProps {
+    /// Create new dynamic render properties
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Resolve all dynamic values using the provided context
+    ///
+    /// This is called at render time to get the actual values to draw with.
+    pub fn resolve(&self, ctx: &ValueContext) -> ResolvedRenderProps {
+        ResolvedRenderProps {
+            background: self.background.as_ref().map(|v| v.get(ctx)),
+            border_radius: self.border_radius,
+            layer: self.layer,
+            material: self.material.clone(),
+            node_id: self.node_id,
+            shadow: self.shadow,
+            transform: self.transform.clone(),
+            opacity: self.opacity.get(ctx),
+            clips_content: self.clips_content,
+        }
+    }
+
+    /// Convert from static RenderProps
+    pub fn from_static(props: RenderProps) -> Self {
+        Self {
+            background: props.background.map(DynValue::Static),
+            border_radius: props.border_radius,
+            layer: props.layer,
+            material: props.material,
+            node_id: props.node_id,
+            shadow: props.shadow,
+            transform: props.transform,
+            opacity: DynFloat::Static(props.opacity),
+            clips_content: props.clips_content,
+        }
+    }
+
+    /// Set static background
+    pub fn with_background(mut self, brush: impl Into<Brush>) -> Self {
+        self.background = Some(DynValue::Static(brush.into()));
+        self
+    }
+
+    /// Set background from a signal reference
+    pub fn with_background_signal(mut self, signal_id: u64, default: Brush) -> Self {
+        self.background = Some(DynValue::Signal { id: signal_id, default });
+        self
+    }
+
+    /// Set static opacity
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = DynFloat::Static(opacity.clamp(0.0, 1.0));
+        self
+    }
+
+    /// Set opacity from a signal reference
+    pub fn with_opacity_signal(mut self, signal_id: u64, default: f32) -> Self {
+        self.opacity = DynFloat::Signal { id: signal_id, default };
+        self
+    }
+
+    /// Set opacity from a spring animation
+    pub fn with_opacity_spring(mut self, spring_id: u64, generation: u32, default: f32) -> Self {
+        self.opacity = DynFloat::Spring { id: spring_id, generation, default };
+        self
+    }
+}
+
+/// Resolved render props with concrete values
+///
+/// This is the result of resolving `DynRenderProps` at render time.
+/// All dynamic references have been replaced with their current values.
+#[derive(Clone)]
+pub struct ResolvedRenderProps {
+    /// Background fill (resolved)
+    pub background: Option<Brush>,
+    /// Corner radius
+    pub border_radius: CornerRadius,
+    /// Render layer
+    pub layer: RenderLayer,
+    /// Material
+    pub material: Option<Material>,
+    /// Node ID
+    pub node_id: Option<LayoutNodeId>,
+    /// Drop shadow
+    pub shadow: Option<Shadow>,
+    /// Transform
+    pub transform: Option<Transform>,
+    /// Opacity (resolved)
+    pub opacity: f32,
+    /// Whether this element clips its children
+    pub clips_content: bool,
+}
+
+impl Default for ResolvedRenderProps {
+    fn default() -> Self {
+        Self {
+            background: None,
+            border_radius: CornerRadius::default(),
+            layer: RenderLayer::default(),
+            material: None,
+            node_id: None,
+            shadow: None,
+            transform: None,
+            opacity: 1.0,
+            clips_content: false,
+        }
     }
 }

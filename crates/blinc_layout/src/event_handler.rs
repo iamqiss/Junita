@@ -32,7 +32,7 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 use blinc_core::events::{event_types, EventType};
 
@@ -41,7 +41,8 @@ use crate::tree::LayoutNodeId;
 /// Callback for handling events
 ///
 /// The callback receives an `EventContext` with information about the event.
-pub type EventCallback = Arc<dyn Fn(&EventContext) + Send + Sync>;
+/// Uses Rc since UI is single-threaded.
+pub type EventCallback = Rc<dyn Fn(&EventContext)>;
 
 /// Context passed to event handlers
 #[derive(Clone, Debug)]
@@ -158,12 +159,12 @@ impl EventHandlers {
     /// Register a handler for an event type
     pub fn on<F>(&mut self, event_type: EventType, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.handlers
             .entry(event_type)
             .or_default()
-            .push(Arc::new(handler));
+            .push(Rc::new(handler));
     }
 
     /// Get handlers for an event type
@@ -204,7 +205,7 @@ impl EventHandlers {
     /// Note: This registers for POINTER_UP, which fires after press+release.
     pub fn on_click<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::POINTER_UP, handler);
     }
@@ -212,7 +213,7 @@ impl EventHandlers {
     /// Register a mouse down handler
     pub fn on_mouse_down<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::POINTER_DOWN, handler);
     }
@@ -220,7 +221,7 @@ impl EventHandlers {
     /// Register a mouse up handler
     pub fn on_mouse_up<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::POINTER_UP, handler);
     }
@@ -228,7 +229,7 @@ impl EventHandlers {
     /// Register a hover enter handler
     pub fn on_hover_enter<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::POINTER_ENTER, handler);
     }
@@ -236,7 +237,7 @@ impl EventHandlers {
     /// Register a hover leave handler
     pub fn on_hover_leave<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::POINTER_LEAVE, handler);
     }
@@ -244,7 +245,7 @@ impl EventHandlers {
     /// Register a focus handler
     pub fn on_focus<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::FOCUS, handler);
     }
@@ -252,7 +253,7 @@ impl EventHandlers {
     /// Register a blur handler
     pub fn on_blur<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::BLUR, handler);
     }
@@ -260,7 +261,7 @@ impl EventHandlers {
     /// Register a mount handler (element added to tree)
     pub fn on_mount<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::MOUNT, handler);
     }
@@ -268,7 +269,7 @@ impl EventHandlers {
     /// Register an unmount handler (element removed from tree)
     pub fn on_unmount<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::UNMOUNT, handler);
     }
@@ -276,7 +277,7 @@ impl EventHandlers {
     /// Register a key down handler
     pub fn on_key_down<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::KEY_DOWN, handler);
     }
@@ -284,7 +285,7 @@ impl EventHandlers {
     /// Register a key up handler
     pub fn on_key_up<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::KEY_UP, handler);
     }
@@ -292,7 +293,7 @@ impl EventHandlers {
     /// Register a scroll handler
     pub fn on_scroll<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::SCROLL, handler);
     }
@@ -300,7 +301,7 @@ impl EventHandlers {
     /// Register a resize handler
     pub fn on_resize<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::RESIZE, handler);
     }
@@ -308,7 +309,7 @@ impl EventHandlers {
     /// Register a text input handler (for character input)
     pub fn on_text_input<F>(&mut self, handler: F)
     where
-        F: Fn(&EventContext) + Send + Sync + 'static,
+        F: Fn(&EventContext) + 'static,
     {
         self.on(event_types::TEXT_INPUT, handler);
     }
@@ -373,6 +374,7 @@ mod tests {
     use super::*;
     use slotmap::SlotMap;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
 
     fn create_node_id() -> LayoutNodeId {
         let mut sm: SlotMap<LayoutNodeId, ()> = SlotMap::with_key();

@@ -12,6 +12,7 @@ use indexmap::IndexMap;
 use blinc_core::{Brush, ClipShape, Color, CornerRadius, DrawContext, GlassStyle, Rect, Transform};
 use taffy::prelude::*;
 
+use crate::canvas::CanvasData;
 use crate::div::{ElementBuilder, ElementTypeId};
 use crate::element::{ElementBounds, GlassMaterial, Material, RenderLayer, RenderProps};
 use crate::tree::{LayoutNodeId, LayoutTree};
@@ -51,6 +52,8 @@ pub enum ElementType {
     Svg(SvgData),
     /// An image element
     Image(ImageData),
+    /// A canvas element with custom render callback
+    Canvas(CanvasData),
 }
 
 /// Text data for rendering
@@ -314,6 +317,11 @@ impl RenderTree {
                     ElementType::Div
                 }
             }
+            ElementTypeId::Canvas => {
+                ElementType::Canvas(CanvasData {
+                    render_fn: element.canvas_render_info(),
+                })
+            }
             ElementTypeId::Div => ElementType::Div,
         };
 
@@ -386,6 +394,11 @@ impl RenderTree {
                 } else {
                     ElementType::Div
                 }
+            }
+            ElementTypeId::Canvas => {
+                ElementType::Canvas(CanvasData {
+                    render_fn: element.canvas_render_info(),
+                })
             }
             ElementTypeId::Div => ElementType::Div,
         }
@@ -478,14 +491,16 @@ impl RenderTree {
         // Check if this node has handlers for this event type
         if self.handler_registry.has_handler(node_id, event_type) {
             self.handler_registry.dispatch(&ctx);
-            // Mark dirty after dispatching - any event that fires means state may have changed
-            self.dirty_tracker.mark(node_id);
+            // Don't auto-mark dirty - handlers update values in place
         }
     }
 
     /// Dispatch an event with local coordinates
     ///
-    /// This automatically marks the tree as dirty after dispatching.
+    /// Dispatches an event to a node's handler.
+    ///
+    /// Note: This does NOT automatically mark the tree as dirty.
+    /// Handlers that need a rebuild should use EventContext::request_rebuild().
     pub fn dispatch_event_with_local(
         &mut self,
         node_id: LayoutNodeId,
@@ -501,7 +516,8 @@ impl RenderTree {
 
         if self.handler_registry.has_handler(node_id, event_type) {
             self.handler_registry.dispatch(&ctx);
-            self.dirty_tracker.mark(node_id);
+            // Don't auto-mark dirty - handlers update values in place
+            // Rebuild only when explicitly requested via State::set() or structural changes
         }
     }
 
@@ -529,8 +545,8 @@ impl RenderTree {
             .has_handler(node_id, blinc_core::events::event_types::TEXT_INPUT)
         {
             self.handler_registry.dispatch(&ctx);
-            // Mark dirty - text input changes state
-            self.dirty_tracker.mark(node_id);
+            // Don't auto-mark dirty - text input handler updates values in place
+            // and calls State::set() which marks dirty if structural change needed
         }
     }
 
@@ -556,7 +572,7 @@ impl RenderTree {
                     .with_key_char(key_char)
                     .with_modifiers(shift, ctrl, alt, meta);
                 self.handler_registry.dispatch(&ctx);
-                self.dirty_tracker.mark(node_id);
+                // Don't auto-mark dirty - handler updates state in place
                 return; // Stop after first handler found
             }
         }
@@ -581,8 +597,7 @@ impl RenderTree {
 
         if self.handler_registry.has_handler(node_id, event_type) {
             self.handler_registry.dispatch(&ctx);
-            // Mark dirty for key events
-            self.dirty_tracker.mark(node_id);
+            // Don't auto-mark dirty - handler updates state in place
         }
     }
 
@@ -607,7 +622,7 @@ impl RenderTree {
                     .with_key_code(key_code)
                     .with_modifiers(shift, ctrl, alt, meta);
                 self.handler_registry.dispatch(&ctx);
-                self.dirty_tracker.mark(node_id);
+                // Don't auto-mark dirty - handler updates state in place
                 return; // Stop after first handler found
             }
         }
@@ -890,12 +905,15 @@ impl RenderTree {
         }
 
         // Push clip if this element clips its children (e.g., scroll containers)
+        // Clip to padding box (full bounds, excludes border but includes padding)
+        // This matches CSS overflow:hidden behavior
         let clips_content = render_node.props.clips_content;
         if clips_content {
+            let clip_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
             let clip_shape = if radius.is_uniform() && radius.top_left > 0.0 {
-                ClipShape::rounded_rect(rect, radius)
+                ClipShape::rounded_rect(clip_rect, radius)
             } else {
-                ClipShape::rect(rect)
+                ClipShape::rect(clip_rect)
             };
             ctx.push_clip(clip_shape);
         }
@@ -1045,6 +1063,24 @@ impl RenderTree {
         // Determine if this node is a glass element
         let is_glass = matches!(render_node.props.material, Some(Material::Glass(_)));
 
+        // Track if children should be considered inside glass
+        // Once inside glass, stay inside glass for all descendants
+        let children_inside_glass = inside_glass || is_glass;
+
+        // Push clip BEFORE rendering content if this element clips its children
+        // Clip to padding box (full bounds) - matches CSS overflow:hidden behavior
+        let clips_content = render_node.props.clips_content;
+        if clips_content {
+            let clip_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
+            let radius = render_node.props.border_radius;
+            let clip_shape = if radius.is_uniform() && radius.top_left > 0.0 {
+                ClipShape::rounded_rect(clip_rect, radius)
+            } else {
+                ClipShape::rect(clip_rect)
+            };
+            ctx.push_clip(clip_shape);
+        }
+
         // Determine the effective layer for this node:
         // - If we're inside a glass element, children render as foreground
         // - Otherwise, use the node's explicit layer setting
@@ -1087,23 +1123,24 @@ impl RenderTree {
                     ctx.fill_rect(rect, radius, bg.clone());
                 }
             }
-        }
 
-        // Track if children should be considered inside glass
-        // Once inside glass, stay inside glass for all descendants
-        let children_inside_glass = inside_glass || is_glass;
+            // Handle canvas element rendering
+            if let ElementType::Canvas(canvas_data) = &render_node.element_type {
+                if let Some(render_fn) = &canvas_data.render_fn {
+                    // Push clip for canvas bounds - canvas drawing should not overflow
+                    let canvas_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
+                    ctx.push_clip(ClipShape::rect(canvas_rect));
 
-        // Push clip if this element clips its children (e.g., scroll containers)
-        let clips_content = render_node.props.clips_content;
-        if clips_content {
-            let rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-            let radius = render_node.props.border_radius;
-            let clip_shape = if radius.is_uniform() && radius.top_left > 0.0 {
-                ClipShape::rounded_rect(rect, radius)
-            } else {
-                ClipShape::rect(rect)
-            };
-            ctx.push_clip(clip_shape);
+                    let canvas_bounds = crate::canvas::CanvasBounds {
+                        width: bounds.width,
+                        height: bounds.height,
+                    };
+                    render_fn(ctx, canvas_bounds);
+
+                    // Pop canvas clip
+                    ctx.pop_clip();
+                }
+            }
         }
 
         // Check if this node has a scroll offset and apply it to children
@@ -1254,6 +1291,23 @@ impl RenderTree {
         // Determine if this node is a glass element
         let is_glass = matches!(render_node.props.material, Some(Material::Glass(_)));
 
+        // Track if children should be considered inside glass
+        let children_inside_glass = inside_glass || is_glass;
+
+        // Push clip BEFORE rendering content if this element clips its children
+        // Clip to padding box (full bounds) - matches CSS overflow:hidden behavior
+        let clips_content = render_node.props.clips_content;
+        if clips_content {
+            let clip_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
+            let radius = render_node.props.border_radius;
+            let clip_shape = if radius.is_uniform() && radius.top_left > 0.0 {
+                ClipShape::rounded_rect(clip_rect, radius)
+            } else {
+                ClipShape::rect(clip_rect)
+            };
+            ctx.push_clip(clip_shape);
+        }
+
         // Determine the effective layer for this node
         let effective_layer = if inside_glass && !is_glass {
             RenderLayer::Foreground
@@ -1263,52 +1317,57 @@ impl RenderTree {
             render_node.props.layer
         };
 
-        // Only render divs here (text/SVG handled in separate passes)
+        // Only render divs and canvas here (text/SVG handled in separate passes)
         if effective_layer == target_layer {
-            if let ElementType::Div = &render_node.element_type {
-                let rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-                let radius = render_node.props.border_radius;
+            match &render_node.element_type {
+                ElementType::Div => {
+                    let rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
+                    let radius = render_node.props.border_radius;
 
-                // Check if this node has a glass material - if so, render as glass with shadow
-                if let Some(Material::Glass(glass)) = &render_node.props.material {
-                    // For glass elements, pass shadow through GlassStyle to use GPU glass shadow system
-                    let glass_brush = Brush::Glass(GlassStyle {
-                        blur: glass.blur,
-                        tint: glass.tint,
-                        saturation: glass.saturation,
-                        brightness: glass.brightness,
-                        noise: glass.noise,
-                        border_thickness: glass.border_thickness,
-                        shadow: render_node.props.shadow.clone(),
-                    });
-                    ctx.fill_rect(rect, radius, glass_brush);
-                } else {
-                    // For non-glass elements, draw shadow first (renders behind the element)
-                    if let Some(ref shadow) = render_node.props.shadow {
-                        ctx.draw_shadow(rect, radius, shadow.clone());
-                    }
-                    // Draw regular background
-                    if let Some(ref bg) = render_node.props.background {
-                        ctx.fill_rect(rect, radius, bg.clone());
+                    // Check if this node has a glass material - if so, render as glass with shadow
+                    if let Some(Material::Glass(glass)) = &render_node.props.material {
+                        // For glass elements, pass shadow through GlassStyle to use GPU glass shadow system
+                        let glass_brush = Brush::Glass(GlassStyle {
+                            blur: glass.blur,
+                            tint: glass.tint,
+                            saturation: glass.saturation,
+                            brightness: glass.brightness,
+                            noise: glass.noise,
+                            border_thickness: glass.border_thickness,
+                            shadow: render_node.props.shadow.clone(),
+                        });
+                        ctx.fill_rect(rect, radius, glass_brush);
+                    } else {
+                        // For non-glass elements, draw shadow first (renders behind the element)
+                        if let Some(ref shadow) = render_node.props.shadow {
+                            ctx.draw_shadow(rect, radius, shadow.clone());
+                        }
+                        // Draw regular background
+                        if let Some(ref bg) = render_node.props.background {
+                            ctx.fill_rect(rect, radius, bg.clone());
+                        }
                     }
                 }
+                ElementType::Canvas(canvas_data) => {
+                    // Canvas element: invoke the render callback with DrawContext
+                    if let Some(render_fn) = &canvas_data.render_fn {
+                        // Push clip for canvas bounds - canvas drawing should not overflow
+                        let canvas_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
+                        ctx.push_clip(ClipShape::rect(canvas_rect));
+
+                        let canvas_bounds = crate::canvas::CanvasBounds {
+                            width: bounds.width,
+                            height: bounds.height,
+                        };
+                        render_fn(ctx, canvas_bounds);
+
+                        // Pop canvas clip
+                        ctx.pop_clip();
+                    }
+                }
+                // Text, SVG, Image are handled in separate passes
+                _ => {}
             }
-        }
-
-        // Track if children should be considered inside glass
-        let children_inside_glass = inside_glass || is_glass;
-
-        // Push clip if this element clips its children (e.g., scroll containers)
-        let clips_content = render_node.props.clips_content;
-        if clips_content {
-            let rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-            let radius = render_node.props.border_radius;
-            let clip_shape = if radius.is_uniform() && radius.top_left > 0.0 {
-                ClipShape::rounded_rect(rect, radius)
-            } else {
-                ClipShape::rect(rect)
-            };
-            ctx.push_clip(clip_shape);
         }
 
         // Check if this node has a scroll offset and apply it to children

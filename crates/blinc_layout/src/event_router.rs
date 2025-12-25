@@ -80,6 +80,10 @@ pub struct EventRouter {
     mouse_x: f32,
     mouse_y: f32,
 
+    /// Local coordinates from the last hit test (relative to the hit element)
+    last_hit_local_x: f32,
+    last_hit_local_y: f32,
+
     /// Elements currently under the pointer (for enter/leave tracking)
     hovered: HashSet<LayoutNodeId>,
 
@@ -115,6 +119,8 @@ impl EventRouter {
         Self {
             mouse_x: 0.0,
             mouse_y: 0.0,
+            last_hit_local_x: 0.0,
+            last_hit_local_y: 0.0,
             hovered: HashSet::new(),
             pressed_target: None,
             pressed_ancestors: Vec::new(),
@@ -124,6 +130,13 @@ impl EventRouter {
             scroll_delta_x: 0.0,
             scroll_delta_y: 0.0,
         }
+    }
+
+    /// Get the last hit test local coordinates
+    ///
+    /// These are updated whenever a hit test is performed (mouse move, click, etc.)
+    pub fn last_hit_local(&self) -> (f32, f32) {
+        (self.last_hit_local_x, self.last_hit_local_y)
     }
 
     /// Set the event callback for routing events to elements
@@ -168,6 +181,7 @@ impl EventRouter {
         // Send BLUR to old focused element AND bubble to its ancestors
         if let Some(old_focused) = self.focused {
             if Some(old_focused) != node {
+                tracing::info!("EventRouter: sending BLUR to old_focused {:?}, new focus will be {:?}", old_focused, node);
                 // Use the stored focused_ancestors for bubbling BLUR
                 let old_ancestors = std::mem::take(&mut self.focused_ancestors);
                 self.emit_event(old_focused, event_types::BLUR);
@@ -177,7 +191,11 @@ impl EventRouter {
                         self.emit_event(ancestor, event_types::BLUR);
                     }
                 }
+            } else {
+                tracing::info!("EventRouter: focus unchanged at {:?}", node);
             }
+        } else {
+            tracing::info!("EventRouter: no previous focus, setting focus to {:?}", node);
         }
 
         // Send FOCUS to new focused element
@@ -261,6 +279,9 @@ impl EventRouter {
             self.pressed_target = Some(hit.node);
             // Store ancestors for bubbling on release
             self.pressed_ancestors = hit.ancestors.clone();
+            // Store local coordinates for event handlers
+            self.last_hit_local_x = hit.local_x;
+            self.last_hit_local_y = hit.local_y;
 
             // Set focus to the clicked element WITH its ancestors (for BLUR bubbling later)
             self.set_focus_with_ancestors(Some(hit.node), hit.ancestors.clone());

@@ -49,6 +49,8 @@ pub use checkbox::{
 pub use text_input::{
     text_input, text_input_state, text_input_state_with_placeholder, InputType,
     NumberConstraints, SharedTextInputState, TextInput, TextInputConfig, TextInputState,
+    // Cursor blink timing utilities
+    elapsed_ms, has_focused_text_input, CURSOR_BLINK_INTERVAL_MS,
 };
 
 // Re-export text area widget

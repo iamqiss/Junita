@@ -178,6 +178,24 @@ impl BlincApp {
         self.ctx.render_tree(tree, width, height, target)
     }
 
+    /// Render a pre-computed render tree with dynamic render state
+    ///
+    /// This method renders the stable tree structure and overlays any dynamic
+    /// elements from RenderState (cursor, selections, animated properties).
+    ///
+    /// The tree structure is only rebuilt when elements are added/removed.
+    /// The RenderState is updated every frame for animations and cursor blink.
+    pub fn render_tree_with_state(
+        &mut self,
+        tree: &RenderTree,
+        render_state: &blinc_layout::RenderState,
+        target: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+    ) -> Result<()> {
+        self.ctx.render_tree_with_state(tree, render_state, width, height, target)
+    }
+
     /// Get the render context for advanced usage
     pub fn context(&mut self) -> &mut RenderContext {
         &mut self.ctx

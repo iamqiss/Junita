@@ -29,6 +29,7 @@
 //! ```
 
 pub mod animated;
+pub mod canvas;
 pub mod div;
 pub mod element;
 pub mod element_style;
@@ -36,6 +37,7 @@ pub mod event_handler;
 pub mod event_router;
 pub mod image;
 pub mod interactive;
+pub mod render_state;
 pub mod renderer;
 pub mod scroll;
 pub mod stateful;
@@ -43,11 +45,12 @@ pub mod style;
 pub mod svg;
 pub mod text;
 pub mod text_measure;
+pub mod text_selection;
 pub mod tree;
 pub mod widgets;
 
 // Core types
-pub use element::{ElementBounds, RenderLayer, RenderProps};
+pub use element::{DynRenderProps, ElementBounds, RenderLayer, RenderProps, ResolvedRenderProps};
 pub use event_handler::{EventCallback, EventContext, EventHandlers, HandlerRegistry};
 pub use event_router::{EventRouter, HitTestResult, MouseButton};
 pub use interactive::{DirtyTracker, InteractiveContext, NodeState};
@@ -70,6 +73,12 @@ pub use text::{text, Text};
 // Renderer
 pub use renderer::{GlassPanel, ImageData, LayoutRenderer, RenderTree, SvgData, TextData};
 
+// Canvas element
+pub use canvas::{canvas, Canvas, CanvasBounds, CanvasData, CanvasRenderFn};
+
+// Render state (dynamic properties separate from tree structure)
+pub use render_state::{NodeRenderState, Overlay, RenderState};
+
 // Stateful elements
 pub use stateful::{SharedState, StateTransitions, StatefulInner};
 
@@ -82,6 +91,12 @@ pub use text_measure::{
     TextMetrics,
 };
 
+// Text selection (clipboard support)
+pub use text_selection::{
+    clear_selection, get_selected_text, global_selection, set_selection,
+    SelectionSource, SharedTextSelection, TextSelection,
+};
+
 /// Prelude module - import everything commonly needed
 pub mod prelude {
     pub use crate::div::{
@@ -89,7 +104,7 @@ pub mod prelude {
     };
     // Reference binding for external element access
     pub use crate::div::{DivRef, ElementRef};
-    pub use crate::element::{ElementBounds, RenderLayer, RenderProps};
+    pub use crate::element::{DynRenderProps, ElementBounds, RenderLayer, RenderProps, ResolvedRenderProps};
     // Event handlers
     pub use crate::event_handler::{EventCallback, EventContext, EventHandlers, HandlerRegistry};
     // Event routing
@@ -126,6 +141,8 @@ pub mod prelude {
         // Text area widget - ready-to-use
         text_area, text_area_state, text_area_state_with_placeholder,
         SharedTextAreaState, TextArea, TextAreaConfig, TextAreaState, TextPosition,
+        // Cursor blink timing (for use by app layer)
+        elapsed_ms, has_focused_text_input, CURSOR_BLINK_INTERVAL_MS,
     };
     // Material system
     pub use crate::element::{
@@ -144,6 +161,9 @@ pub mod prelude {
     pub use crate::text::{text, Text};
     pub use crate::tree::{LayoutNodeId, LayoutTree};
 
+    // Canvas element
+    pub use crate::canvas::{canvas, Canvas, CanvasBounds};
+
     // Re-export Shadow and Transform from blinc_core for convenience
     pub use blinc_core::{Shadow, Transform};
 
@@ -153,5 +173,19 @@ pub mod prelude {
     // Re-export animation types from blinc_animation for convenience
     pub use blinc_animation::{
         AnimatedKeyframe, AnimatedTimeline, AnimatedValue, Easing, SchedulerHandle, SpringConfig,
+    };
+
+    // Text selection for clipboard support
+    pub use crate::text_selection::{
+        clear_selection, get_selected_text, global_selection, set_selection,
+        SelectionSource, SharedTextSelection, TextSelection,
+    };
+
+    // Render state (dynamic properties separate from tree structure)
+    pub use crate::render_state::{NodeRenderState, Overlay, RenderState};
+
+    // Dynamic value system for render-time resolution
+    pub use blinc_core::{
+        AnimationAccess, DynFloat, DynValue, ReactiveAccess, ValueContext,
     };
 }

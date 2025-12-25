@@ -39,6 +39,7 @@ pub mod fsm;
 pub mod layer;
 pub mod reactive;
 pub mod runtime;
+pub mod value;
 
 pub use draw::{
     DrawCommand, DrawContext, DrawContextExt, FontWeight, ImageId, ImageOptions, LayerConfig,
@@ -57,3 +58,7 @@ pub use layer::{
 };
 pub use reactive::{Derived, DerivedId, Effect, EffectId, ReactiveGraph, Signal, SignalId};
 pub use runtime::BlincReactiveRuntime;
+pub use value::{
+    AnimationAccess, BoxedValue, DynFloat, DynValue, ReactiveAccess, SpringValue, Static,
+    Value, ValueContext,
+};

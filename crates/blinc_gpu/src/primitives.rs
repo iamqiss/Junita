@@ -770,6 +770,22 @@ impl PrimitiveBatch {
     pub fn glyph_count(&self) -> usize {
         self.glyphs.len()
     }
+
+    /// Merge another batch into this one
+    ///
+    /// Useful for combining batches from different paint contexts.
+    pub fn merge(&mut self, other: PrimitiveBatch) {
+        self.primitives.extend(other.primitives);
+        self.glass_primitives.extend(other.glass_primitives);
+        self.glyphs.extend(other.glyphs);
+
+        // Merge paths with index offset
+        let base_vertex = self.paths.vertices.len() as u32;
+        self.paths.vertices.extend(other.paths.vertices);
+        self.paths
+            .indices
+            .extend(other.paths.indices.iter().map(|i| i + base_vertex));
+    }
 }
 
 impl Default for PrimitiveBatch {

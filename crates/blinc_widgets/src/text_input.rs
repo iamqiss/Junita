@@ -14,7 +14,7 @@
 use blinc_animation::spring::{Spring, SpringConfig};
 use blinc_core::events::{event_types, Event, EventData, KeyCode, Modifiers};
 use blinc_core::fsm::StateMachine;
-use blinc_core::Color;
+use blinc_core::{Brush, Color, DrawContext, Rect};
 use blinc_layout::prelude::*;
 
 use crate::context::WidgetContext;
@@ -1060,16 +1060,35 @@ impl TextInput {
         };
         inner = inner.child(text_content);
 
-        // Add cursor when focused
-        if is_focused && state.cursor_visible {
-            inner = inner.child(
-                div()
-                    .w(2.0)
-                    .h(self.config.font_size + 4.0)
-                    .bg(self.config.cursor_color)
-                    .rounded(1.0),
-            );
-        }
+        // Cursor canvas (absolute positioned, doesn't affect text layout)
+        // Canvas always exists, but cursor rect is conditionally drawn based on focus/blink state
+        let cursor_visible = is_focused && state.cursor_visible;
+        let cursor_color = self.config.cursor_color;
+        let cursor_height = self.config.font_size + 4.0;
+
+        // Calculate cursor x position based on text width
+        // TODO: Use proper text measurement for accurate positioning
+        let char_width = self.config.font_size * 0.6; // Approximate monospace width
+        let cursor_x = self.config.padding_x + (state.cursor_pos as f32 * char_width);
+
+        inner = inner.child(
+            canvas(move |ctx: &mut dyn DrawContext, bounds| {
+                // Only draw cursor rect when visible (blink on + focused)
+                if cursor_visible {
+                    let cursor_y = (bounds.height - cursor_height) / 2.0;
+                    ctx.fill_rect(
+                        Rect::new(0.0, cursor_y, 2.0, cursor_height),
+                        0.0.into(),
+                        Brush::Solid(cursor_color),
+                    );
+                }
+            })
+            .absolute()
+            .left(cursor_x)
+            .top(0.0)
+            .w(2.0)
+            .h_full(),
+        );
 
         // Build outer container (provides border)
         div()

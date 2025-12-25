@@ -6,13 +6,16 @@
 //! - `AnimatedKeyframe` - Keyframe-based timed animations
 //! - `AnimatedTimeline` - Timeline orchestration of multiple animations
 
+use blinc_core::AnimationAccess;
 use crate::easing::Easing;
 use crate::keyframe::{Keyframe, KeyframeAnimation};
 use crate::spring::{Spring, SpringConfig};
 use crate::timeline::Timeline;
 use slotmap::{new_key_type, SlotMap};
 use std::sync::{Arc, Mutex, Weak};
-use std::time::Instant;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+use std::thread::{self, JoinHandle};
 
 new_key_type! {
     /// Handle to a registered spring animation
@@ -21,6 +24,23 @@ new_key_type! {
     pub struct KeyframeId;
     /// Handle to a registered timeline
     pub struct TimelineId;
+}
+
+impl SpringId {
+    /// Convert to raw u64 for atomic storage
+    ///
+    /// Use with `from_raw()` for lock-free animation ID passing.
+    pub fn to_raw(self) -> u64 {
+        self.0.as_ffi()
+    }
+
+    /// Reconstruct from raw u64
+    ///
+    /// # Safety
+    /// The raw value must have been created by `to_raw()` on a valid SpringId.
+    pub fn from_raw(raw: u64) -> Self {
+        SpringId::from(slotmap::KeyData::from_ffi(raw))
+    }
 }
 
 /// Internal state of the animation scheduler
@@ -36,8 +56,22 @@ struct SchedulerInner {
 ///
 /// This is typically held by the application context and shared via `SchedulerHandle`.
 /// Animations register themselves implicitly when created.
+///
+/// # Background Thread Mode
+///
+/// The scheduler can run on its own background thread via `start_background()`.
+/// This ensures animations continue even when the window loses focus.
+///
+/// ```ignore
+/// let scheduler = AnimationScheduler::new();
+/// scheduler.start_background(); // Runs at 120fps in background thread
+/// ```
 pub struct AnimationScheduler {
     inner: Arc<Mutex<SchedulerInner>>,
+    /// Stop signal for background thread
+    stop_flag: Arc<AtomicBool>,
+    /// Background thread handle (if running)
+    thread_handle: Option<JoinHandle<()>>,
 }
 
 impl AnimationScheduler {
@@ -50,7 +84,86 @@ impl AnimationScheduler {
                 last_frame: Instant::now(),
                 target_fps: 120,
             })),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+            thread_handle: None,
         }
+    }
+
+    /// Start the scheduler on a background thread
+    ///
+    /// This ensures animations continue even when the window loses focus.
+    /// The thread runs at the configured target FPS (default 120).
+    pub fn start_background(&mut self) {
+        if self.thread_handle.is_some() {
+            return; // Already running
+        }
+
+        let inner = Arc::clone(&self.inner);
+        let stop_flag = Arc::clone(&self.stop_flag);
+
+        self.thread_handle = Some(thread::spawn(move || {
+            let frame_duration = Duration::from_micros(1_000_000 / 120); // 120fps
+
+            while !stop_flag.load(Ordering::Relaxed) {
+                let start = Instant::now();
+
+                // Tick animations
+                {
+                    let mut inner = inner.lock().unwrap();
+                    let now = Instant::now();
+                    let dt = (now - inner.last_frame).as_secs_f32();
+                    let dt_ms = dt * 1000.0;
+                    inner.last_frame = now;
+
+                    // Update all springs
+                    for (_, spring) in inner.springs.iter_mut() {
+                        spring.step(dt);
+                    }
+
+                    // Update all keyframe animations
+                    for (_, keyframe) in inner.keyframes.iter_mut() {
+                        keyframe.tick(dt_ms);
+                    }
+
+                    // Update all timelines
+                    for (_, timeline) in inner.timelines.iter_mut() {
+                        timeline.tick(dt_ms);
+                    }
+
+                    // NOTE: We do NOT remove settled springs here!
+                    // Springs are only removed when:
+                    // 1. AnimatedValue is dropped (element removed from scene)
+                    // 2. set_immediate() is called
+                    // This ensures animations can be restarted after settling.
+
+                    // Remove finished keyframe animations (these are one-shot)
+                    inner.keyframes.retain(|_, k| k.is_playing());
+
+                    // Remove finished timelines (these are one-shot)
+                    inner.timelines.retain(|_, t| t.is_playing());
+                }
+
+                // Sleep for remaining frame time
+                let elapsed = start.elapsed();
+                if elapsed < frame_duration {
+                    thread::sleep(frame_duration - elapsed);
+                }
+            }
+        }));
+    }
+
+    /// Stop the background thread
+    pub fn stop_background(&mut self) {
+        self.stop_flag.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+        self.stop_flag.store(false, Ordering::Relaxed);
+    }
+
+    /// Check if the background thread is running
+    pub fn is_background_running(&self) -> bool {
+        self.thread_handle.is_some()
     }
 
     /// Get a handle to this scheduler for passing to components
@@ -89,17 +202,19 @@ impl AnimationScheduler {
             timeline.tick(dt_ms);
         }
 
-        // Remove settled springs
-        inner.springs.retain(|_, s| !s.is_settled());
+        // NOTE: Springs are NOT removed when settled - only when AnimatedValue drops
+        // This ensures springs can be restarted with new targets
 
-        // Remove finished keyframe animations
+        // Remove finished keyframe animations (one-shot)
         inner.keyframes.retain(|_, k| k.is_playing());
 
-        // Remove finished timelines
+        // Remove finished timelines (one-shot)
         inner.timelines.retain(|_, t| t.is_playing());
 
-        // Return true if there are still active animations
-        !inner.springs.is_empty() || !inner.keyframes.is_empty() || !inner.timelines.is_empty()
+        // Return true if there are still active (not settled) animations
+        inner.springs.iter().any(|(_, s)| !s.is_settled())
+            || !inner.keyframes.is_empty()
+            || !inner.timelines.is_empty()
     }
 
     /// Check if any animations are still active
@@ -273,7 +388,63 @@ impl Clone for AnimationScheduler {
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
+            stop_flag: Arc::clone(&self.stop_flag),
+            // Cloned scheduler doesn't own the background thread
+            thread_handle: None,
         }
+    }
+}
+
+impl Drop for AnimationScheduler {
+    fn drop(&mut self) {
+        // Stop background thread when scheduler is dropped
+        self.stop_background();
+    }
+}
+
+/// Implement AnimationAccess for AnimationScheduler
+///
+/// This allows the scheduler to be used directly with ValueContext for
+/// resolving dynamic animation values at render time.
+impl AnimationAccess for AnimationScheduler {
+    fn get_spring_value(&self, id: u64, generation: u32) -> Option<f32> {
+        // Reconstruct SpringId from raw parts
+        // slotmap keys are 64-bit with version in upper bits
+        let key_data = slotmap::KeyData::from_ffi((id as u32 as u64) | ((generation as u64) << 32));
+        let spring_id = SpringId::from(key_data);
+        self.inner
+            .lock()
+            .unwrap()
+            .springs
+            .get(spring_id)
+            .map(|s| s.value())
+    }
+
+    fn get_keyframe_value(&self, id: u64) -> Option<f32> {
+        // For keyframes, we use the full id (version is in upper 32 bits)
+        let key_data = slotmap::KeyData::from_ffi(id);
+        let keyframe_id = KeyframeId::from(key_data);
+        self.inner
+            .lock()
+            .unwrap()
+            .keyframes
+            .get(keyframe_id)
+            .map(|k| k.value())
+    }
+
+    fn get_timeline_value(&self, timeline_id: u64, _property: &str) -> Option<f32> {
+        // Timeline values are accessed through entry IDs, not property names
+        // This is a placeholder - timeline access is more complex
+        let key_data = slotmap::KeyData::from_ffi(timeline_id);
+        let tid = TimelineId::from(key_data);
+        // For now, return None as timeline access requires entry IDs
+        // Future: parse property as "entry_{id}" and look up
+        self.inner
+            .lock()
+            .unwrap()
+            .timelines
+            .get(tid)
+            .map(|_t| 0.0) // Placeholder
     }
 }
 
@@ -466,6 +637,43 @@ impl SchedulerHandle {
     }
 }
 
+/// Implement AnimationAccess for SchedulerHandle
+///
+/// This allows the handle to be used with ValueContext for resolving
+/// dynamic animation values at render time.
+impl AnimationAccess for SchedulerHandle {
+    fn get_spring_value(&self, id: u64, generation: u32) -> Option<f32> {
+        self.inner.upgrade().and_then(|inner| {
+            let key_data = slotmap::KeyData::from_ffi((id as u32 as u64) | ((generation as u64) << 32));
+            let spring_id = SpringId::from(key_data);
+            inner
+                .lock()
+                .unwrap()
+                .springs
+                .get(spring_id)
+                .map(|s| s.value())
+        })
+    }
+
+    fn get_keyframe_value(&self, id: u64) -> Option<f32> {
+        self.inner.upgrade().and_then(|inner| {
+            let key_data = slotmap::KeyData::from_ffi(id);
+            let keyframe_id = KeyframeId::from(key_data);
+            inner
+                .lock()
+                .unwrap()
+                .keyframes
+                .get(keyframe_id)
+                .map(|k| k.value())
+        })
+    }
+
+    fn get_timeline_value(&self, _timeline_id: u64, _property: &str) -> Option<f32> {
+        // Placeholder - timeline access is more complex
+        None
+    }
+}
+
 // ============================================================================
 // Animated Value (Spring-based)
 // ============================================================================
@@ -492,7 +700,10 @@ pub struct AnimatedValue {
     handle: SchedulerHandle,
     spring_id: Option<SpringId>,
     config: SpringConfig,
+    /// The last known value (updated when spring settles)
     current: f32,
+    /// The target value we're animating towards
+    target: f32,
 }
 
 impl AnimatedValue {
@@ -504,6 +715,7 @@ impl AnimatedValue {
             spring_id: None,
             config,
             current: initial,
+            target: initial,
         }
     }
 
@@ -514,15 +726,19 @@ impl AnimatedValue {
 
     /// Set the target value - starts animation if different from current
     pub fn set_target(&mut self, target: f32) {
-        // If we already have a spring, update its target
+        self.target = target;
+
+        // If we have a spring, just update its target (spring persists until dropped)
         if let Some(id) = self.spring_id {
             self.handle.set_spring_target(id, target);
-        } else if (target - self.current).abs() > 0.001 {
-            // Create and register a new spring
-            let spring = Spring::new(self.config, self.current);
-            if let Some(id) = self.handle.register_spring(spring) {
-                self.spring_id = Some(id);
-                self.handle.set_spring_target(id, target);
+        } else {
+            // No spring yet - create one if target differs from current
+            if (target - self.current).abs() > 0.001 {
+                let spring = Spring::new(self.config, self.current);
+                if let Some(id) = self.handle.register_spring(spring) {
+                    self.spring_id = Some(id);
+                    self.handle.set_spring_target(id, target);
+                }
             }
         }
     }
@@ -530,7 +746,8 @@ impl AnimatedValue {
     /// Get the current animated value
     pub fn get(&self) -> f32 {
         if let Some(id) = self.spring_id {
-            self.handle.get_spring_value(id).unwrap_or(self.current)
+            // Try to get spring value; if spring was removed (settled), use target
+            self.handle.get_spring_value(id).unwrap_or(self.target)
         } else {
             self.current
         }
@@ -543,11 +760,22 @@ impl AnimatedValue {
             self.handle.remove_spring(id);
         }
         self.current = value;
+        self.target = value;
     }
 
     /// Check if currently animating
     pub fn is_animating(&self) -> bool {
-        self.spring_id.is_some()
+        if let Some(id) = self.spring_id {
+            // Spring exists but may have been removed by scheduler
+            self.handle.get_spring_value(id).is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Get the current target value
+    pub fn target(&self) -> f32 {
+        self.target
     }
 }
 
