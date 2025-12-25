@@ -1229,6 +1229,24 @@ impl WindowedApp {
                             }
 
                             frame.present();
+
+                            // =========================================================
+                            // PHASE 5: Request next frame if animations are active
+                            // This ensures smooth animation without waiting for events
+                            // =========================================================
+
+                            // Check if there are active animations that need continuous rendering
+                            let scheduler = windowed_ctx.animations.lock().unwrap();
+                            let spring_count = scheduler.spring_count();
+                            let has_active = scheduler.has_active_animations();
+                            drop(scheduler); // Release lock before request_redraw
+
+                            if has_active || spring_count > 0 {
+                                // Request another frame to continue animation
+                                // We check spring_count > 0 to ensure we render the first frame
+                                // after a spring is created, even if it hasn't started moving yet
+                                window.request_redraw();
+                            }
                         }
                     }
 
