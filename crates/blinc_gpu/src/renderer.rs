@@ -1330,6 +1330,12 @@ impl GpuRenderer {
         self.texture_format
     }
 
+    /// Poll the device to process completed GPU operations and free resources.
+    /// Call this after frame rendering to prevent memory accumulation.
+    pub fn poll(&self) {
+        self.device.poll(wgpu::Maintain::Wait);
+    }
+
     /// Render a batch of primitives to a texture view
     /// Render primitives with transparent background (default)
     pub fn render(&mut self, target: &wgpu::TextureView, batch: &PrimitiveBatch) {

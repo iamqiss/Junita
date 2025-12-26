@@ -325,6 +325,9 @@ impl RenderContext {
             }
         }
 
+        // Poll the device to free completed command buffers and prevent memory accumulation
+        self.renderer.poll();
+
         Ok(())
     }
 

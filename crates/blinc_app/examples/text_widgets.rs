@@ -200,7 +200,8 @@ fn build_form_section(ctx: &WindowedContext, message: &SharedTextAreaState) -> i
         // Form card
         .child(
             div()
-                .glass()
+                .glass() // Disabled for memory testing
+                // .bg(Color::rgba(0.2, 0.2, 0.25, 0.9))
                 .shadow_lg()
                 .rounded(16.0)
                 .p(16.0)
