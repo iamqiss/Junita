@@ -222,6 +222,8 @@ image("path/to/image.png") // Image element
 
 Blinc provides a comprehensive animation system with spring physics, keyframe animations, and declarative motion containers.
 
+![keyframe animations](ScreenRecording2025-12-26at18.54.28-ezgif.com-video-to-gif-converter.gif)
+
 ### Spring Animations
 
 Spring physics animations with RK4 integration for natural, interruptible motion:
