@@ -196,10 +196,42 @@ struct BindGroupLayouts {
 }
 
 impl GpuRenderer {
+    /// Get the preferred backend for the current platform
+    ///
+    /// Using the primary backend instead of all backends reduces memory usage
+    /// by avoiding initialization of multiple GPU driver stacks.
+    fn preferred_backends() -> wgpu::Backends {
+        #[cfg(target_os = "macos")]
+        {
+            wgpu::Backends::METAL
+        }
+        #[cfg(target_os = "windows")]
+        {
+            wgpu::Backends::DX12
+        }
+        #[cfg(target_os = "linux")]
+        {
+            wgpu::Backends::VULKAN
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL
+        }
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux",
+            target_arch = "wasm32"
+        )))]
+        {
+            wgpu::Backends::PRIMARY
+        }
+    }
+
     /// Create a new renderer without a surface (for headless rendering)
     pub async fn new(config: RendererConfig) -> Result<Self, RendererError> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: Self::preferred_backends(),
             ..Default::default()
         });
 
@@ -257,7 +289,7 @@ impl GpuRenderer {
             + 'static,
     {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: Self::preferred_backends(),
             ..Default::default()
         });
 
