@@ -223,9 +223,13 @@ impl RenderContext {
         fg_batch.merge(svg_ctx.take_batch());
 
         self.renderer.resize(width, height);
-        self.ensure_textures(width, height);
 
         let has_glass = bg_batch.glass_count() > 0;
+
+        // Only allocate glass textures when glass is actually used
+        if has_glass {
+            self.ensure_glass_textures(width, height);
+        }
         let use_msaa_overlay = self.sample_count > 1;
 
         // Background layer uses SDF rendering (shader-based AA, no MSAA needed)
@@ -328,8 +332,9 @@ impl RenderContext {
         Ok(())
     }
 
-    /// Ensure internal textures exist and are the right size
-    fn ensure_textures(&mut self, width: u32, height: u32) {
+    /// Ensure glass-related textures exist and are the right size.
+    /// Only called when glass elements are present in the scene.
+    fn ensure_glass_textures(&mut self, width: u32, height: u32) {
         // Use the same texture format as the renderer's pipelines
         let format = self.renderer.texture_format();
 
@@ -392,9 +397,6 @@ impl RenderContext {
                 height,
             });
         }
-
-        // Note: MSAA textures for overlay rendering are created internally by
-        // render_overlay_msaa, so we don't need to cache them here.
     }
 
     /// Copy one texture to another
