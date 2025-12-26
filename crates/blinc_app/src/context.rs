@@ -25,8 +25,7 @@ pub struct RenderContext {
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     sample_count: u32,
-    // Cached textures for glass rendering
-    pre_glass_texture: Option<CachedTexture>,
+    // Single texture for glass backdrop (rendered to and sampled from)
     backdrop_texture: Option<CachedTexture>,
     // Cached MSAA texture for anti-aliased rendering
     msaa_texture: Option<CachedTexture>,
@@ -95,7 +94,6 @@ impl RenderContext {
             device,
             queue,
             sample_count,
-            pre_glass_texture: None,
             backdrop_texture: None,
             msaa_texture: None,
             image_cache: HashMap::new(),
@@ -242,51 +240,43 @@ impl RenderContext {
                 .iter()
                 .partition(|img| img.layer == RenderLayer::Background);
 
-            // Glass path:
-            // 1. Render background primitives to pre-glass texture
-            // 2. Render background-layer images to pre-glass texture (will be blurred by glass)
-            // 3. Copy to backdrop for glass sampling
-            // 4. Render background primitives to target
-            // 5. Render background-layer images to target
-            // 6. Render glass with backdrop blur onto target
-            // 7. Render glass/foreground-layer images (on top of glass, not blurred)
-            // 8. Render foreground primitives (with MSAA if enabled)
-            // 9. Render text
+            // Glass path (optimized - single backdrop texture):
+            // 1. Render background primitives to backdrop texture
+            // 2. Render background-layer images to backdrop texture (will be blurred by glass)
+            // 3. Render background primitives to target
+            // 4. Render background-layer images to target
+            // 5. Render glass with backdrop blur onto target
+            // 6. Render glass/foreground-layer images (on top of glass, not blurred)
+            // 7. Render foreground primitives (with MSAA if enabled)
+            // 8. Render text
 
-            // Step 1: Render background primitives to pre-glass texture
+            // Step 1: Render background primitives to backdrop texture (for glass to sample)
             {
-                let pre_glass_view = &self.pre_glass_texture.as_ref().unwrap().view;
+                let backdrop_view = &self.backdrop_texture.as_ref().unwrap().view;
                 self.renderer
-                    .render_with_clear(pre_glass_view, &bg_batch, [0.0, 0.0, 0.0, 0.0]);
+                    .render_with_clear(backdrop_view, &bg_batch, [0.0, 0.0, 0.0, 0.0]);
             }
 
-            // Step 2: Render background-layer images to pre-glass texture (so glass can blur them)
-            self.render_images_to_pre_glass(&bg_images);
+            // Step 2: Render background-layer images to backdrop texture (so glass can blur them)
+            self.render_images_to_backdrop(&bg_images);
 
-            // Step 3: Copy pre-glass to backdrop for glass sampling
-            {
-                let pre_glass_tex = &self.pre_glass_texture.as_ref().unwrap().texture;
-                let backdrop_tex = &self.backdrop_texture.as_ref().unwrap().texture;
-                self.copy_texture(pre_glass_tex, backdrop_tex, width, height);
-            }
-
-            // Step 4: Render background primitives to target
+            // Step 3: Render background primitives to target
             self.renderer
                 .render_with_clear(target, &bg_batch, [0.0, 0.0, 0.0, 1.0]);
 
-            // Step 5: Render background-layer images to target
+            // Step 4: Render background-layer images to target
             self.render_images_ref(target, &bg_images);
 
-            // Step 6: Render glass with backdrop blur onto target
+            // Step 5: Render glass with backdrop blur onto target
             {
                 let backdrop_view = &self.backdrop_texture.as_ref().unwrap().view;
                 self.renderer.render_glass(target, backdrop_view, &bg_batch);
             }
 
-            // Step 7: Render glass/foreground-layer images (on top of glass, NOT blurred)
+            // Step 6: Render glass/foreground-layer images (on top of glass, NOT blurred)
             self.render_images_ref(target, &fg_images);
 
-            // Step 8: Render foreground primitives with MSAA for smooth SVG edges
+            // Step 7: Render foreground primitives with MSAA for smooth SVG edges
             if !fg_batch.is_empty() {
                 if use_msaa_overlay {
                     self.renderer
@@ -296,7 +286,7 @@ impl RenderContext {
                 }
             }
 
-            // Step 9: Render text
+            // Step 8: Render text
             if !all_glyphs.is_empty() {
                 self.render_text(target, &all_glyphs);
             }
@@ -334,39 +324,12 @@ impl RenderContext {
 
     /// Ensure glass-related textures exist and are the right size.
     /// Only called when glass elements are present in the scene.
+    ///
+    /// We use a single texture for both rendering and sampling (backdrop_texture).
+    /// This saves ~2.5MB of GPU memory compared to using two separate textures.
     fn ensure_glass_textures(&mut self, width: u32, height: u32) {
         // Use the same texture format as the renderer's pipelines
         let format = self.renderer.texture_format();
-
-        let needs_pre_glass = self
-            .pre_glass_texture
-            .as_ref()
-            .map(|t| t.width != width || t.height != height)
-            .unwrap_or(true);
-
-        if needs_pre_glass {
-            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("Pre-Glass Texture"),
-                size: wgpu::Extent3d {
-                    width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                view_formats: &[],
-            });
-            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-            self.pre_glass_texture = Some(CachedTexture {
-                texture,
-                view,
-                width,
-                height,
-            });
-        }
 
         let needs_backdrop = self
             .backdrop_texture
@@ -375,6 +338,7 @@ impl RenderContext {
             .unwrap_or(true);
 
         if needs_backdrop {
+            // Single texture that can be both rendered to AND sampled from
             let texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("Glass Backdrop"),
                 size: wgpu::Extent3d {
@@ -386,7 +350,7 @@ impl RenderContext {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             });
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -399,37 +363,6 @@ impl RenderContext {
         }
     }
 
-    /// Copy one texture to another
-    fn copy_texture(&self, src: &wgpu::Texture, dst: &wgpu::Texture, width: u32, height: u32) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Backdrop Copy Encoder"),
-            });
-
-        encoder.copy_texture_to_texture(
-            wgpu::ImageCopyTexture {
-                texture: src,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::ImageCopyTexture {
-                texture: dst,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-        );
-
-        self.queue.submit(std::iter::once(encoder.finish()));
-    }
-
     /// Render text glyphs
     fn render_text(&mut self, target: &wgpu::TextureView, glyphs: &[GpuGlyph]) {
         if let Some(atlas_view) = self.text_ctx.atlas_view() {
@@ -438,13 +371,13 @@ impl RenderContext {
         }
     }
 
-    /// Render images to the pre-glass texture (for images that should be blurred by glass)
-    fn render_images_to_pre_glass(&mut self, images: &[&ImageElement]) {
-        let Some(ref pre_glass) = self.pre_glass_texture else {
+    /// Render images to the backdrop texture (for images that should be blurred by glass)
+    fn render_images_to_backdrop(&mut self, images: &[&ImageElement]) {
+        let Some(ref backdrop) = self.backdrop_texture else {
             return;
         };
         // Create a new view to avoid borrow conflicts
-        let target = pre_glass
+        let target = backdrop
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
         self.render_images_ref(&target, images);
