@@ -34,7 +34,7 @@ pub mod event_loop;
 pub mod input;
 pub mod window;
 
-pub use event_loop::DesktopEventLoop;
+pub use event_loop::{DesktopEventLoop, WakeProxy};
 pub use window::DesktopWindow;
 
 use blinc_platform::{Platform, PlatformError, WindowConfig};

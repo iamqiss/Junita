@@ -52,6 +52,12 @@ struct SchedulerInner {
     target_fps: u32,
 }
 
+/// Callback type for waking up the main thread from the animation thread
+///
+/// This is called when there are active animations that need to be rendered.
+/// The callback should wake up the event loop (e.g., via EventLoopProxy).
+pub type WakeCallback = Arc<dyn Fn() + Send + Sync>;
+
 /// The animation scheduler that ticks all active animations
 ///
 /// This is typically held by the application context and shared via `SchedulerHandle`.
@@ -75,6 +81,8 @@ pub struct AnimationScheduler {
     needs_redraw: Arc<AtomicBool>,
     /// Background thread handle (if running)
     thread_handle: Option<JoinHandle<()>>,
+    /// Optional callback to wake up the main thread
+    wake_callback: Option<WakeCallback>,
 }
 
 impl AnimationScheduler {
@@ -90,7 +98,26 @@ impl AnimationScheduler {
             stop_flag: Arc::new(AtomicBool::new(false)),
             needs_redraw: Arc::new(AtomicBool::new(false)),
             thread_handle: None,
+            wake_callback: None,
         }
+    }
+
+    /// Set a wake callback that will be called when animations need a redraw
+    ///
+    /// This callback is invoked from the background animation thread when there
+    /// are active animations. Use this to wake up an event loop from another thread.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let wake_proxy = event_loop.wake_proxy();
+    /// scheduler.set_wake_callback(move || wake_proxy.wake());
+    /// ```
+    pub fn set_wake_callback<F>(&mut self, callback: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.wake_callback = Some(Arc::new(callback));
     }
 
     /// Start the scheduler on a background thread
@@ -101,6 +128,9 @@ impl AnimationScheduler {
     /// The thread sets the `needs_redraw` flag whenever there are active
     /// animations. The main thread should call `take_needs_redraw()` to
     /// check and clear this flag, then request a window redraw.
+    ///
+    /// If a wake callback is set via `set_wake_callback()`, it will be called
+    /// to wake up the main thread's event loop when animations are active.
     pub fn start_background(&mut self) {
         if self.thread_handle.is_some() {
             return; // Already running
@@ -109,6 +139,7 @@ impl AnimationScheduler {
         let inner = Arc::clone(&self.inner);
         let stop_flag = Arc::clone(&self.stop_flag);
         let needs_redraw = Arc::clone(&self.needs_redraw);
+        let wake_callback = self.wake_callback.clone();
 
         self.thread_handle = Some(thread::spawn(move || {
             let frame_duration = Duration::from_micros(1_000_000 / 120); // 120fps
@@ -139,27 +170,26 @@ impl AnimationScheduler {
                         timeline.tick(dt_ms);
                     }
 
-                    // NOTE: We do NOT remove settled springs here!
-                    // Springs are only removed when:
-                    // 1. AnimatedValue is dropped (element removed from scene)
-                    // 2. set_immediate() is called
-                    // This ensures animations can be restarted after settling.
+                    // NOTE: We do NOT remove animations here!
+                    // Springs, keyframes, and timelines are only removed when:
+                    // 1. Their wrapper (AnimatedValue, AnimatedKeyframe, AnimatedTimeline) is dropped
+                    // 2. set_immediate() is called on springs
+                    // This ensures animations can be restarted after completing.
 
-                    // Remove finished keyframe animations (these are one-shot)
-                    inner.keyframes.retain(|_, k| k.is_playing());
-
-                    // Remove finished timelines (these are one-shot)
-                    inner.timelines.retain(|_, t| t.is_playing());
-
-                    // Check if any animations are still active
+                    // Check if any animations are still active (playing, not just present)
                     inner.springs.iter().any(|(_, s)| !s.is_settled())
-                        || !inner.keyframes.is_empty()
-                        || !inner.timelines.is_empty()
+                        || inner.keyframes.iter().any(|(_, k)| k.is_playing())
+                        || inner.timelines.iter().any(|(_, t)| t.is_playing())
                 };
 
                 // Signal main thread that it needs to redraw
                 if has_active {
                     needs_redraw.store(true, Ordering::Release);
+
+                    // Wake up the event loop if a callback is set
+                    if let Some(ref callback) = wake_callback {
+                        callback();
+                    }
                 }
 
                 // Sleep for remaining frame time
@@ -241,19 +271,14 @@ impl AnimationScheduler {
             timeline.tick(dt_ms);
         }
 
-        // NOTE: Springs are NOT removed when settled - only when AnimatedValue drops
-        // This ensures springs can be restarted with new targets
+        // NOTE: We do NOT remove animations here!
+        // Springs, keyframes, and timelines are only removed when their wrappers drop.
+        // This ensures animations can be restarted after completing.
 
-        // Remove finished keyframe animations (one-shot)
-        inner.keyframes.retain(|_, k| k.is_playing());
-
-        // Remove finished timelines (one-shot)
-        inner.timelines.retain(|_, t| t.is_playing());
-
-        // Return true if there are still active (not settled) animations
+        // Return true if there are still active (playing, not just present) animations
         inner.springs.iter().any(|(_, s)| !s.is_settled())
-            || !inner.keyframes.is_empty()
-            || !inner.timelines.is_empty()
+            || inner.keyframes.iter().any(|(_, k)| k.is_playing())
+            || inner.timelines.iter().any(|(_, t)| t.is_playing())
     }
 
     /// Check if any animations are still active
@@ -431,6 +456,7 @@ impl Clone for AnimationScheduler {
             needs_redraw: Arc::clone(&self.needs_redraw),
             // Cloned scheduler doesn't own the background thread
             thread_handle: None,
+            wake_callback: self.wake_callback.clone(),
         }
     }
 }
@@ -1059,9 +1085,24 @@ impl AnimatedTimeline {
     }
 
     /// Start the timeline
+    ///
+    /// If the timeline has finished and been removed from the scheduler,
+    /// use `restart()` instead to re-register it.
     pub fn start(&self) {
         if let Some(id) = self.timeline_id {
             self.handle.start_timeline(id);
+        }
+    }
+
+    /// Restart the timeline from the beginning
+    ///
+    /// Resets the timeline to time 0 and starts playing.
+    /// This works even after the timeline has completed.
+    pub fn restart(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.start(); // start() already resets time to 0
+            });
         }
     }
 
@@ -1073,14 +1114,13 @@ impl AnimatedTimeline {
     }
 
     /// Get the current value for a timeline entry
-    pub fn get(&self, entry_id: crate::timeline::TimelineEntryId) -> f32 {
+    pub fn get(&self, entry_id: crate::timeline::TimelineEntryId) -> Option<f32> {
         if let Some(id) = self.timeline_id {
             self.handle
                 .with_timeline(id, |timeline| timeline.value(entry_id))
                 .flatten()
-                .unwrap_or(0.0)
         } else {
-            0.0
+            None
         }
     }
 
@@ -1182,7 +1222,7 @@ mod tests {
         assert!(timeline.is_playing());
 
         // Initial value should be 0
-        assert_eq!(timeline.get(entry), 0.0);
+        assert_eq!(timeline.get(entry), Some(0.0));
 
         // Tick scheduler
         scheduler.tick();

@@ -6,17 +6,24 @@
 //!
 //! - **Spring Physics**: RK4-integrated springs with stiffness, damping, mass
 //! - **Keyframe Animations**: Timed sequences with easing functions
+//! - **Multi-Property Keyframes**: Animate multiple properties simultaneously
 //! - **Timelines**: Orchestrate multiple animations with offsets
 //! - **Interruptible**: Animations inherit velocity when interrupted
+//! - **Animation Presets**: Common entry/exit animations
 
 pub mod easing;
 pub mod keyframe;
+pub mod presets;
 pub mod scheduler;
 pub mod spring;
 pub mod timeline;
 
 pub use easing::Easing;
-pub use keyframe::{Keyframe, KeyframeAnimation};
+pub use keyframe::{
+    FillMode, Keyframe, KeyframeAnimation, KeyframeProperties, MultiKeyframe,
+    MultiKeyframeAnimation, PlayDirection,
+};
+pub use presets::AnimationPreset;
 pub use scheduler::{
     AnimatedKeyframe, AnimatedTimeline, AnimatedValue, AnimationScheduler, KeyframeId,
     SchedulerHandle, SpringId, TimelineId,

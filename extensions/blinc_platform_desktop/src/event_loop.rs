@@ -7,14 +7,32 @@ use blinc_platform::{
 };
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent as WinitWindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop as WinitEventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop as WinitEventLoop, EventLoopProxy};
 use winit::keyboard::ModifiersState;
 use winit::window::WindowId;
+
+/// Proxy for waking up the event loop from another thread
+///
+/// Use this to request a redraw from a background animation thread.
+/// Call `wake()` to send a wake-up signal to the event loop.
+#[derive(Clone)]
+pub struct WakeProxy {
+    proxy: EventLoopProxy<()>,
+}
+
+impl WakeProxy {
+    /// Wake up the event loop, causing it to process events and potentially redraw
+    pub fn wake(&self) {
+        // Ignore errors (e.g., if event loop has exited)
+        let _ = self.proxy.send_event(());
+    }
+}
 
 /// Desktop event loop wrapping winit's event loop
 pub struct DesktopEventLoop {
     event_loop: WinitEventLoop<()>,
     window_config: WindowConfig,
+    wake_proxy: WakeProxy,
 }
 
 impl DesktopEventLoop {
@@ -23,10 +41,22 @@ impl DesktopEventLoop {
         let event_loop =
             WinitEventLoop::new().map_err(|e| PlatformError::EventLoop(e.to_string()))?;
 
+        let wake_proxy = WakeProxy {
+            proxy: event_loop.create_proxy(),
+        };
+
         Ok(Self {
             event_loop,
             window_config: config,
+            wake_proxy,
         })
+    }
+
+    /// Get a wake proxy that can be used to wake up the event loop from another thread
+    ///
+    /// This is useful for animation threads that need to request redraws.
+    pub fn wake_proxy(&self) -> WakeProxy {
+        self.wake_proxy.clone()
     }
 }
 
@@ -228,5 +258,12 @@ where
 
     fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {
         self.handle_event(Event::Lifecycle(LifecycleEvent::LowMemory));
+    }
+
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: ()) {
+        // Wake event from animation thread - request a redraw
+        if let Some(ref window) = self.window {
+            window.request_redraw();
+        }
     }
 }

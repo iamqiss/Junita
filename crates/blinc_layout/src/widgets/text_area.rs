@@ -854,6 +854,8 @@ impl TextArea {
                         // Use FSM: POINTER_ENTER transitions hover states
                         if let Some(new_state) = s.visual.on_event(event_types::POINTER_ENTER) {
                             s.visual = new_state;
+                            // TODO: Use render-time visual state instead of rebuild
+                            // For now, hover affects border color which requires rebuild
                             request_rebuild();
                         }
                     }
@@ -865,6 +867,8 @@ impl TextArea {
                         // Use FSM: POINTER_LEAVE transitions hover states
                         if let Some(new_state) = s.visual.on_event(event_types::POINTER_LEAVE) {
                             s.visual = new_state;
+                            // TODO: Use render-time visual state instead of rebuild
+                            // For now, hover affects border color which requires rebuild
                             request_rebuild();
                         }
                     }

@@ -676,6 +676,9 @@ impl WindowedApp {
             .create_event_loop_with_config(config)
             .map_err(|e| BlincError::Platform(e.to_string()))?;
 
+        // Get a wake proxy to allow the animation thread to wake up the event loop
+        let wake_proxy = event_loop.wake_proxy();
+
         // We need to defer BlincApp creation until we have a window
         let mut app: Option<BlincApp> = None;
         let mut surface: Option<wgpu::Surface<'static>> = None;
@@ -696,6 +699,8 @@ impl WindowedApp {
         // Shared animation scheduler for spring/keyframe animations
         // Runs on background thread so animations continue even when window loses focus
         let mut scheduler = AnimationScheduler::new();
+        // Set up wake callback so animation thread can wake the event loop
+        scheduler.set_wake_callback(move || wake_proxy.wake());
         scheduler.start_background();
         let animations: SharedAnimationScheduler = Arc::new(Mutex::new(scheduler));
 

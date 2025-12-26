@@ -37,6 +37,7 @@ pub mod event_handler;
 pub mod event_router;
 pub mod image;
 pub mod interactive;
+pub mod motion;
 pub mod render_state;
 pub mod renderer;
 pub mod scroll;
@@ -87,6 +88,9 @@ pub use stateful::{SharedState, StateTransitions, StatefulInner};
 
 // Animation integration
 pub use animated::{AnimatedProperties, AnimationBuilder};
+
+// Motion container for entry/exit animations
+pub use motion::{motion, ElementAnimation, Motion, SlideDirection, StaggerConfig, StaggerDirection};
 
 // Text measurement
 pub use text_measure::{
@@ -218,7 +222,13 @@ pub mod prelude {
 
     // Re-export animation types from blinc_animation for convenience
     pub use blinc_animation::{
-        AnimatedKeyframe, AnimatedTimeline, AnimatedValue, Easing, SchedulerHandle, SpringConfig,
+        AnimatedKeyframe, AnimatedTimeline, AnimatedValue, AnimationPreset, Easing,
+        KeyframeProperties, MultiKeyframeAnimation, SchedulerHandle, SpringConfig,
+    };
+
+    // Motion container for entry/exit animations
+    pub use crate::motion::{
+        motion, ElementAnimation, Motion, SlideDirection, StaggerConfig, StaggerDirection,
     };
 
     // Text selection for clipboard support
