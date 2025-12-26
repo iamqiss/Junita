@@ -217,7 +217,7 @@ where
 /// Dynamic value that can be static, signal, or spring
 ///
 /// This is more efficient than BoxedValue for common cases because it avoids
-/// the indirection of Arc<dyn Value<T>>.
+/// the indirection of `Arc<dyn Value<T>>`.
 #[derive(Clone)]
 pub enum DynValue<T: Clone + Send + Sync + 'static> {
     /// Static value that never changes

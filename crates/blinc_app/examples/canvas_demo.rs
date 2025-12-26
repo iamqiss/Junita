@@ -295,7 +295,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> Color {
 /// Demo 7: Animated bouncing ball using AnimatedValue
 ///
 /// Uses the built-in AnimatedValue wrapper which handles spring management.
-/// With Rc<RefCell> - no thread-safety overhead since UI is single-threaded.
+/// With `Rc<RefCell>` - no thread-safety overhead since UI is single-threaded.
 fn animated_demo_card(ctx: &WindowedContext) -> Div {
     // AnimatedValue manages the spring internally
     let ball_x = Rc::new(RefCell::new(AnimatedValue::new(

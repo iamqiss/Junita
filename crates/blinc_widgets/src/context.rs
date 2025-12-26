@@ -49,7 +49,7 @@ pub struct WidgetContext {
     pub events: EventDispatcher,
     /// Per-widget data (widget ID -> layout node mapping)
     widgets: SlotMap<WidgetId, WidgetData>,
-    /// Shared context for callbacks (wrapped in Arc<Mutex> for thread safety)
+    /// Shared context for callbacks (wrapped in `Arc<Mutex>` for thread safety)
     shared: Arc<Mutex<SharedContext>>,
     /// Counter for generating unique layout node IDs
     next_layout_id: u32,
