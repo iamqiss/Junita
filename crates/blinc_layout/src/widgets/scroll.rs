@@ -83,7 +83,8 @@ impl Default for ScrollConfig {
     fn default() -> Self {
         Self {
             bounce_enabled: true,
-            bounce_spring: SpringConfig::wobbly(),
+            // High stiffness for quick snap-back, low damping for elastic feel
+            bounce_spring: SpringConfig::new(500.0, 20.0, 1.0),
             deceleration: 1500.0,     // Decelerate at 1500 px/s²
             velocity_threshold: 10.0, // Stop when below 10 px/s
             max_overscroll: 0.3,

@@ -1302,9 +1302,8 @@ impl WindowedApp {
                             let _animations_active = rs.tick(current_time);
 
                             // Tick scroll physics for bounce-back animations
-                            let scroll_animating = if let Some(ref tree) = render_tree {
-                                // dt is in seconds - use 1/60 for ~60fps
-                                tree.tick_scroll_physics(1.0 / 60.0)
+                            let scroll_animating = if let Some(ref mut tree) = render_tree {
+                                tree.tick_scroll_physics(current_time)
                             } else {
                                 false
                             };

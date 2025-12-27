@@ -197,6 +197,8 @@ pub struct RenderTree {
     scroll_offsets: HashMap<LayoutNodeId, (f32, f32)>,
     /// Scroll physics for scroll containers (keyed by node_id)
     scroll_physics: HashMap<LayoutNodeId, crate::scroll::SharedScrollPhysics>,
+    /// Last tick time for scroll physics (in milliseconds)
+    last_scroll_tick_ms: Option<u64>,
     /// DPI scale factor (physical / logical pixels)
     ///
     /// When set, all layout positions and sizes are multiplied by this factor
@@ -223,6 +225,7 @@ impl RenderTree {
             node_states: HashMap::new(),
             scroll_offsets: HashMap::new(),
             scroll_physics: HashMap::new(),
+            last_scroll_tick_ms: None,
             scale_factor: 1.0,
         }
     }
@@ -990,11 +993,23 @@ impl RenderTree {
 
     /// Tick all scroll physics and return true if any are animating
     ///
-    /// Call this each frame to update bounce-back animations.
-    pub fn tick_scroll_physics(&self, dt: f32) -> bool {
+    /// Call this each frame with the current time in milliseconds.
+    /// Uses actual time delta for smooth, frame-rate independent animation.
+    pub fn tick_scroll_physics(&mut self, current_time_ms: u64) -> bool {
+        // Calculate actual delta time
+        let dt_secs = if let Some(last_time) = self.last_scroll_tick_ms {
+            (current_time_ms.saturating_sub(last_time)) as f32 / 1000.0
+        } else {
+            1.0 / 60.0 // Assume ~60fps for first frame
+        };
+        self.last_scroll_tick_ms = Some(current_time_ms);
+
+        // Clamp dt to prevent huge jumps if app was paused
+        let dt_secs = dt_secs.min(0.1);
+
         let mut any_animating = false;
         for physics in self.scroll_physics.values() {
-            if physics.lock().unwrap().tick(dt) {
+            if physics.lock().unwrap().tick(dt_secs) {
                 any_animating = true;
             }
         }
