@@ -56,5 +56,8 @@ coverage/
 *.temp
 .cache/
 
+# Plans (local development notes)
+docs/plan/
+
 test_output/
 test_references/
