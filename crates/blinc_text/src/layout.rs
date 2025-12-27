@@ -151,11 +151,16 @@ impl TextLayoutEngine {
 
         let ascender = metrics.ascender_px(font_size);
 
+        // Check for explicit newlines - these are always respected regardless of wrap mode
+        let has_newlines = text.contains('\n');
+
         // Shape the entire text first
         let shaped = self.shaper.shape(text, font, font_size);
 
-        // If no wrapping, return single line (but still apply alignment if max_width is set)
-        if options.max_width.is_none() || options.line_break == LineBreakMode::None {
+        // If no wrapping AND no explicit newlines, return single line
+        if (options.max_width.is_none() || options.line_break == LineBreakMode::None)
+            && !has_newlines
+        {
             let mut line = self.create_line(&shaped, 0.0, ascender, options);
             let width = line.width;
 
@@ -178,6 +183,21 @@ impl TextLayoutEngine {
                 width,
                 height: line_height,
             };
+        }
+
+        // Handle explicit newlines without word wrapping
+        if has_newlines
+            && (options.max_width.is_none() || options.line_break == LineBreakMode::None)
+        {
+            return self.layout_with_newlines_only(
+                text,
+                &shaped,
+                font,
+                font_size,
+                ascender,
+                line_height,
+                options,
+            );
         }
 
         let max_width = options.max_width.unwrap();
@@ -225,6 +245,91 @@ impl TextLayoutEngine {
         }
     }
 
+    /// Layout text that contains explicit newlines but no word wrapping
+    fn layout_with_newlines_only(
+        &self,
+        text: &str,
+        shaped: &ShapedText,
+        _font: &FontFace,
+        _font_size: f32,
+        ascender: f32,
+        line_height: f32,
+        options: &LayoutOptions,
+    ) -> TextLayout {
+        let mut lines = Vec::new();
+        let mut current_line: Vec<ShapedGlyph> = Vec::new();
+
+        // Split glyphs by newline character
+        for glyph in &shaped.glyphs {
+            if glyph.codepoint == '\n' {
+                // End current line, don't include the newline glyph
+                lines.push(std::mem::take(&mut current_line));
+            } else {
+                current_line.push(*glyph);
+            }
+        }
+
+        // Add remaining line
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        // Handle case where text ends with newline
+        if text.ends_with('\n') {
+            lines.push(Vec::new());
+        }
+
+        // Position lines
+        let mut positioned_lines = Vec::with_capacity(lines.len());
+        let mut y = ascender;
+        let mut max_width_found = 0.0f32;
+        let metrics_units_per_em = shaped.units_per_em;
+
+        for line_glyphs in lines {
+            let shaped_line = ShapedText {
+                glyphs: line_glyphs,
+                total_advance: 0,
+                font_size: shaped.font_size,
+                units_per_em: metrics_units_per_em,
+            };
+
+            let line = self.create_line(&shaped_line, 0.0, y, options);
+            max_width_found = max_width_found.max(line.width);
+            positioned_lines.push(line);
+            y += line_height;
+        }
+
+        // Apply alignment if max_width is set
+        if let Some(max_width) = options.max_width {
+            if options.alignment != TextAlignment::Left {
+                for line in &mut positioned_lines {
+                    if line.width < max_width {
+                        let offset = match options.alignment {
+                            TextAlignment::Center => (max_width - line.width) / 2.0,
+                            TextAlignment::Right => max_width - line.width,
+                            TextAlignment::Left => 0.0,
+                        };
+                        for glyph in &mut line.glyphs {
+                            glyph.x += offset;
+                        }
+                    }
+                }
+            }
+        }
+
+        let total_height = if positioned_lines.is_empty() {
+            line_height
+        } else {
+            (positioned_lines.len() as f32) * line_height
+        };
+
+        TextLayout {
+            lines: positioned_lines,
+            width: max_width_found,
+            height: total_height,
+        }
+    }
+
     /// Create a layout line from shaped glyphs
     fn create_line(
         &self,
@@ -262,8 +367,8 @@ impl TextLayoutEngine {
         &self,
         text: &str,
         shaped: &ShapedText,
-        font: &FontFace,
-        font_size: f32,
+        _font: &FontFace,
+        _font_size: f32,
         max_width: f32,
         options: &LayoutOptions,
     ) -> Vec<Vec<ShapedGlyph>> {
@@ -279,10 +384,18 @@ impl TextLayoutEngine {
             .collect();
 
         let mut last_word_end = 0;
-        let mut last_word_end_glyph = 0;
         let mut last_word_width = 0.0f32;
 
-        for (i, glyph) in shaped.glyphs.iter().enumerate() {
+        for glyph in shaped.glyphs.iter() {
+            // Handle explicit newline - always force a line break
+            if glyph.codepoint == '\n' {
+                lines.push(std::mem::take(&mut current_line));
+                line_width = 0.0;
+                last_word_end = 0;
+                last_word_width = 0.0;
+                continue; // Don't include the newline glyph itself
+            }
+
             let advance = shaped.scale(glyph.x_advance) + options.letter_spacing;
 
             // Check if this is a word boundary
@@ -290,11 +403,10 @@ impl TextLayoutEngine {
 
             if is_word_break {
                 last_word_end = current_line.len();
-                last_word_end_glyph = i;
                 last_word_width = line_width;
             }
 
-            // Check if we need to break
+            // Check if we need to break due to width
             if line_width + advance > max_width && !current_line.is_empty() {
                 match options.line_break {
                     LineBreakMode::Word if last_word_end > 0 => {
@@ -319,7 +431,7 @@ impl TextLayoutEngine {
                 }
             }
 
-            // Skip leading whitespace on new lines
+            // Skip leading whitespace on new lines (but not after explicit newline)
             if current_line.is_empty() && glyph.codepoint.is_whitespace() {
                 continue;
             }

@@ -380,8 +380,10 @@ impl RenderState {
                         .cloned()
                         .unwrap_or_default();
                     let to = MotionKeyframe::default();
-                    // Apply ease-out for enter animation
-                    let eased = ease_out_cubic(*progress);
+                    // Apply ease-in-out for enter animation
+                    // This provides a smooth start that doesn't feel "sudden"
+                    // when items appear in sequence (stagger animations)
+                    let eased = ease_in_out_cubic(*progress);
                     motion.current = from.lerp(&to, eased);
                     true // Still animating
                 }
@@ -765,10 +767,14 @@ impl RenderState {
 // Easing helper functions
 // ============================================================================
 
-/// Cubic ease-out (fast start, slow end) - good for enter animations
-fn ease_out_cubic(t: f32) -> f32 {
-    let t = 1.0 - t;
-    1.0 - t * t * t
+/// Cubic ease-in-out (slow start, slow end) - good for stagger enter animations
+/// This prevents the "sudden" appearance when items animate in sequence
+fn ease_in_out_cubic(t: f32) -> f32 {
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    }
 }
 
 /// Cubic ease-in (slow start, fast end) - good for exit animations

@@ -1081,7 +1081,8 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
             color,
             anchor,
             alignment,
-            None, // No width constraint
+            None,  // No width constraint
+            false, // No wrap for canvas text
         ) {
             // Apply current clip bounds to all glyphs
             for glyph in &mut glyphs {

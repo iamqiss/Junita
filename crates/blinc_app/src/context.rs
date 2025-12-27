@@ -57,6 +57,12 @@ struct TextElement {
     clip_bounds: Option<[f32; 4]>,
     /// Motion opacity inherited from parent motion container
     motion_opacity: f32,
+    /// Whether to wrap text at container bounds
+    wrap: bool,
+    /// Line height multiplier
+    line_height: f32,
+    /// Measured width (before layout constraints) - used to determine if wrap is needed
+    measured_width: f32,
 }
 
 /// Image element data for rendering
@@ -189,6 +195,20 @@ impl RenderContext {
                 TextVerticalAlign::Center => (TextAnchor::Center, text.y + text.height / 2.0),
                 TextVerticalAlign::Top => (TextAnchor::Top, text.y),
             };
+
+            // Determine wrap width: use clip bounds if available (parent constraint),
+            // otherwise use the text element's own layout width
+            let wrap_width = if text.wrap {
+                if let Some(clip) = text.clip_bounds {
+                    // clip[2] is the clip width - use it if smaller than text width
+                    clip[2].min(text.width)
+                } else {
+                    text.width
+                }
+            } else {
+                text.width
+            };
+
             if let Ok(mut glyphs) = self.text_ctx.prepare_text_with_options(
                 &text.content,
                 text.x,
@@ -197,7 +217,8 @@ impl RenderContext {
                 text.color,
                 anchor,
                 alignment,
-                Some(text.width), // Width for alignment (wrapping disabled internally)
+                Some(wrap_width),
+                text.wrap,
             ) {
                 // Apply clip bounds to all glyphs if the text element has clip bounds
                 if let Some(clip) = text.clip_bounds {
@@ -567,6 +588,9 @@ impl RenderContext {
         let mut svgs = Vec::new();
         let mut images = Vec::new();
 
+        // Get the scale factor from the tree for DPI scaling
+        let scale = tree.scale_factor();
+
         if let Some(root) = tree.root() {
             self.collect_elements_recursive(
                 tree,
@@ -576,6 +600,7 @@ impl RenderContext {
                 None, // No initial clip
                 1.0,  // Initial motion opacity
                 render_state,
+                scale,
                 &mut texts,
                 &mut svgs,
                 &mut images,
@@ -594,6 +619,7 @@ impl RenderContext {
         current_clip: Option<[f32; 4]>,
         inherited_motion_opacity: f32,
         render_state: Option<&blinc_layout::RenderState>,
+        scale: f32,
         texts: &mut Vec<TextElement>,
         svgs: &mut Vec<(String, f32, f32, f32, f32)>,
         images: &mut Vec<ImageElement>,
@@ -655,55 +681,74 @@ impl RenderContext {
 
             match &render_node.element_type {
                 ElementType::Text(text_data) => {
-                    // Debug: Log text positioning at DEBUG level for visibility
+                    // Apply DPI scale factor to positions and sizes
+                    let scaled_x = abs_x * scale;
+                    let scaled_y = abs_y * scale;
+                    let scaled_width = bounds.width * scale;
+                    let scaled_height = bounds.height * scale;
+                    let scaled_font_size = text_data.font_size * scale;
+                    let scaled_measured_width = text_data.measured_width * scale;
+
+                    // Scale clip bounds if present
+                    let scaled_clip = current_clip
+                        .map(|[cx, cy, cw, ch]| [cx * scale, cy * scale, cw * scale, ch * scale]);
+
                     tracing::debug!(
                         "Text '{}': abs=({:.1}, {:.1}), size=({:.1}x{:.1}), font={:.1}, align={:?}, v_align={:?}",
                         text_data.content,
-                        abs_x,
-                        abs_y,
-                        bounds.width,
-                        bounds.height,
-                        text_data.font_size,
+                        scaled_x,
+                        scaled_y,
+                        scaled_width,
+                        scaled_height,
+                        scaled_font_size,
                         text_data.align,
                         text_data.v_align
                     );
                     texts.push(TextElement {
                         content: text_data.content.clone(),
-                        x: abs_x,
-                        y: abs_y,
-                        width: bounds.width,
-                        height: bounds.height,
-                        font_size: text_data.font_size,
+                        x: scaled_x,
+                        y: scaled_y,
+                        width: scaled_width,
+                        height: scaled_height,
+                        font_size: scaled_font_size,
                         color: text_data.color,
                         align: text_data.align,
                         weight: text_data.weight,
                         v_align: text_data.v_align,
-                        clip_bounds: current_clip,
+                        clip_bounds: scaled_clip,
                         motion_opacity: effective_motion_opacity,
+                        wrap: text_data.wrap,
+                        line_height: text_data.line_height,
+                        measured_width: scaled_measured_width,
                     });
                 }
                 ElementType::Svg(svg_data) => {
+                    // Apply DPI scale factor to SVG positions and sizes
                     svgs.push((
                         svg_data.source.clone(),
-                        abs_x,
-                        abs_y,
-                        bounds.width,
-                        bounds.height,
+                        abs_x * scale,
+                        abs_y * scale,
+                        bounds.width * scale,
+                        bounds.height * scale,
                     ));
                 }
                 ElementType::Image(image_data) => {
+                    // Apply DPI scale factor to image positions and sizes
+                    let scaled_clip = current_clip
+                        .map(|[cx, cy, cw, ch]| [cx * scale, cy * scale, cw * scale, ch * scale]);
+
                     images.push(ImageElement {
                         source: image_data.source.clone(),
-                        x: abs_x,
-                        y: abs_y,
-                        width: bounds.width,
-                        height: bounds.height,
+                        x: abs_x * scale,
+                        y: abs_y * scale,
+                        width: bounds.width * scale,
+                        height: bounds.height * scale,
                         object_fit: image_data.object_fit,
                         object_position: image_data.object_position,
                         opacity: image_data.opacity,
-                        border_radius: image_data.border_radius,
+                        border_radius: image_data.border_radius * scale,
                         tint: image_data.tint,
-                        clip_bounds: current_clip,
+                        clip_bounds: scaled_clip,
                         clip_radius: [0.0; 4],
                         layer: effective_layer,
                     });
@@ -726,6 +771,7 @@ impl RenderContext {
                 child_clip,
                 effective_motion_opacity,
                 render_state,
+                scale,
                 texts,
                 svgs,
                 images,
@@ -827,6 +873,17 @@ impl RenderContext {
                 text.color
             };
 
+            // Only wrap if:
+            // 1. wrap is enabled AND
+            // 2. layout width is significantly smaller than measured width (text was constrained)
+            // Using a tolerance of 2.0 physical pixels to account for DPI scaling and floating point
+            let needs_wrap = text.wrap && text.width < text.measured_width - 2.0;
+            let wrap_width = if needs_wrap {
+                Some(text.width)
+            } else {
+                None // No width constraint = no wrapping
+            };
+
             if let Ok(glyphs) = self.text_ctx.prepare_text_with_options(
                 &text.content,
                 text.x,
@@ -835,7 +892,8 @@ impl RenderContext {
                 color,
                 TextAnchor::Top,
                 alignment,
-                Some(text.width),
+                wrap_width,
+                needs_wrap,
             ) {
                 // Apply clip bounds if present
                 let mut glyphs = glyphs;

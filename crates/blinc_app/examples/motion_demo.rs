@@ -39,9 +39,8 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
         .bg(Color::rgba(0.08, 0.08, 0.12, 1.0))
         .flex_col()
         .items_center()
-        .justify_center()
-        .gap(24.0)
-        .p(32.0)
+        .gap(5.0)
+        .p(10.0)
         .child(
             text("Motion Container Demo")
                 .size(28.0)
@@ -55,8 +54,10 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
         )
         .child(
             div()
+                .w_full()
                 .flex_row()
-                .gap(24.0)
+                .justify_center()
+                .gap(5.0)
                 .flex_wrap()
                 .child(single_element_demo())
                 .child(stagger_forward_demo())
@@ -95,7 +96,7 @@ fn stagger_forward_demo() -> Div {
     demo_card("Stagger Forward", "delay: 300ms").child(
         motion()
             .gap(4.0) // Add gap between staggered items
-            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(300)))
+            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(800)))
             .children(items.iter().map(|item| list_item(item))),
     )
 }
@@ -107,7 +108,7 @@ fn stagger_reverse_demo() -> Div {
     demo_card("Stagger Reverse", "delay: 300ms").child(
         motion()
             .gap(4.0) // Add gap between staggered items
-            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(300)).reverse())
+            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(800)).reverse())
             .children(items.iter().map(|item| list_item(item))),
     )
 }
@@ -119,14 +120,14 @@ fn stagger_center_demo() -> Div {
     demo_card("Stagger Center", "delay: 300ms").child(
         motion()
             .gap(4.0) // Add gap between staggered items
-            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(300)).from_center())
+            .stagger(StaggerConfig::new(300, AnimationPreset::fade_in(800)).from_center())
             .children(items.iter().map(|item| list_item(item))),
     )
 }
 
 fn list_item(label: &str) -> Div {
     div()
-        .w(120.0)
+        .w(160.0)
         .h(24.0)
         .bg(Color::rgba(0.5, 0.8, 0.6, 1.0))
         .rounded(4.0)
@@ -138,7 +139,7 @@ fn list_item(label: &str) -> Div {
 /// Showcase the motion() API
 fn api_showcase() -> Scroll {
     scroll()
-        .h(500.0)
+        .h(600.0)
         .direction(ScrollDirection::Vertical)
         .p(20.0)
         .rounded(12.0)
@@ -210,11 +211,11 @@ fn demo_card(title: &str, subtitle: &str) -> Div {
         .w(180.0)
         .flex_col()
         .gap(8.0)
-        .p(16.0)
+        .px(4.0)
+        .py(10.0)
         .bg(Color::rgba(0.14, 0.14, 0.18, 1.0))
         .rounded(12.0)
         .items_center()
-        .justify_center()
         .child(
             text(title)
                 .size(14.0)

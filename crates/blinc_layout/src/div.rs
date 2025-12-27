@@ -1466,6 +1466,13 @@ pub struct TextRenderInfo {
     pub align: TextAlign,
     pub weight: FontWeight,
     pub v_align: TextVerticalAlign,
+    /// Whether to wrap text at container bounds (default: true for text())
+    pub wrap: bool,
+    /// Line height multiplier (default: 1.2)
+    pub line_height: f32,
+    /// Measured width of the text (before any layout constraints)
+    /// Used to determine if wrapping is actually needed at render time
+    pub measured_width: f32,
 }
 
 /// SVG render data extracted from element

@@ -185,12 +185,20 @@ impl<T: Clone + Send + 'static> State<T> {
 
 /// Context passed to the UI builder function
 pub struct WindowedContext {
-    /// Current window width in physical pixels (matches surface size)
+    /// Current window width in logical pixels (for UI layout)
+    ///
+    /// This is the width you should use when building UI. It automatically
+    /// accounts for DPI scaling, so elements sized to `ctx.width` will
+    /// fill the window regardless of display scale factor.
     pub width: f32,
-    /// Current window height in physical pixels (matches surface size)
+    /// Current window height in logical pixels (for UI layout)
     pub height: f32,
     /// Current scale factor (physical / logical)
     pub scale_factor: f64,
+    /// Physical window width (for internal use)
+    physical_width: f32,
+    /// Physical window height (for internal use)
+    physical_height: f32,
     /// Whether the window is focused
     pub focused: bool,
     /// Event router for input event handling
@@ -214,13 +222,22 @@ impl WindowedContext {
         reactive: SharedReactiveGraph,
         hooks: SharedHookState,
     ) -> Self {
-        // Use physical size for rendering - the surface is in physical pixels
-        // UI layout and rendering must use physical dimensions to match the surface
-        let (width, height) = window.size();
+        // Get physical size (actual surface pixels) and scale factor
+        let (physical_width, physical_height) = window.size();
+        let scale_factor = window.scale_factor();
+
+        // Compute logical size (what users work with in their UI code)
+        // This ensures elements sized with ctx.width/height fill the window
+        // regardless of DPI, and font sizes appear consistent across displays
+        let logical_width = physical_width as f32 / scale_factor as f32;
+        let logical_height = physical_height as f32 / scale_factor as f32;
+
         Self {
-            width: width as f32,
-            height: height as f32,
-            scale_factor: window.scale_factor(),
+            width: logical_width,
+            height: logical_height,
+            scale_factor,
+            physical_width: physical_width as f32,
+            physical_height: physical_height as f32,
             focused: window.is_focused(),
             event_router,
             animations,
@@ -232,11 +249,33 @@ impl WindowedContext {
 
     /// Update context from window (preserving event router, dirty flag, and reactive graph)
     fn update_from_window<W: Window>(&mut self, window: &W) {
-        let (width, height) = window.size();
-        self.width = width as f32;
-        self.height = height as f32;
-        self.scale_factor = window.scale_factor();
+        let (physical_width, physical_height) = window.size();
+        let scale_factor = window.scale_factor();
+
+        self.physical_width = physical_width as f32;
+        self.physical_height = physical_height as f32;
+        self.width = physical_width as f32 / scale_factor as f32;
+        self.height = physical_height as f32 / scale_factor as f32;
+        self.scale_factor = scale_factor;
         self.focused = window.is_focused();
+    }
+
+    // =========================================================================
+    // DPI-Related Helpers
+    // =========================================================================
+
+    /// Get the physical window width (for advanced use cases)
+    ///
+    /// Most users should use `ctx.width` which is in logical pixels.
+    /// Physical dimensions are only needed when directly interfacing
+    /// with GPU surfaces or platform-specific code.
+    pub fn physical_width(&self) -> f32 {
+        self.physical_width
+    }
+
+    /// Get the physical window height (for advanced use cases)
+    pub fn physical_height(&self) -> f32 {
+        self.physical_height
     }
 
     // =========================================================================
@@ -772,13 +811,15 @@ impl WindowedApp {
                                 surf.configure(&blinc_app.device(), config);
                                 needs_rebuild = true;
 
-                                // Dispatch RESIZE event to elements
+                                // Dispatch RESIZE event to elements (use logical dimensions)
                                 if let (Some(ref mut windowed_ctx), Some(ref tree)) =
                                     (&mut ctx, &render_tree)
                                 {
+                                    let logical_width = width as f32 / windowed_ctx.scale_factor as f32;
+                                    let logical_height = height as f32 / windowed_ctx.scale_factor as f32;
                                     windowed_ctx
                                         .event_router
-                                        .on_window_resize(tree, width as f32, height as f32);
+                                        .on_window_resize(tree, logical_width, logical_height);
                                 }
                             }
                         }
@@ -867,32 +908,42 @@ impl WindowedApp {
                                 }
                             });
 
+                            // Convert physical coordinates to logical for hit testing
+                            let scale = windowed_ctx.scale_factor as f32;
+
                             match input_event {
                                 InputEvent::Mouse(mouse_event) => match mouse_event {
                                     MouseEvent::Moved { x, y } => {
-                                        router.on_mouse_move(tree, x, y);
+                                        // Convert physical to logical coordinates
+                                        let lx = x / scale;
+                                        let ly = y / scale;
+                                        router.on_mouse_move(tree, lx, ly);
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                         }
                                     }
                                     MouseEvent::ButtonPressed { button, x, y } => {
+                                        let lx = x / scale;
+                                        let ly = y / scale;
                                         let btn = convert_mouse_button(button);
-                                        router.on_mouse_down(tree, x, y, btn);
+                                        router.on_mouse_down(tree, lx, ly, btn);
                                         let (local_x, local_y) = router.last_hit_local();
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                             event.local_x = local_x;
                                             event.local_y = local_y;
                                         }
                                     }
                                     MouseEvent::ButtonReleased { button, x, y } => {
+                                        let lx = x / scale;
+                                        let ly = y / scale;
                                         let btn = convert_mouse_button(button);
-                                        router.on_mouse_up(tree, x, y, btn);
+                                        router.on_mouse_up(tree, lx, ly, btn);
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                         }
                                     }
                                     MouseEvent::Left => {
@@ -1024,27 +1075,33 @@ impl WindowedApp {
                                 },
                                 InputEvent::Touch(touch_event) => match touch_event {
                                     TouchEvent::Started { x, y, .. } => {
-                                        router.on_mouse_down(tree, x, y, MouseButton::Left);
+                                        let lx = x / scale;
+                                        let ly = y / scale;
+                                        router.on_mouse_down(tree, lx, ly, MouseButton::Left);
                                         let (local_x, local_y) = router.last_hit_local();
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                             event.local_x = local_x;
                                             event.local_y = local_y;
                                         }
                                     }
                                     TouchEvent::Moved { x, y, .. } => {
-                                        router.on_mouse_move(tree, x, y);
+                                        let lx = x / scale;
+                                        let ly = y / scale;
+                                        router.on_mouse_move(tree, lx, ly);
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                         }
                                     }
                                     TouchEvent::Ended { x, y, .. } => {
-                                        router.on_mouse_up(tree, x, y, MouseButton::Left);
+                                        let lx = x / scale;
+                                        let ly = y / scale;
+                                        router.on_mouse_up(tree, lx, ly, MouseButton::Left);
                                         for event in pending_events.iter_mut() {
-                                            event.mouse_x = x;
-                                            event.mouse_y = y;
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
                                         }
                                     }
                                     TouchEvent::Cancelled { .. } => {
@@ -1053,12 +1110,15 @@ impl WindowedApp {
                                 },
                                 InputEvent::Scroll { delta_x, delta_y } => {
                                     let (mx, my) = router.mouse_position();
-                                    router.on_scroll(tree, delta_x, delta_y);
+                                    // Scroll deltas are also in physical pixels, convert to logical
+                                    let ldx = delta_x / scale;
+                                    let ldy = delta_y / scale;
+                                    router.on_scroll(tree, ldx, ldy);
                                     for event in pending_events.iter_mut() {
                                         event.mouse_x = mx;
                                         event.mouse_y = my;
-                                        event.scroll_delta_x = delta_x;
-                                        event.scroll_delta_y = delta_y;
+                                        event.scroll_delta_x = ldx;
+                                        event.scroll_delta_y = ldy;
                                     }
                                 }
                             }
@@ -1193,6 +1253,13 @@ impl WindowedApp {
                                 // Build UI and create render tree
                                 let ui = ui_builder(windowed_ctx);
                                 let mut tree = RenderTree::from_element(&ui);
+
+                                // Set DPI scale factor for HiDPI rendering
+                                // Layout uses logical pixels (ctx.width/height), then scaling
+                                // is applied at render time to map to physical pixels
+                                tree.set_scale_factor(windowed_ctx.scale_factor as f32);
+
+                                // Compute layout in logical pixels
                                 tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
 
                                 // Transfer node states from old tree to preserve state across rebuilds
@@ -1228,12 +1295,13 @@ impl WindowedApp {
 
                             if let Some(ref tree) = render_tree {
                                 // Render with motion animations
+                                // Use physical pixel dimensions for the render surface
                                 let result = blinc_app.render_tree_with_motion(
                                     tree,
                                     rs,
                                     &view,
-                                    windowed_ctx.width as u32,
-                                    windowed_ctx.height as u32,
+                                    windowed_ctx.physical_width as u32,
+                                    windowed_ctx.physical_height as u32,
                                 );
                                 if let Err(e) = result {
                                     tracing::error!("Render error: {}", e);

@@ -118,6 +118,7 @@ impl TextRenderingContext {
             anchor,
             TextAlignment::Left,
             None,
+            false, // no wrap for simple text
         )
     }
 
@@ -133,7 +134,8 @@ impl TextRenderingContext {
     /// * `color` - RGBA color as [r, g, b, a] in 0.0-1.0 range
     /// * `anchor` - Vertical anchor (Top, Center, Baseline)
     /// * `alignment` - Horizontal alignment (Left, Center, Right)
-    /// * `width` - Optional width for alignment (if None, text is positioned at x)
+    /// * `width` - Optional width for alignment/wrapping (if None, text is positioned at x)
+    /// * `wrap` - Whether to wrap text at width boundary
     pub fn prepare_text_with_options(
         &mut self,
         text: &str,
@@ -144,12 +146,9 @@ impl TextRenderingContext {
         anchor: TextAnchor,
         alignment: TextAlignment,
         width: Option<f32>,
+        wrap: bool,
     ) -> Result<Vec<GpuGlyph>, blinc_text::TextError> {
-        // For regular text, disable wrapping (LineBreakMode::None)
-        // This allows width to be used for alignment only
-        self.prepare_text_full(
-            text, x, y, font_size, color, anchor, alignment, width, false,
-        )
+        self.prepare_text_full(text, x, y, font_size, color, anchor, alignment, width, wrap)
     }
 
     /// Prepare text with full control over wrapping behavior

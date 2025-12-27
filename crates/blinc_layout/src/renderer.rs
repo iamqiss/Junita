@@ -65,6 +65,12 @@ pub struct TextData {
     pub align: crate::div::TextAlign,
     pub weight: crate::div::FontWeight,
     pub v_align: crate::div::TextVerticalAlign,
+    /// Whether to wrap text at container bounds
+    pub wrap: bool,
+    /// Line height multiplier
+    pub line_height: f32,
+    /// Measured width (before layout constraints)
+    pub measured_width: f32,
 }
 
 /// SVG data for rendering
@@ -191,6 +197,12 @@ pub struct RenderTree {
     scroll_offsets: HashMap<LayoutNodeId, (f32, f32)>,
     /// Scroll physics for scroll containers (keyed by node_id)
     scroll_physics: HashMap<LayoutNodeId, crate::scroll::SharedScrollPhysics>,
+    /// DPI scale factor (physical / logical pixels)
+    ///
+    /// When set, all layout positions and sizes are multiplied by this factor
+    /// before rendering. This allows users to specify sizes in logical pixels
+    /// while rendering happens at physical pixel resolution.
+    scale_factor: f32,
 }
 
 impl Default for RenderTree {
@@ -211,6 +223,7 @@ impl RenderTree {
             node_states: HashMap::new(),
             scroll_offsets: HashMap::new(),
             scroll_physics: HashMap::new(),
+            scale_factor: 1.0,
         }
     }
 
@@ -219,6 +232,22 @@ impl RenderTree {
         let mut tree = Self::new();
         tree.root = Some(tree.build_element(element));
         tree
+    }
+
+    /// Set the DPI scale factor for this render tree
+    ///
+    /// This scales all layout positions and sizes by the given factor
+    /// before rendering. Use this for HiDPI/Retina display support.
+    ///
+    /// # Arguments
+    /// * `scale_factor` - The scale factor (1.0 = no scaling, 2.0 = 2x DPI)
+    pub fn set_scale_factor(&mut self, scale_factor: f32) {
+        self.scale_factor = scale_factor;
+    }
+
+    /// Get the current scale factor
+    pub fn scale_factor(&self) -> f32 {
+        self.scale_factor
     }
 
     /// Recursively build elements into the tree
@@ -287,6 +316,9 @@ impl RenderTree {
                         align: info.align,
                         weight: info.weight,
                         v_align: info.v_align,
+                        wrap: info.wrap,
+                        line_height: info.line_height,
+                        measured_width: info.measured_width,
                     })
                 } else {
                     ElementType::Div
@@ -390,6 +422,9 @@ impl RenderTree {
                         align: info.align,
                         weight: info.weight,
                         v_align: info.v_align,
+                        wrap: info.wrap,
+                        line_height: info.line_height,
+                        measured_width: info.measured_width,
                     })
                 } else {
                     ElementType::Div
@@ -466,6 +501,9 @@ impl RenderTree {
                         align: info.align,
                         weight: info.weight,
                         v_align: info.v_align,
+                        wrap: info.wrap,
+                        line_height: info.line_height,
+                        measured_width: info.measured_width,
                     })
                 } else {
                     ElementType::Div
@@ -1193,6 +1231,12 @@ impl RenderTree {
         render_state: &crate::render_state::RenderState,
     ) {
         if let Some(root) = self.root {
+            // Apply DPI scale factor if set (for HiDPI display support)
+            let has_scale = self.scale_factor != 1.0;
+            if has_scale {
+                ctx.push_transform(Transform::scale(self.scale_factor, self.scale_factor));
+            }
+
             // Pass 1: Background
             self.render_layer_with_motion(
                 ctx,
@@ -1222,6 +1266,11 @@ impl RenderTree {
                 false,
                 render_state,
             );
+
+            // Pop the DPI scale transform
+            if has_scale {
+                ctx.pop_transform();
+            }
         }
     }
 
@@ -1480,7 +1529,18 @@ impl RenderTree {
     /// as foreground - no need to mark them with `.foreground()`.
     pub fn render_to_layer(&self, ctx: &mut dyn DrawContext, target_layer: RenderLayer) {
         if let Some(root) = self.root {
+            // Apply DPI scale factor if set (for HiDPI display support)
+            let has_scale = self.scale_factor != 1.0;
+            if has_scale {
+                ctx.push_transform(Transform::scale(self.scale_factor, self.scale_factor));
+            }
+
             self.render_layer(ctx, root, (0.0, 0.0), target_layer, false);
+
+            // Pop the DPI scale transform
+            if has_scale {
+                ctx.pop_transform();
+            }
         }
     }
 

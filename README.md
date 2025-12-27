@@ -281,7 +281,7 @@ fn canvas_example() -> Canvas{
 
 Blinc provides a comprehensive animation system with spring physics, keyframe animations, and declarative motion containers.
 
-![keyframe animations](ScreenRecording2025-12-26at18.54.28-ezgif.com-video-to-gif-converter.gif)
+![keyframe animations](ScreenRecording2025-12-27at13.02.25-ezgif.com-video-to-gif-converter.gif)
 
 ### Spring Animations
 

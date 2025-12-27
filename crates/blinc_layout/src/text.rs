@@ -41,6 +41,12 @@ pub struct Text {
     shadow: Option<Shadow>,
     /// Transform
     transform: Option<Transform>,
+    /// Whether to wrap text at container bounds (default: true)
+    wrap: bool,
+    /// Line height multiplier (default: 1.2)
+    line_height: f32,
+    /// Measured width of the text (before layout constraints)
+    measured_width: f32,
 }
 
 impl Text {
@@ -57,6 +63,9 @@ impl Text {
             render_layer: RenderLayer::default(),
             shadow: None,
             transform: None,
+            wrap: true,          // wrap by default
+            line_height: 1.2,    // standard line height
+            measured_width: 0.0, // will be set by update_size_estimate
         }
     }
 
@@ -211,8 +220,23 @@ impl Text {
         // Use the global text measurer if available, otherwise fall back to estimation
         let metrics = crate::text_measure::measure_text(&self.content, self.font_size);
 
+        // Store measured width for render-time comparison
+        self.measured_width = metrics.width;
+
+        // Use measured width for layout. This allows text to respect
+        // parent flex alignment (items_center, etc.).
+        //
+        // Text wrapping only happens at render time when the text element's
+        // layout bounds (from parent constraints like explicit width) are
+        // smaller than its measured width AND wrap=true.
+        //
+        // We do NOT use flex_shrink because that causes text to shrink
+        // even when there's enough space (e.g., with items_center).
+        // Instead, parents should use explicit widths or overflow_clip
+        // to constrain text.
         self.style.size.width = Dimension::Length(metrics.width);
         self.style.size.height = Dimension::Length(metrics.height);
+        self.style.flex_shrink = 0.0; // Don't shrink - use natural size
     }
 
     // =========================================================================
@@ -298,6 +322,29 @@ impl Text {
     pub fn rotate(self, angle: f32) -> Self {
         self.transform(Transform::rotate(angle))
     }
+
+    // =========================================================================
+    // Text Wrapping
+    // =========================================================================
+
+    /// Disable word wrapping (text stays on single line)
+    ///
+    /// By default, text wraps at container bounds. Use this for headings
+    /// or single-line text that should not wrap.
+    pub fn no_wrap(mut self) -> Self {
+        self.wrap = false;
+        // Recalculate size to use measured width instead of percentage
+        self.update_size_estimate();
+        self
+    }
+
+    /// Set line height multiplier
+    ///
+    /// Default is 1.2. Increase for more spacing between lines.
+    pub fn line_height(mut self, multiplier: f32) -> Self {
+        self.line_height = multiplier;
+        self
+    }
 }
 
 impl ElementBuilder for Text {
@@ -336,6 +383,9 @@ impl ElementBuilder for Text {
             align: self.align,
             weight: self.weight,
             v_align: self.v_align,
+            wrap: self.wrap,
+            line_height: self.line_height,
+            measured_width: self.measured_width,
         })
     }
 }
