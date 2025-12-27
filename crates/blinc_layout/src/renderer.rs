@@ -71,6 +71,10 @@ pub struct TextData {
     pub line_height: f32,
     /// Measured width (before layout constraints)
     pub measured_width: f32,
+    /// Font family category
+    pub font_family: crate::div::FontFamily,
+    /// Word spacing in pixels (0.0 = normal)
+    pub word_spacing: f32,
 }
 
 /// SVG data for rendering
@@ -322,6 +326,8 @@ impl RenderTree {
                         wrap: info.wrap,
                         line_height: info.line_height,
                         measured_width: info.measured_width,
+                        font_family: info.font_family,
+                        word_spacing: info.word_spacing,
                     })
                 } else {
                     ElementType::Div
@@ -428,6 +434,8 @@ impl RenderTree {
                         wrap: info.wrap,
                         line_height: info.line_height,
                         measured_width: info.measured_width,
+                        font_family: info.font_family,
+                        word_spacing: info.word_spacing,
                     })
                 } else {
                     ElementType::Div
@@ -507,6 +515,8 @@ impl RenderTree {
                         wrap: info.wrap,
                         line_height: info.line_height,
                         measured_width: info.measured_width,
+                        font_family: info.font_family,
+                        word_spacing: info.word_spacing,
                     })
                 } else {
                     ElementType::Div

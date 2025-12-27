@@ -1469,6 +1469,23 @@ pub enum TextVerticalAlign {
     Center,
 }
 
+/// Font family categories
+///
+/// Specifies which font category to use for text rendering.
+/// The actual font file is determined by the platform/renderer based on this category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FontFamily {
+    /// Default system font (sans-serif on most platforms)
+    #[default]
+    System,
+    /// Monospace font for code (Menlo, Consolas, etc.)
+    Monospace,
+    /// Serif font (Times, Georgia, etc.)
+    Serif,
+    /// Sans-serif font (Helvetica, Arial, etc.)
+    SansSerif,
+}
+
 /// Text render data extracted from element
 #[derive(Clone)]
 pub struct TextRenderInfo {
@@ -1485,6 +1502,10 @@ pub struct TextRenderInfo {
     /// Measured width of the text (before any layout constraints)
     /// Used to determine if wrapping is actually needed at render time
     pub measured_width: f32,
+    /// Font family category
+    pub font_family: FontFamily,
+    /// Word spacing in pixels (0.0 = normal)
+    pub word_spacing: f32,
 }
 
 /// SVG render data extracted from element

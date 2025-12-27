@@ -14,7 +14,8 @@ use blinc_core::{Color, Shadow, Transform};
 use taffy::prelude::*;
 
 use crate::div::{
-    ElementBuilder, ElementTypeId, FontWeight, TextAlign, TextRenderInfo, TextVerticalAlign,
+    ElementBuilder, ElementTypeId, FontFamily, FontWeight, TextAlign, TextRenderInfo,
+    TextVerticalAlign,
 };
 use crate::element::{RenderLayer, RenderProps};
 use crate::tree::{LayoutNodeId, LayoutTree};
@@ -33,6 +34,8 @@ pub struct Text {
     v_align: TextVerticalAlign,
     /// Font weight
     weight: FontWeight,
+    /// Font family category
+    font_family: FontFamily,
     /// Taffy style for layout
     style: Style,
     /// Render layer
@@ -47,6 +50,8 @@ pub struct Text {
     line_height: f32,
     /// Measured width of the text (before layout constraints)
     measured_width: f32,
+    /// Word spacing in pixels (0.0 = normal)
+    word_spacing: f32,
 }
 
 impl Text {
@@ -59,6 +64,7 @@ impl Text {
             align: TextAlign::default(),
             v_align: TextVerticalAlign::default(),
             weight: FontWeight::default(),
+            font_family: FontFamily::default(),
             style: Style::default(),
             render_layer: RenderLayer::default(),
             shadow: None,
@@ -66,6 +72,7 @@ impl Text {
             wrap: true,          // wrap by default
             line_height: 1.2,    // standard line height
             measured_width: 0.0, // will be set by update_size_estimate
+            word_spacing: 0.0,   // normal word spacing
         }
     }
 
@@ -187,6 +194,44 @@ impl Text {
     /// Set font weight to black (900)
     pub fn black(self) -> Self {
         self.weight(FontWeight::Black)
+    }
+
+    // =========================================================================
+    // Font Family
+    // =========================================================================
+
+    /// Set font family
+    pub fn font_family(mut self, family: FontFamily) -> Self {
+        self.font_family = family;
+        self
+    }
+
+    /// Use monospace font (for code)
+    pub fn monospace(self) -> Self {
+        self.font_family(FontFamily::Monospace)
+    }
+
+    /// Use serif font
+    pub fn serif(self) -> Self {
+        self.font_family(FontFamily::Serif)
+    }
+
+    /// Use sans-serif font
+    pub fn sans_serif(self) -> Self {
+        self.font_family(FontFamily::SansSerif)
+    }
+
+    // =========================================================================
+    // Word Spacing
+    // =========================================================================
+
+    /// Set word spacing in pixels
+    ///
+    /// Positive values increase spacing, negative values decrease.
+    /// Default is 0.0 (normal spacing).
+    pub fn word_spacing(mut self, spacing: f32) -> Self {
+        self.word_spacing = spacing;
+        self
     }
 
     /// Set the render layer
@@ -388,6 +433,8 @@ impl ElementBuilder for Text {
             wrap: self.wrap,
             line_height: self.line_height,
             measured_width: self.measured_width,
+            font_family: self.font_family,
+            word_spacing: self.word_spacing,
         })
     }
 }

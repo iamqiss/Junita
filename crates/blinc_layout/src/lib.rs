@@ -72,7 +72,7 @@ pub use element::{
 
 // Builder API
 pub use div::{
-    div, Div, ElementBuilder, ElementTypeId, FontWeight, ImageRenderInfo, TextAlign,
+    div, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, ImageRenderInfo, TextAlign,
     TextVerticalAlign,
 };
 // Reference binding
@@ -116,8 +116,8 @@ pub use text_selection::{
 /// Prelude module - import everything commonly needed
 pub mod prelude {
     pub use crate::div::{
-        div, Div, ElementBuilder, ElementTypeId, FontWeight, ImageRenderInfo, TextAlign,
-        TextVerticalAlign,
+        div, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, ImageRenderInfo,
+        TextAlign, TextVerticalAlign,
     };
     // Reference binding for external element access
     pub use crate::div::{DivRef, ElementRef};

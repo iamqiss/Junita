@@ -280,9 +280,10 @@ pub fn caption(content: impl Into<String>) -> Text {
         .color(Color::rgba(0.5, 0.5, 0.55, 1.0))
 }
 
-/// Create code-styled inline text (monospace appearance via content)
+/// Create code-styled inline text with monospace font
 ///
-/// Note: This uses the default font but styles text for inline code.
+/// Uses the monospace font family for code-like appearance.
+/// Color is inherited from context; override with `.color()` if needed.
 /// For full code blocks with syntax highlighting, use `code()`.
 ///
 /// # Example
@@ -295,9 +296,7 @@ pub fn caption(content: impl Into<String>) -> Text {
 ///     .child(text(" function"))
 /// ```
 pub fn inline_code(content: impl Into<String>) -> Text {
-    text(content)
-        .size(13.0)
-        .color(Color::rgba(0.9, 0.6, 0.5, 1.0))
+    text(content).size(13.0).monospace()
 }
 
 #[cfg(test)]

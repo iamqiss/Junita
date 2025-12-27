@@ -7,7 +7,7 @@ use blinc_gpu::{
     GpuGlyph, GpuImage, GpuImageInstance, GpuPaintContext, GpuRenderer, ImageRenderingContext,
     TextAlignment, TextAnchor, TextRenderingContext,
 };
-use blinc_layout::div::{FontWeight, TextAlign, TextVerticalAlign};
+use blinc_layout::div::{FontFamily, FontWeight, TextAlign, TextVerticalAlign};
 use blinc_layout::prelude::*;
 use blinc_layout::render_state::Overlay;
 use blinc_layout::renderer::ElementType;
@@ -63,6 +63,10 @@ struct TextElement {
     line_height: f32,
     /// Measured width (before layout constraints) - used to determine if wrap is needed
     measured_width: f32,
+    /// Font family category
+    font_family: FontFamily,
+    /// Word spacing in pixels (0.0 = normal)
+    word_spacing: f32,
 }
 
 /// Image element data for rendering
@@ -734,6 +738,8 @@ impl RenderContext {
                         wrap: text_data.wrap,
                         line_height: text_data.line_height,
                         measured_width: scaled_measured_width,
+                        font_family: text_data.font_family,
+                        word_spacing: text_data.word_spacing,
                     });
                 }
                 ElementType::Svg(svg_data) => {
