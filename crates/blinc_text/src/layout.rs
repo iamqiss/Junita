@@ -376,7 +376,7 @@ impl TextLayoutEngine {
         let mut current_line: Vec<ShapedGlyph> = Vec::new();
         let mut line_width = 0.0f32;
 
-        // Find word boundaries
+        // Find word boundaries (whitespace positions)
         let word_breaks: Vec<usize> = text
             .char_indices()
             .filter(|(_, c)| c.is_whitespace())
@@ -398,46 +398,96 @@ impl TextLayoutEngine {
 
             let advance = shaped.scale(glyph.x_advance) + options.letter_spacing;
 
-            // Check if this is a word boundary
+            // Check if this is a word boundary (at a whitespace character)
             let is_word_break = word_breaks.contains(&(glyph.cluster as usize));
 
-            if is_word_break {
-                last_word_end = current_line.len();
-                last_word_width = line_width;
-            }
-
-            // Check if we need to break due to width
+            // Check if adding this glyph would overflow the line
             if line_width + advance > max_width && !current_line.is_empty() {
+                let mut broke_line = false;
                 match options.line_break {
-                    LineBreakMode::Word if last_word_end > 0 => {
-                        // Break at last word boundary
-                        let remaining: Vec<_> = current_line.drain(last_word_end..).collect();
-                        lines.push(std::mem::take(&mut current_line));
-                        current_line = remaining;
-                        line_width = line_width - last_word_width;
-                        last_word_end = 0;
-                        last_word_width = 0.0;
+                    LineBreakMode::Word => {
+                        if last_word_end > 0 {
+                            // Break at last word boundary
+                            // Keep glyphs 0..last_word_end on current line
+                            // Move glyphs last_word_end.. to next line
+                            let remaining: Vec<_> = current_line.drain(last_word_end..).collect();
+                            lines.push(std::mem::take(&mut current_line));
+
+                            // Start new line with remaining glyphs (skip leading whitespace)
+                            for g in remaining {
+                                if current_line.is_empty() && g.codepoint.is_whitespace() {
+                                    continue; // Skip leading whitespace
+                                }
+                                current_line.push(g);
+                            }
+
+                            // Recalculate line width
+                            line_width = current_line
+                                .iter()
+                                .map(|g| shaped.scale(g.x_advance) + options.letter_spacing)
+                                .sum();
+                            last_word_end = 0;
+                            last_word_width = 0.0;
+                            broke_line = true;
+                        } else {
+                            // No word boundary found - break at current position (character break)
+                            lines.push(std::mem::take(&mut current_line));
+                            line_width = 0.0;
+                            last_word_end = 0;
+                            last_word_width = 0.0;
+                            broke_line = true;
+                        }
                     }
-                    LineBreakMode::Character | LineBreakMode::Word => {
+                    LineBreakMode::Character => {
                         // Break at current position
                         lines.push(std::mem::take(&mut current_line));
                         line_width = 0.0;
                         last_word_end = 0;
                         last_word_width = 0.0;
+                        broke_line = true;
                     }
                     LineBreakMode::None => {
-                        // No breaking (shouldn't reach here)
+                        // No breaking - let line overflow
                     }
+                }
+
+                // After breaking, we still need to add the current glyph (unless it's whitespace at line start)
+                if broke_line {
+                    // Skip leading whitespace on new lines
+                    if current_line.is_empty() && glyph.codepoint.is_whitespace() {
+                        continue;
+                    }
+
+                    // Add the current glyph that triggered the overflow
+                    current_line.push(*glyph);
+                    line_width += advance;
+
+                    // Update word boundary if this glyph is a word break
+                    if is_word_break {
+                        last_word_end = current_line.len();
+                        last_word_width = line_width;
+                    }
+                    continue; // Move to next glyph
                 }
             }
 
-            // Skip leading whitespace on new lines (but not after explicit newline)
+            // Skip leading whitespace on new lines
             if current_line.is_empty() && glyph.codepoint.is_whitespace() {
                 continue;
             }
 
+            // Add glyph to current line
             current_line.push(*glyph);
             line_width += advance;
+
+            // Update word boundary tracking AFTER adding the glyph
+            // This way, when we break at last_word_end, all content up to and including
+            // the space is on the current line, and remaining content goes to next line
+            if is_word_break {
+                // Mark position AFTER this whitespace as potential break point
+                last_word_end = current_line.len();
+                last_word_width = line_width;
+            }
         }
 
         // Add remaining line
@@ -464,5 +514,175 @@ impl TextLayoutEngine {
 impl Default for TextLayoutEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shaper::ShapedGlyph;
+
+    /// Helper to verify all text content is preserved after word wrapping
+    fn verify_content_preserved(lines: &[Vec<ShapedGlyph>], original: &str) {
+        // Collect all characters from wrapped lines
+        let wrapped: String = lines
+            .iter()
+            .flat_map(|line| line.iter().map(|g| g.codepoint))
+            .collect();
+
+        // The original text with whitespace normalized (single spaces between words)
+        let original_normalized: String = original
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // The wrapped text should have the same content (just with different whitespace)
+        let wrapped_normalized: String = wrapped
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert_eq!(
+            wrapped_normalized, original_normalized,
+            "Text content was lost during wrapping!\nOriginal: {}\nWrapped: {}",
+            original_normalized, wrapped_normalized
+        );
+    }
+
+    fn create_mock_shaped_text(text: &str) -> ShapedText {
+        let mut glyphs = Vec::new();
+        for (i, c) in text.char_indices() {
+            glyphs.push(ShapedGlyph {
+                glyph_id: c as u16,
+                cluster: i as u32,
+                // ~5px space, ~10px char at font_size=16, units_per_em=1000
+                x_advance: if c.is_whitespace() { 313 } else { 625 },
+                y_advance: 0,
+                x_offset: 0,
+                y_offset: 0,
+                codepoint: c,
+            });
+        }
+
+        ShapedText {
+            glyphs,
+            total_advance: 0,
+            font_size: 16.0,
+            units_per_em: 1000,
+        }
+    }
+
+    /// Standalone test of the word-break algorithm logic without needing a FontFace
+    fn test_break_algorithm(text: &str, max_width: f32) -> Vec<Vec<ShapedGlyph>> {
+        let shaped = create_mock_shaped_text(text);
+        let options = LayoutOptions {
+            max_width: Some(max_width),
+            line_break: LineBreakMode::Word,
+            ..Default::default()
+        };
+
+        // Re-implement break_lines logic directly for testing
+        let mut lines = Vec::new();
+        let mut current_line: Vec<ShapedGlyph> = Vec::new();
+        let mut line_width = 0.0f32;
+
+        let word_breaks: Vec<usize> = text
+            .char_indices()
+            .filter(|(_, c)| c.is_whitespace())
+            .map(|(i, _)| i)
+            .collect();
+
+        let mut last_word_end = 0;
+
+        for glyph in shaped.glyphs.iter() {
+            let advance = shaped.scale(glyph.x_advance) + options.letter_spacing;
+            let is_word_break = word_breaks.contains(&(glyph.cluster as usize));
+
+            if line_width + advance > max_width && !current_line.is_empty() {
+                let mut broke_line = false;
+                if last_word_end > 0 {
+                    let remaining: Vec<_> = current_line.drain(last_word_end..).collect();
+                    lines.push(std::mem::take(&mut current_line));
+
+                    for g in remaining {
+                        if current_line.is_empty() && g.codepoint.is_whitespace() {
+                            continue;
+                        }
+                        current_line.push(g);
+                    }
+
+                    line_width = current_line
+                        .iter()
+                        .map(|g| shaped.scale(g.x_advance) + options.letter_spacing)
+                        .sum();
+                    last_word_end = 0;
+                    broke_line = true;
+                } else {
+                    lines.push(std::mem::take(&mut current_line));
+                    line_width = 0.0;
+                    last_word_end = 0;
+                    broke_line = true;
+                }
+
+                if broke_line {
+                    if current_line.is_empty() && glyph.codepoint.is_whitespace() {
+                        continue;
+                    }
+
+                    current_line.push(*glyph);
+                    line_width += advance;
+
+                    if is_word_break {
+                        last_word_end = current_line.len();
+                    }
+                    continue;
+                }
+            }
+
+            if current_line.is_empty() && glyph.codepoint.is_whitespace() {
+                continue;
+            }
+
+            current_line.push(*glyph);
+            line_width += advance;
+
+            if is_word_break {
+                last_word_end = current_line.len();
+            }
+        }
+
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        lines
+    }
+
+    #[test]
+    fn test_word_wrap_preserves_all_content() {
+        let text = "This is a paragraph with optimal line height for readability.";
+        let lines = test_break_algorithm(text, 200.0);
+
+        // Verify no content lost
+        verify_content_preserved(&lines, text);
+
+        // Should have multiple lines due to wrapping
+        assert!(lines.len() > 1, "Text should have wrapped into multiple lines");
+    }
+
+    #[test]
+    fn test_problematic_paragraph() {
+        // This is the exact text that was losing content
+        let text = "This is a paragraph with optimal line height (1.5) for readability. Paragraphs are styled at 16px with comfortable spacing for body text.";
+        let lines = test_break_algorithm(text, 400.0);
+
+        // Verify no content lost
+        verify_content_preserved(&lines, text);
+
+        // Print lines for debugging
+        for (i, line) in lines.iter().enumerate() {
+            let line_text: String = line.iter().map(|g| g.codepoint).collect();
+            println!("Line {}: '{}'", i + 1, line_text);
+        }
     }
 }

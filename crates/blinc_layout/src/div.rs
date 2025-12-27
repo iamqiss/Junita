@@ -965,6 +965,18 @@ impl Div {
         self
     }
 
+    /// Set horizontal overflow only (X-axis)
+    pub fn overflow_x(mut self, overflow: Overflow) -> Self {
+        self.style.overflow.x = overflow;
+        self
+    }
+
+    /// Set vertical overflow only (Y-axis)
+    pub fn overflow_y(mut self, overflow: Overflow) -> Self {
+        self.style.overflow.y = overflow;
+        self
+    }
+
     // =========================================================================
     // Visual Properties
     // =========================================================================

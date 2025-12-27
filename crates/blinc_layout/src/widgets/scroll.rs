@@ -653,8 +653,34 @@ impl Scroll {
     }
 
     /// Set scroll direction
-    pub fn direction(self, direction: ScrollDirection) -> Self {
+    ///
+    /// This also updates the Taffy overflow settings:
+    /// - Vertical: overflow_y = Scroll, overflow_x = Clip (width constrained)
+    /// - Horizontal: overflow_x = Scroll, overflow_y = Clip (height constrained)
+    /// - Both: overflow = Scroll on both axes
+    pub fn direction(mut self, direction: ScrollDirection) -> Self {
         self.physics.lock().unwrap().config.direction = direction;
+
+        // Update Taffy overflow based on direction to constrain the non-scrolling axis
+        use taffy::Overflow;
+        match direction {
+            ScrollDirection::Vertical => {
+                // Width constrained, height scrollable
+                self.inner = std::mem::take(&mut self.inner)
+                    .overflow_x(Overflow::Clip)
+                    .overflow_y(Overflow::Scroll);
+            }
+            ScrollDirection::Horizontal => {
+                // Height constrained, width scrollable
+                self.inner = std::mem::take(&mut self.inner)
+                    .overflow_x(Overflow::Scroll)
+                    .overflow_y(Overflow::Clip);
+            }
+            ScrollDirection::Both => {
+                // Both axes scrollable
+                self.inner = std::mem::take(&mut self.inner).overflow_scroll();
+            }
+        }
         self
     }
 

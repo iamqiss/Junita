@@ -887,13 +887,22 @@ impl RenderContext {
                 text.color
             };
 
-            // Only wrap if:
-            // 1. wrap is enabled AND
-            // 2. layout width is significantly smaller than measured width (text was constrained)
-            // Using a tolerance of 2.0 physical pixels to account for DPI scaling and floating point
-            let needs_wrap = text.wrap && text.width < text.measured_width - 2.0;
+            // Determine wrap width:
+            // 1. If clip bounds exist and are smaller than measured width, use clip width
+            //    (this handles scroll containers where layout width isn't constrained)
+            // 2. Otherwise, if layout width is smaller than measured, use layout width
+            // 3. Otherwise, don't wrap (text fits naturally)
+            let effective_width = if let Some(clip) = text.clip_bounds {
+                // Use clip width if it constrains the text
+                clip[2].min(text.width)
+            } else {
+                text.width
+            };
+
+            // Wrap if effective width is significantly smaller than measured width
+            let needs_wrap = text.wrap && effective_width < text.measured_width - 2.0;
             let wrap_width = if needs_wrap {
-                Some(text.width)
+                Some(effective_width)
             } else {
                 None // No width constraint = no wrapping
             };

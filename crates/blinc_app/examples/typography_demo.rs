@@ -43,6 +43,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                 .direction(ScrollDirection::Vertical)
                 .child(
                     div()
+                        .w_full() // Constrain width to scroll viewport for text wrapping
                         .flex_col()
                         .gap(32.0)
                         .p(8.0)
@@ -70,7 +71,7 @@ fn typography_section() -> Div {
                 .rounded(8.0)
                 .p(16.0)
                 .flex_col()
-                .gap(8.0)
+                .gap(2.0)
                 .child(h1("Heading 1 (32px, bold)").color(Color::WHITE))
                 .child(h2("Heading 2 (24px, bold)").color(Color::WHITE))
                 .child(h3("Heading 3 (20px, semibold)").color(Color::WHITE))
@@ -100,6 +101,7 @@ fn typography_section() -> Div {
 /// Demonstrates inline text helpers
 fn inline_text_section() -> Div {
     div()
+    .w_full()
         .flex_col()
         .gap(12.0)
         .child(h2("Inline Text Helpers").color(Color::WHITE))
@@ -164,8 +166,7 @@ fn inline_text_section() -> Div {
                         .w_full() // Allow text to wrap within container
                         .child(label("p():").color(Color::GRAY))
                         .child(
-                            p("This is a paragraph with optimal line height (1.5) for readability. \
-                               Paragraphs are styled at 16px with comfortable spacing for body text.")
+                            p("This is a paragraph with optimal line height (1.5) for readability. Paragraphs are styled at 16px with comfortable spacing for body text.")
                                 .color(Color::WHITE),
                         ),
                 )
@@ -173,7 +174,7 @@ fn inline_text_section() -> Div {
                 .child(
                     div()
                         .flex_row()
-                        .gap(8.0)
+                        .gap(1.0)
                         .items_center()
                         .child(label("inline_code():").color(Color::GRAY))
                         .child(span("Use ").color(Color::WHITE))

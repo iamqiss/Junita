@@ -223,20 +223,22 @@ impl Text {
         // Store measured width for render-time comparison
         self.measured_width = metrics.width;
 
-        // Use measured width for layout. This allows text to respect
-        // parent flex alignment (items_center, etc.).
-        //
-        // Text wrapping only happens at render time when the text element's
-        // layout bounds (from parent constraints like explicit width) are
-        // smaller than its measured width AND wrap=true.
-        //
-        // We do NOT use flex_shrink because that causes text to shrink
-        // even when there's enough space (e.g., with items_center).
-        // Instead, parents should use explicit widths or overflow_clip
-        // to constrain text.
-        self.style.size.width = Dimension::Length(metrics.width);
-        self.style.size.height = Dimension::Length(metrics.height);
-        self.style.flex_shrink = 0.0; // Don't shrink - use natural size
+        // Text wrapping behavior:
+        // - When wrap=true: Width is 100% of parent, height is based on single line.
+        //   At render time, text wraps based on actual layout width and height adjusts.
+        // - When wrap=false (no_wrap): Use natural measured width/height, don't shrink.
+        if self.wrap {
+            // Width: 100% of parent container
+            self.style.size.width = Dimension::Percent(1.0);
+            // Height: single line height (will be visually taller when wrapped at render)
+            self.style.size.height = Dimension::Length(metrics.height);
+            self.style.min_size.width = Dimension::Length(0.0);
+            self.style.flex_shrink = 1.0;
+        } else {
+            self.style.size.width = Dimension::Length(metrics.width);
+            self.style.size.height = Dimension::Length(metrics.height);
+            self.style.flex_shrink = 0.0;
+        }
     }
 
     // =========================================================================
