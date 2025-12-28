@@ -41,6 +41,7 @@ pub mod motion;
 pub mod render_state;
 pub mod renderer;
 pub mod scroll;
+pub mod stack;
 pub mod stateful;
 pub mod style;
 pub mod styled_text;
@@ -72,9 +73,11 @@ pub use element::{
 
 // Builder API
 pub use div::{
-    div, stack, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, GenericFont, ImageRenderInfo,
-    Stack, TextAlign, TextVerticalAlign,
+    div, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, GenericFont, ImageRenderInfo,
+    TextAlign, TextVerticalAlign,
 };
+// Stack container (overlayed children)
+pub use stack::{stack, Stack};
 // Reference binding
 pub use div::{DivRef, ElementRef};
 pub use image::{image, img, Image, ImageFilter, ObjectFit, ObjectPosition};
@@ -120,9 +123,11 @@ pub use text_selection::{
 /// Prelude module - import everything commonly needed
 pub mod prelude {
     pub use crate::div::{
-        div, stack, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, GenericFont,
-        ImageRenderInfo, Stack, TextAlign, TextVerticalAlign,
+        div, Div, ElementBuilder, ElementTypeId, FontFamily, FontWeight, GenericFont,
+        ImageRenderInfo, TextAlign, TextVerticalAlign,
     };
+    // Stack container (overlayed children)
+    pub use crate::stack::{stack, Stack};
     // Reference binding for external element access
     pub use crate::div::{DivRef, ElementRef};
     pub use crate::element::{
