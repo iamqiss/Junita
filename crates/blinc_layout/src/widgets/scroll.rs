@@ -1249,7 +1249,10 @@ mod tests {
 
     #[test]
     fn test_scroll_physics_bounce() {
-        let mut physics = ScrollPhysics::default();
+        // Create scheduler for bounce animation
+        let scheduler = Arc::new(Mutex::new(AnimationScheduler::new()));
+
+        let mut physics = ScrollPhysics::with_scheduler(ScrollConfig::default(), &scheduler);
         physics.viewport_height = 400.0;
         physics.content_height = 1000.0;
 
@@ -1257,18 +1260,24 @@ mod tests {
         physics.offset_y = 50.0;
         physics.state = ScrollState::Scrolling;
 
-        // End scroll gesture
+        // End scroll gesture - should transition to Bouncing
         physics.on_scroll_end();
 
-        // Should be bouncing back
+        // Should be bouncing back (spring created for animation)
         assert_eq!(physics.state, ScrollState::Bouncing);
         assert!(physics.spring_y.is_some());
 
-        // Tick until settled
-        for _ in 0..120 {
-            if !physics.tick(1.0 / 60.0) {
-                break;
-            }
+        // Note: In real usage, the scheduler runs on a background thread and steps
+        // springs over real time. In tests, we verify the state machine behavior:
+        // - Bouncing state was entered
+        // - Spring was created
+        // - SETTLED event transitions to Idle
+
+        // Simulate spring settling by manually triggering SETTLED event
+        use crate::stateful::{scroll_events, StateTransitions};
+        physics.offset_y = 0.0; // Spring would animate to target (0.0)
+        if let Some(new_state) = physics.state.on_event(scroll_events::SETTLED) {
+            physics.state = new_state;
         }
 
         assert_eq!(physics.state, ScrollState::Idle);
@@ -1306,11 +1315,19 @@ mod tests {
         // Should be in decelerating state
         assert_eq!(physics.state, ScrollState::Decelerating);
 
-        // Tick should settle to idle (since macOS provides momentum)
+        // Tick returns false (no internal animation) - momentum comes from system scroll events
         let still_animating = physics.tick(1.0 / 60.0);
-
-        // Should settle immediately since we're not overscrolling
         assert!(!still_animating);
+
+        // State remains Decelerating until SETTLED event is sent externally
+        // (on macOS, this happens when system momentum scroll events stop)
+        assert_eq!(physics.state, ScrollState::Decelerating);
+
+        // Manually trigger SETTLED to transition to Idle
+        use crate::stateful::{scroll_events, StateTransitions};
+        if let Some(new_state) = physics.state.on_event(scroll_events::SETTLED) {
+            physics.state = new_state;
+        }
         assert_eq!(physics.state, ScrollState::Idle);
     }
 

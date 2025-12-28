@@ -1258,18 +1258,16 @@ impl RenderTree {
                 } else if delta_x.abs() < 0.001 {
                     // No horizontal delta to consume
                     false
-                } else if p.config.bounce_enabled {
-                    // With bounce enabled, always consume (for overscroll effect)
-                    true
+                } else if delta_x < 0.0 {
+                    // Scrolling left - can consume if not at left edge
+                    // With bounce: only consume if we can still scroll OR are bouncing back
+                    // Without bounce: only consume if not at edge
+                    let at_left_edge = p.offset_x <= p.max_offset_x();
+                    !at_left_edge || p.is_overscrolling_x()
                 } else {
-                    // Without bounce, only consume if we can actually scroll
-                    if delta_x < 0.0 {
-                        // Scrolling left - can consume if not at left edge
-                        p.offset_x > p.max_offset_x()
-                    } else {
-                        // Scrolling right - can consume if not at right edge
-                        p.offset_x < p.min_offset_x()
-                    }
+                    // Scrolling right - can consume if not at right edge
+                    let at_right_edge = p.offset_x >= p.min_offset_x();
+                    !at_right_edge || p.is_overscrolling_x()
                 }
             }
             _ => false,
@@ -1285,18 +1283,16 @@ impl RenderTree {
                 } else if delta_y.abs() < 0.001 {
                     // No vertical delta to consume
                     false
-                } else if p.config.bounce_enabled {
-                    // With bounce enabled, always consume (for overscroll effect)
-                    true
+                } else if delta_y < 0.0 {
+                    // Scrolling up (content moves down) - can consume if not at bottom edge
+                    // With bounce: only consume if we can still scroll OR are bouncing back
+                    // Without bounce: only consume if not at edge
+                    let at_bottom_edge = p.offset_y <= p.max_offset_y();
+                    !at_bottom_edge || p.is_overscrolling_y()
                 } else {
-                    // Without bounce, only consume if we can actually scroll
-                    if delta_y < 0.0 {
-                        // Scrolling up - can consume if not at top edge
-                        p.offset_y > p.max_offset_y()
-                    } else {
-                        // Scrolling down - can consume if not at bottom edge
-                        p.offset_y < p.min_offset_y()
-                    }
+                    // Scrolling down (content moves up) - can consume if not at top edge
+                    let at_top_edge = p.offset_y >= p.min_offset_y();
+                    !at_top_edge || p.is_overscrolling_y()
                 }
             }
             _ => false,
