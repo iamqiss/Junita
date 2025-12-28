@@ -29,7 +29,7 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use blinc_animation::{AnimationScheduler, SchedulerHandle};
+use blinc_animation::{AnimatedValue, AnimationScheduler, SchedulerHandle, SpringConfig};
 use blinc_core::reactive::{Derived, ReactiveGraph, Signal};
 use blinc_layout::prelude::*;
 use blinc_layout::widgets::overlay::{overlay_manager, OverlayManager, OverlayManagerExt};
@@ -686,6 +686,89 @@ impl WindowedContext {
             shared_state
         }
     }
+
+    /// Create a persistent animated value using caller location as key
+    ///
+    /// The animated value survives UI rebuilds, preserving its current value
+    /// and active spring animations. This is essential for continuous animations
+    /// driven by state changes.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Animated value persists across rebuilds
+    /// let offset_y = ctx.use_animated_value(0.0, SpringConfig::wobbly());
+    ///
+    /// // Can be used in motion bindings
+    /// motion().translate_y(offset_y.clone()).child(content)
+    /// ```
+    #[track_caller]
+    pub fn use_animated_value(
+        &self,
+        initial: f32,
+        config: SpringConfig,
+    ) -> SharedAnimatedValue {
+        let location = std::panic::Location::caller();
+        let key = format!(
+            "{}:{}:{}",
+            location.file(),
+            location.line(),
+            location.column()
+        );
+        self.use_animated_value_for(&key, initial, config)
+    }
+
+    /// Create a persistent animated value with an explicit key
+    ///
+    /// Use this for reusable components or when creating multiple animated
+    /// values at the same source location (e.g., in a loop).
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Multiple animated values with unique keys
+    /// for i in 0..3 {
+    ///     let scale = ctx.use_animated_value_for(
+    ///         format!("item_{}_scale", i),
+    ///         1.0,
+    ///         SpringConfig::snappy(),
+    ///     );
+    /// }
+    /// ```
+    pub fn use_animated_value_for<K: Hash>(
+        &self,
+        key: K,
+        initial: f32,
+        config: SpringConfig,
+    ) -> SharedAnimatedValue {
+        use blinc_core::reactive::SignalId;
+
+        // Use a type marker for SharedAnimatedValue
+        let state_key = StateKey::new::<SharedAnimatedValue, _>(&key);
+        let mut hooks = self.hooks.lock().unwrap();
+
+        if let Some(raw_id) = hooks.get(&state_key) {
+            // Existing animated value - retrieve from signal
+            let signal_id = SignalId::from_raw(raw_id);
+            let signal: Signal<SharedAnimatedValue> = Signal::from_id(signal_id);
+            self.reactive.lock().unwrap().get(signal).unwrap()
+        } else {
+            // New animated value - create and store in signal
+            let animated_value: SharedAnimatedValue = Arc::new(Mutex::new(AnimatedValue::new(
+                self.animation_handle(),
+                initial,
+                config,
+            )));
+            let signal = self
+                .reactive
+                .lock()
+                .unwrap()
+                .create_signal(animated_value.clone());
+            let raw_id = signal.id().to_raw();
+            hooks.insert(state_key, raw_id);
+            animated_value
+        }
+    }
 }
 
 /// Windowed application runner
@@ -774,6 +857,8 @@ impl WindowedApp {
         let mut render_tree: Option<RenderTree> = None;
         // Track if we need to rebuild UI (e.g., after resize)
         let mut needs_rebuild = true;
+        // Track if we need to relayout (e.g., after resize even if tree unchanged)
+        let mut needs_relayout = false;
         // Shared dirty flag for element refs
         let ref_dirty_flag: RefDirtyFlag = Arc::new(AtomicBool::new(false));
         // Shared reactive graph for signal-based state management
@@ -859,6 +944,7 @@ impl WindowedApp {
                                 config.height = height;
                                 surf.configure(&blinc_app.device(), config);
                                 needs_rebuild = true;
+                                needs_relayout = true;
 
                                 // Dispatch RESIZE event to elements (use logical dimensions)
                                 if let (Some(ref mut windowed_ctx), Some(ref tree)) =
@@ -870,6 +956,9 @@ impl WindowedApp {
                                         .event_router
                                         .on_window_resize(tree, logical_width, logical_height);
                                 }
+
+                                // Request redraw to trigger relayout with new dimensions
+                                window.request_redraw();
                             }
                         }
                     }
@@ -1012,7 +1101,10 @@ impl WindowedApp {
                                         }
                                     }
                                     MouseEvent::Left => {
+                                        // on_mouse_leave now emits POINTER_UP if there was a pressed target
+                                        // This handles the case where mouse leaves window while dragging
                                         router.on_mouse_leave();
+                                        // Events are collected via the callback set above
                                     }
                                     MouseEvent::Entered => {
                                         let (mx, my) = router.mouse_position();
@@ -1179,6 +1271,8 @@ impl WindowedApp {
                                         }
                                     }
                                     TouchEvent::Cancelled { .. } => {
+                                        // Touch cancelled - treat like mouse leave
+                                        // This will emit POINTER_UP if there was a pressed target
                                         router.on_mouse_leave();
                                     }
                                 },
@@ -1384,15 +1478,25 @@ impl WindowedApp {
 
                                 // Apply any pending prop updates directly to the render tree
                                 if let Some(ref mut tree) = render_tree {
-                                    for (node_id, props) in blinc_layout::take_pending_prop_updates() {
+                                    // Apply prop updates (visual-only changes)
+                                    let prop_updates = blinc_layout::take_pending_prop_updates();
+                                    let had_prop_updates = !prop_updates.is_empty();
+                                    for (node_id, props) in prop_updates {
                                         tree.update_render_props(node_id, |p| *p = props);
                                     }
 
-                                    // Process pending subtree rebuilds (for child updates)
+                                    // Process pending subtree rebuilds (structural changes)
+                                    // Only recompute layout if subtree rebuilds occurred
+                                    let had_subtree_rebuilds = blinc_layout::has_pending_subtree_rebuilds();
                                     tree.process_pending_subtree_rebuilds();
 
-                                    // Recompute layout for the affected nodes
-                                    tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                    // Recompute layout only if structural changes happened
+                                    if had_subtree_rebuilds {
+                                        tracing::debug!("Subtree rebuilds processed, recomputing layout");
+                                        tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                    } else if had_prop_updates {
+                                        tracing::trace!("Visual-only prop updates, skipping layout");
+                                    }
                                 }
 
                                 // Request window redraw without rebuild
@@ -1408,45 +1512,68 @@ impl WindowedApp {
                                 // Build UI element tree
                                 let ui = ui_builder(windowed_ctx);
 
-                                // Check if tree hash matches existing tree (optimization)
-                                let needs_full_rebuild = if let Some(ref existing_tree) = render_tree {
-                                    // Use hash comparison to skip rebuild if unchanged
-                                    !existing_tree.matches_element(&ui)
-                                } else {
-                                    true // No existing tree, must build
-                                };
+                                // Use incremental update if we have an existing tree
+                                if let Some(ref mut existing_tree) = render_tree {
+                                    use blinc_layout::UpdateResult;
 
-                                if needs_full_rebuild {
-                                    // Hash differs or no tree exists - do full rebuild
+                                    let update_result = existing_tree.incremental_update(&ui);
+
+                                    match update_result {
+                                        UpdateResult::NoChanges => {
+                                            // Tree unchanged - but check if relayout needed (e.g., resize)
+                                            if needs_relayout {
+                                                tracing::debug!("Incremental update: NoChanges but relayout needed (resize)");
+                                                existing_tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                            } else {
+                                                tracing::debug!("Incremental update: NoChanges - skipping rebuild");
+                                            }
+                                        }
+                                        UpdateResult::VisualOnly => {
+                                            // Only visual props changed - check if relayout needed
+                                            if needs_relayout {
+                                                tracing::debug!("Incremental update: VisualOnly but relayout needed (resize)");
+                                                existing_tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                            } else {
+                                                tracing::debug!("Incremental update: VisualOnly - skipping layout");
+                                            }
+                                            // Props already updated in-place by incremental_update
+                                        }
+                                        UpdateResult::LayoutChanged => {
+                                            // Layout changed - recompute layout
+                                            tracing::debug!("Incremental update: LayoutChanged - recomputing layout");
+                                            existing_tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                        }
+                                        UpdateResult::ChildrenChanged => {
+                                            // Children changed - subtrees were rebuilt in place
+                                            tracing::debug!("Incremental update: ChildrenChanged - subtrees rebuilt");
+
+                                            // Recompute layout since structure changed
+                                            existing_tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+
+                                            // Initialize motion animations for any new nodes wrapped in motion() containers
+                                            existing_tree.initialize_motion_animations(rs);
+                                        }
+                                    }
+
+                                    // Clear relayout flag after processing
+                                    needs_relayout = false;
+                                } else {
+                                    // No existing tree - create new
                                     let mut tree = RenderTree::from_element(&ui);
 
                                     // Set animation scheduler for scroll bounce springs
                                     tree.set_animations(&windowed_ctx.animations);
 
                                     // Set DPI scale factor for HiDPI rendering
-                                    // Layout uses logical pixels (ctx.width/height), then scaling
-                                    // is applied at render time to map to physical pixels
                                     tree.set_scale_factor(windowed_ctx.scale_factor as f32);
 
                                     // Compute layout in logical pixels
                                     tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
 
-                                    // Transfer node states from old tree to preserve state across rebuilds
-                                    // Note: scroll_physics comes from the element itself via scroll_physics()
-                                    // and should NOT be transferred to avoid desync with element handlers
-                                    if let Some(ref old_tree) = render_tree {
-                                        tree.transfer_states_from(old_tree);
-                                        // Legacy scroll_offsets still transferred for non-physics scroll
-                                        tree.transfer_scroll_offsets_from(old_tree);
-                                    }
-
                                     // Initialize motion animations for any nodes wrapped in motion() containers
                                     tree.initialize_motion_animations(rs);
 
                                     render_tree = Some(tree);
-                                } else {
-                                    // Hash matches - tree is identical, skip rebuild
-                                    tracing::trace!("Skipping rebuild: tree hash unchanged");
                                 }
 
                                 needs_rebuild = false;

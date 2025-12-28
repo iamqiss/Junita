@@ -14,7 +14,7 @@ use blinc_core::{Brush, ClipShape, Color, CornerRadius, DrawContext, GlassStyle,
 use taffy::prelude::*;
 
 use crate::canvas::CanvasData;
-use crate::diff::DivHash;
+use crate::diff::{render_props_eq, ChangeCategory, DivHash};
 use crate::div::{ElementBuilder, ElementTypeId};
 use crate::element::{ElementBounds, GlassMaterial, Material, RenderLayer, RenderProps};
 use crate::tree::{LayoutNodeId, LayoutTree};
@@ -252,6 +252,9 @@ pub struct RenderTree {
     /// Hash of the element tree used to build this RenderTree
     /// Used for quick equality checks to skip unnecessary rebuilds
     tree_hash: Option<DivHash>,
+    /// Per-node hashes for incremental change detection
+    /// Maps node_id to (own_hash, tree_hash) - own excludes children, tree includes children
+    node_hashes: HashMap<LayoutNodeId, (DivHash, DivHash)>,
 }
 
 /// Result of an incremental update attempt
@@ -263,8 +266,8 @@ pub enum UpdateResult {
     VisualOnly,
     /// Layout properties changed (layout needs recomputation)
     LayoutChanged,
-    /// Structure changed (full rebuild was performed)
-    FullRebuild,
+    /// Children changed - subtree rebuilds queued, needs layout recomputation
+    ChildrenChanged,
 }
 
 impl Default for RenderTree {
@@ -290,6 +293,7 @@ impl RenderTree {
             scale_factor: 1.0,
             animations: Weak::new(),
             tree_hash: None,
+            node_hashes: HashMap::new(),
         }
     }
 
@@ -364,44 +368,425 @@ impl RenderTree {
     /// - If nothing changed: returns NoChanges, no work done
     /// - If only visual props changed: updates render props, returns VisualOnly
     /// - If layout changed: updates props + needs relayout, returns LayoutChanged
-    /// - If children changed: does full rebuild, returns FullRebuild
+    /// - If children changed: rebuilds affected subtrees, returns ChildrenChanged
     ///
     /// The caller should:
     /// - NoChanges: skip layout and just render
     /// - VisualOnly: skip layout, just render with updated props
     /// - LayoutChanged: call compute_layout(), then render
-    /// - FullRebuild: call compute_layout(), transfer states, then render
+    /// - ChildrenChanged: call compute_layout(), then render
     pub fn incremental_update<E: ElementBuilder>(&mut self, element: &E) -> UpdateResult {
-        let new_hash = DivHash::compute_element_tree(element);
+        let new_tree_hash = DivHash::compute_element_tree(element);
 
-        // Quick path: if hash matches, nothing changed
-        if self.tree_hash == Some(new_hash) {
+        // Quick path: if tree hash matches, nothing changed
+        if self.tree_hash == Some(new_tree_hash) {
             return UpdateResult::NoChanges;
         }
 
-        // Hash differs - need to analyze what changed
-        // For now, we do a simplified check: compute element's own hash (without children)
-        // vs the new element to determine change category
+        // Tree hash differs - analyze what kind of changes occurred
+        // Walk the tree comparing per-node hashes to detect change categories
+        let Some(root_id) = self.root else {
+            // No existing tree - build it (this is initial build, not an update)
+            self.tree_hash = Some(new_tree_hash);
+            self.root = Some(self.build_element(element));
+            return UpdateResult::ChildrenChanged;
+        };
 
-        // Since we don't have the old element stored, we need to do a full rebuild
-        // for any structural change. However, we can optimize the common case of
-        // prop-only changes by walking the tree and updating props in place.
+        // Analyze changes by comparing stored hashes with new element
+        let changes = self.analyze_changes(element, root_id);
 
-        // For this initial implementation, we categorize based on tree hash change:
-        // - Different hash = something changed = need rebuild
-        // Future optimization: store element references or per-node hashes for
-        // more granular change detection
+        tracing::trace!(
+            "incremental_update: layout={}, visual={}, children={}, handlers={}",
+            changes.layout,
+            changes.visual,
+            changes.children,
+            changes.handlers
+        );
 
-        // Update the stored hash
-        self.tree_hash = Some(new_hash);
+        // Update tree hash
+        self.tree_hash = Some(new_tree_hash);
 
-        // Clear and rebuild
-        self.render_nodes.clear();
-        self.handler_registry = crate::event_handler::HandlerRegistry::new();
-        self.layout_tree = LayoutTree::new();
-        self.root = Some(self.build_element(element));
+        // Determine update strategy based on change category
+        if changes.children {
+            // Children changed - rebuild affected subtrees in place
+            // Walk tree and rebuild nodes with changed children
+            self.rebuild_changed_subtrees(element, root_id);
+            // Also update props for nodes that didn't get rebuilt
+            self.update_render_props_in_place(element, root_id);
+            UpdateResult::ChildrenChanged
+        } else if changes.layout {
+            // Layout changed - update props and need relayout
+            self.update_render_props_in_place(element, root_id);
+            UpdateResult::LayoutChanged
+        } else if changes.visual || changes.handlers {
+            // Only visual/handler changes - update props in place, no layout needed
+            self.update_render_props_in_place(element, root_id);
+            UpdateResult::VisualOnly
+        } else {
+            // No changes detected (shouldn't happen if tree hash differed)
+            UpdateResult::NoChanges
+        }
+    }
 
-        UpdateResult::FullRebuild
+    /// Rebuild subtrees for nodes with changed children
+    ///
+    /// This walks the tree comparing stored hashes with the new element tree.
+    /// When it finds a node whose children have changed (different count),
+    /// it rebuilds that subtree in place.
+    fn rebuild_changed_subtrees<E: ElementBuilder>(&mut self, element: &E, node_id: LayoutNodeId) {
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        // Check if children count changed - rebuild children of this node
+        if child_node_ids.len() != child_builders.len() {
+            self.rebuild_children_in_place(node_id, child_builders);
+            return;
+        }
+
+        // Same child count - check each child for deeper changes
+        for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+            // Get stored hash for this child
+            if let Some(&(_, stored_tree_hash)) = self.node_hashes.get(&child_node_id) {
+                let new_tree_hash = DivHash::compute_element_tree(child_builder.as_ref());
+                if stored_tree_hash != new_tree_hash {
+                    // Child's subtree changed - check if it's the child count or deeper changes
+                    let child_children_count = self.layout_tree.children(child_node_id).len();
+                    let new_children_count = child_builder.children_builders().len();
+
+                    if child_children_count != new_children_count {
+                        // This child's children changed - rebuild its children
+                        self.rebuild_children_in_place(child_node_id, child_builder.children_builders());
+                    } else {
+                        // Recurse to find deeper changes
+                        self.rebuild_changed_subtrees_boxed(child_builder.as_ref(), child_node_id);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Rebuild subtrees for boxed element builder
+    fn rebuild_changed_subtrees_boxed(&mut self, element: &dyn ElementBuilder, node_id: LayoutNodeId) {
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        if child_node_ids.len() != child_builders.len() {
+            self.rebuild_children_in_place(node_id, child_builders);
+            return;
+        }
+
+        for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+            if let Some(&(_, stored_tree_hash)) = self.node_hashes.get(&child_node_id) {
+                let new_tree_hash = DivHash::compute_element_tree(child_builder.as_ref());
+                if stored_tree_hash != new_tree_hash {
+                    let child_children_count = self.layout_tree.children(child_node_id).len();
+                    let new_children_count = child_builder.children_builders().len();
+
+                    if child_children_count != new_children_count {
+                        self.rebuild_children_in_place(child_node_id, child_builder.children_builders());
+                    } else {
+                        self.rebuild_changed_subtrees_boxed(child_builder.as_ref(), child_node_id);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Rebuild children of a node in place
+    ///
+    /// This removes old children and builds new ones from the provided element builders.
+    fn rebuild_children_in_place(&mut self, parent_id: LayoutNodeId, new_children: &[Box<dyn ElementBuilder>]) {
+        // Remove old children
+        let old_children = self.layout_tree.children(parent_id);
+        for child_id in &old_children {
+            self.remove_subtree_nodes(*child_id);
+        }
+        self.layout_tree.clear_children(parent_id);
+
+        // Build new children
+        for child in new_children {
+            let child_id = child.build(&mut self.layout_tree);
+            self.layout_tree.add_child(parent_id, child_id);
+            self.collect_render_props_boxed(child.as_ref(), child_id);
+        }
+    }
+
+    /// Analyze what categories of changes occurred between stored tree and new element
+    fn analyze_changes<E: ElementBuilder>(&self, element: &E, node_id: LayoutNodeId) -> ChangeCategory {
+        let mut changes = ChangeCategory::none();
+
+        // Get stored hash for this node
+        let Some(&(stored_own_hash, stored_tree_hash)) = self.node_hashes.get(&node_id) else {
+            // No stored hash - treat as everything changed
+            changes.layout = true;
+            changes.visual = true;
+            changes.children = true;
+            return changes;
+        };
+
+        // Compute new hashes
+        let new_own_hash = DivHash::compute_element(element);
+        let new_tree_hash = DivHash::compute_element_tree(element);
+
+        // If tree hashes match, nothing changed in this subtree
+        if stored_tree_hash == new_tree_hash {
+            return changes;
+        }
+
+        // Tree hash differs - analyze further
+        if stored_own_hash != new_own_hash {
+            // This node's own properties changed
+            // Check render props to distinguish visual vs layout
+            if let Some(old_render_node) = self.render_nodes.get(&node_id) {
+                let new_props = element.render_props();
+                let old_props = &old_render_node.props;
+
+                // Visual change detection: compare render-only properties
+                if !Self::props_visually_equal(old_props, &new_props) {
+                    changes.visual = true;
+                }
+
+                // Layout change: if hash differs but not just visual, assume layout changed
+                // (We can't access Style directly from ElementBuilder, so we infer)
+                if !changes.visual {
+                    changes.layout = true;
+                }
+            } else {
+                // No old render node - everything changed
+                changes.layout = true;
+                changes.visual = true;
+            }
+        }
+
+        // Check children
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        // Different number of children = structural change
+        if child_node_ids.len() != child_builders.len() {
+            changes.children = true;
+            return changes;
+        }
+
+        // Recursively check children
+        for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+            let child_changes = self.analyze_changes_boxed(child_builder.as_ref(), child_node_id);
+            changes.layout = changes.layout || child_changes.layout;
+            changes.visual = changes.visual || child_changes.visual;
+            changes.children = changes.children || child_changes.children;
+            changes.handlers = changes.handlers || child_changes.handlers;
+
+            // Short circuit if children changed (need full rebuild anyway)
+            if changes.children {
+                return changes;
+            }
+        }
+
+        changes
+    }
+
+    /// Analyze changes for a boxed element builder
+    fn analyze_changes_boxed(&self, element: &dyn ElementBuilder, node_id: LayoutNodeId) -> ChangeCategory {
+        let mut changes = ChangeCategory::none();
+
+        let Some(&(stored_own_hash, stored_tree_hash)) = self.node_hashes.get(&node_id) else {
+            changes.layout = true;
+            changes.visual = true;
+            changes.children = true;
+            return changes;
+        };
+
+        let new_own_hash = DivHash::compute_element(element);
+        let new_tree_hash = DivHash::compute_element_tree(element);
+
+        if stored_tree_hash == new_tree_hash {
+            return changes;
+        }
+
+        if stored_own_hash != new_own_hash {
+            if let Some(old_render_node) = self.render_nodes.get(&node_id) {
+                let new_props = element.render_props();
+                let old_props = &old_render_node.props;
+
+                if !Self::props_visually_equal(old_props, &new_props) {
+                    changes.visual = true;
+                }
+                if !changes.visual {
+                    changes.layout = true;
+                }
+            } else {
+                changes.layout = true;
+                changes.visual = true;
+            }
+        }
+
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        if child_node_ids.len() != child_builders.len() {
+            changes.children = true;
+            return changes;
+        }
+
+        for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+            let child_changes = self.analyze_changes_boxed(child_builder.as_ref(), child_node_id);
+            changes.layout = changes.layout || child_changes.layout;
+            changes.visual = changes.visual || child_changes.visual;
+            changes.children = changes.children || child_changes.children;
+            changes.handlers = changes.handlers || child_changes.handlers;
+
+            if changes.children {
+                return changes;
+            }
+        }
+
+        changes
+    }
+
+    /// Compare render props for visual equality
+    fn props_visually_equal(old: &RenderProps, new: &RenderProps) -> bool {
+        render_props_eq(old, new)
+    }
+
+    /// Update render props in place without rebuilding the tree
+    fn update_render_props_in_place<E: ElementBuilder>(&mut self, element: &E, node_id: LayoutNodeId) {
+        // Update this node's props
+        if let Some(render_node) = self.render_nodes.get_mut(&node_id) {
+            let mut new_props = element.render_props();
+            new_props.node_id = Some(node_id);
+            // Preserve motion from old props (set by parent)
+            new_props.motion = render_node.props.motion.clone();
+            render_node.props = new_props;
+        } else {
+            // Render node doesn't exist - create it
+            tracing::debug!(
+                "update_render_props_in_place: creating missing render_node for {:?}",
+                node_id
+            );
+            let mut new_props = element.render_props();
+            new_props.node_id = Some(node_id);
+            let element_type = Self::determine_element_type(element);
+            self.render_nodes.insert(
+                node_id,
+                RenderNode {
+                    props: new_props,
+                    element_type,
+                },
+            );
+        }
+
+        // Update taffy node's layout style if element provides one
+        // This is critical for layout changes (width, height, padding, etc.)
+        if let Some(style) = element.layout_style() {
+            self.layout_tree.set_style(node_id, style.clone());
+        }
+
+        // Update stored hash
+        let own_hash = DivHash::compute_element(element);
+        let tree_hash = DivHash::compute_element_tree(element);
+        self.node_hashes.insert(node_id, (own_hash, tree_hash));
+
+        // Update event handlers
+        if let Some(handlers) = element.event_handlers() {
+            self.handler_registry.register(node_id, handlers.clone());
+        }
+
+        // Update scroll physics if this is a scroll element
+        if let Some(physics) = element.scroll_physics() {
+            // Set the animation scheduler for bounce springs
+            if let Some(scheduler) = self.animations.upgrade() {
+                physics.lock().unwrap().set_scheduler(&scheduler);
+            }
+            self.scroll_physics.insert(node_id, physics);
+        }
+
+        // Update motion bindings if this element has continuous animations
+        if let Some(bindings) = element.motion_bindings() {
+            self.motion_bindings.insert(node_id, bindings);
+        }
+
+        // Recursively update children
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        // Handle mismatch between layout children and builder children
+        if child_node_ids.len() != child_builders.len() {
+            // Rebuild children in place to fix the mismatch
+            self.rebuild_children_in_place(node_id, child_builders);
+        } else {
+            for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+                self.update_render_props_in_place_boxed(child_builder.as_ref(), child_node_id);
+            }
+        }
+    }
+
+    /// Update render props for a boxed element builder
+    fn update_render_props_in_place_boxed(&mut self, element: &dyn ElementBuilder, node_id: LayoutNodeId) {
+        if let Some(render_node) = self.render_nodes.get_mut(&node_id) {
+            let mut new_props = element.render_props();
+            new_props.node_id = Some(node_id);
+            new_props.motion = render_node.props.motion.clone();
+            render_node.props = new_props;
+        } else {
+            // Render node doesn't exist - this can happen if the tree structure changed
+            // but rebuild_children_in_place wasn't called for this subtree.
+            // Create a new render node entry.
+            tracing::debug!(
+                "update_render_props_in_place_boxed: creating missing render_node for {:?}",
+                node_id
+            );
+            let mut new_props = element.render_props();
+            new_props.node_id = Some(node_id);
+            let element_type = Self::determine_element_type_boxed(element);
+            self.render_nodes.insert(
+                node_id,
+                RenderNode {
+                    props: new_props,
+                    element_type,
+                },
+            );
+        }
+
+        // Update taffy node's layout style if element provides one
+        // This is critical for layout changes (width, height, padding, etc.)
+        if let Some(style) = element.layout_style() {
+            self.layout_tree.set_style(node_id, style.clone());
+        }
+
+        let own_hash = DivHash::compute_element(element);
+        let tree_hash = DivHash::compute_element_tree(element);
+        self.node_hashes.insert(node_id, (own_hash, tree_hash));
+
+        if let Some(handlers) = element.event_handlers() {
+            self.handler_registry.register(node_id, handlers.clone());
+        }
+
+        // Update scroll physics if this is a scroll element
+        if let Some(physics) = element.scroll_physics() {
+            // Set the animation scheduler for bounce springs
+            if let Some(scheduler) = self.animations.upgrade() {
+                physics.lock().unwrap().set_scheduler(&scheduler);
+            }
+            self.scroll_physics.insert(node_id, physics);
+        }
+
+        // Update motion bindings if this element has continuous animations
+        if let Some(bindings) = element.motion_bindings() {
+            self.motion_bindings.insert(node_id, bindings);
+        }
+
+        let child_node_ids = self.layout_tree.children(node_id);
+        let child_builders = element.children_builders();
+
+        // Handle mismatch between layout children and builder children
+        if child_node_ids.len() != child_builders.len() {
+            // Rebuild children in place to fix the mismatch
+            self.rebuild_children_in_place(node_id, child_builders);
+        } else {
+            for (child_builder, &child_node_id) in child_builders.iter().zip(child_node_ids.iter()) {
+                self.update_render_props_in_place_boxed(child_builder.as_ref(), child_node_id);
+            }
+        }
     }
 
     /// Set the DPI scale factor for this render tree
@@ -449,6 +834,11 @@ impl RenderTree {
                 element_type,
             },
         );
+
+        // Store per-node hashes for incremental update detection
+        let own_hash = DivHash::compute_element(element);
+        let tree_hash = DivHash::compute_element_tree(element);
+        self.node_hashes.insert(node_id, (own_hash, tree_hash));
 
         // Register event handlers if present
         if let Some(handlers) = element.event_handlers() {
@@ -553,6 +943,11 @@ impl RenderTree {
             },
         );
 
+        // Store per-node hashes for incremental update detection
+        let own_hash = DivHash::compute_element(element);
+        let tree_hash = DivHash::compute_element_tree(element);
+        self.node_hashes.insert(node_id, (own_hash, tree_hash));
+
         // Register event handlers if present
         if let Some(handlers) = element.event_handlers() {
             self.handler_registry.register(node_id, handlers.clone());
@@ -575,6 +970,16 @@ impl RenderTree {
         // Get child node IDs from the layout tree
         let child_node_ids = self.layout_tree.children(node_id);
         let child_builders = element.children_builders();
+
+        // Debug: warn on mismatch
+        if child_node_ids.len() != child_builders.len() {
+            tracing::warn!(
+                "collect_render_props_boxed: node {:?} has {} layout children but {} builder children",
+                node_id,
+                child_node_ids.len(),
+                child_builders.len()
+            );
+        }
 
         // Check if this is a Motion container
         let is_motion = element.element_type_id() == ElementTypeId::Motion;
@@ -670,6 +1075,11 @@ impl RenderTree {
             },
         );
 
+        // Store per-node hashes for incremental update detection
+        let own_hash = DivHash::compute_element(element);
+        let tree_hash = DivHash::compute_element_tree(element);
+        self.node_hashes.insert(node_id, (own_hash, tree_hash));
+
         // Register event handlers if present
         if let Some(handlers) = element.event_handlers() {
             self.handler_registry.register(node_id, handlers.clone());
@@ -750,6 +1160,61 @@ impl RenderTree {
             }),
             ElementTypeId::Div => ElementType::Div,
             ElementTypeId::Motion => ElementType::Div, // Motion is a transparent container
+        }
+    }
+
+    /// Determine element type from a boxed element builder
+    fn determine_element_type_boxed(element: &dyn ElementBuilder) -> ElementType {
+        match element.element_type_id() {
+            ElementTypeId::Text => {
+                if let Some(info) = element.text_render_info() {
+                    ElementType::Text(TextData {
+                        content: info.content,
+                        font_size: info.font_size,
+                        color: info.color,
+                        align: info.align,
+                        weight: info.weight,
+                        v_align: info.v_align,
+                        wrap: info.wrap,
+                        line_height: info.line_height,
+                        measured_width: info.measured_width,
+                        font_family: info.font_family,
+                        word_spacing: info.word_spacing,
+                    })
+                } else {
+                    ElementType::Div
+                }
+            }
+            ElementTypeId::Svg => {
+                if let Some(info) = element.svg_render_info() {
+                    ElementType::Svg(SvgData {
+                        source: info.source,
+                        tint: info.tint,
+                    })
+                } else {
+                    ElementType::Div
+                }
+            }
+            ElementTypeId::Image => {
+                if let Some(info) = element.image_render_info() {
+                    ElementType::Image(ImageData {
+                        source: info.source,
+                        object_fit: info.object_fit,
+                        object_position: info.object_position,
+                        opacity: info.opacity,
+                        border_radius: info.border_radius,
+                        tint: info.tint,
+                        filter: info.filter,
+                    })
+                } else {
+                    ElementType::Div
+                }
+            }
+            ElementTypeId::Canvas => ElementType::Canvas(CanvasData {
+                render_fn: element.canvas_render_info(),
+            }),
+            ElementTypeId::Div => ElementType::Div,
+            ElementTypeId::Motion => ElementType::Div,
         }
     }
 
@@ -860,11 +1325,19 @@ impl RenderTree {
         local_x: f32,
         local_y: f32,
     ) {
+        let has_handler = self.handler_registry.has_handler(node_id, event_type);
+        tracing::debug!(
+            "dispatch_event_with_local: node={:?}, event_type={}, has_handler={}",
+            node_id,
+            event_type,
+            has_handler
+        );
+
         let ctx = crate::event_handler::EventContext::new(event_type, node_id)
             .with_mouse_pos(mouse_x, mouse_y)
             .with_local_pos(local_x, local_y);
 
-        if self.handler_registry.has_handler(node_id, event_type) {
+        if has_handler {
             self.handler_registry.dispatch(&ctx);
             // Don't auto-mark dirty - handlers update values in place
             // Rebuild only when explicitly requested via State::set() or structural changes
@@ -1914,6 +2387,10 @@ impl RenderTree {
         };
 
         let Some(render_node) = self.render_nodes.get(&node) else {
+            tracing::trace!(
+                "render_layer_with_motion: no render_node for {:?}, skipping",
+                node
+            );
             return;
         };
 

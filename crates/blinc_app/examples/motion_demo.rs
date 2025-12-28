@@ -12,17 +12,20 @@
 //!
 //! Run with: cargo run -p blinc_app --example motion_demo --features windowed
 
-use blinc_animation::{AnimatedValue, AnimationPreset, SpringConfig};
+use blinc_animation::{AnimationPreset, SpringConfig};
 use blinc_app::prelude::*;
 use blinc_app::windowed::{WindowedApp, WindowedContext};
 use blinc_core::Color;
-use blinc_layout::motion::{motion, SharedAnimatedValue, StaggerConfig};
+use blinc_layout::motion::{motion, StaggerConfig};
 use blinc_layout::widgets::scroll::Scroll;
 use std::sync::{Arc, Mutex};
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into()),
+        )
         .init();
 
     let config = WindowConfig {
@@ -68,11 +71,11 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                             .justify_center()
                             .gap(5.0)
                             .flex_wrap()
+                            .child(pull_to_refresh_demo(ctx))
                             .child(single_element_demo())
                             .child(stagger_forward_demo())
                             .child(stagger_reverse_demo())
-                            .child(stagger_center_demo())
-                            .child(pull_to_refresh_demo(ctx)),
+                            .child(stagger_center_demo()),
                     )
                     .child(api_showcase()),
             ),
@@ -175,25 +178,17 @@ impl blinc_layout::prelude::StateTransitions for PullState {
 /// - stateful() handles FSM for pointer events and state transitions
 fn pull_to_refresh_demo(ctx: &WindowedContext) -> Div {
     // AnimatedValue for content Y offset - drags content down
-    let content_offset_y: SharedAnimatedValue = Arc::new(Mutex::new(AnimatedValue::new(
-        ctx.animation_handle(),
-        0.0,
-        SpringConfig::wobbly(),
-    )));
+    // Using use_animated_value_for to persist across UI rebuilds
+    let content_offset_y =
+        ctx.use_animated_value_for("pull_refresh_content_offset", 0.0, SpringConfig::wobbly());
 
     // AnimatedValue for refresh icon scale - scales up when armed/refreshing
-    let icon_scale: SharedAnimatedValue = Arc::new(Mutex::new(AnimatedValue::new(
-        ctx.animation_handle(),
-        0.5,
-        SpringConfig::snappy(),
-    )));
+    let icon_scale =
+        ctx.use_animated_value_for("pull_refresh_icon_scale", 0.5, SpringConfig::snappy());
 
     // AnimatedValue for refresh icon opacity - fades in when pulling
-    let icon_opacity: SharedAnimatedValue = Arc::new(Mutex::new(AnimatedValue::new(
-        ctx.animation_handle(),
-        0.0,
-        SpringConfig::snappy(),
-    )));
+    let icon_opacity =
+        ctx.use_animated_value_for("pull_refresh_icon_opacity", 0.0, SpringConfig::snappy());
 
     // Track start Y position for drag calculation
     let drag_start_y = Arc::new(Mutex::new(0.0f32));

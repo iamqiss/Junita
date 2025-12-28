@@ -135,6 +135,13 @@ pub fn take_pending_subtree_rebuilds() -> Vec<PendingSubtreeRebuild> {
     std::mem::take(&mut *PENDING_SUBTREE_REBUILDS.lock().unwrap())
 }
 
+/// Check if there are pending subtree rebuilds without consuming them
+///
+/// Used to determine if layout recomputation is needed before processing.
+pub fn has_pending_subtree_rebuilds() -> bool {
+    !PENDING_SUBTREE_REBUILDS.lock().unwrap().is_empty()
+}
+
 /// Registry of stateful elements with signal dependencies
 ///
 /// Each entry is (deps, refresh_fn) where refresh_fn triggers a rebuild.
@@ -1810,23 +1817,13 @@ impl<S: StateTransitions> ElementBuilder for Stateful<S> {
             let shared = self.shared_state.lock().unwrap();
             let has_callback = shared.state_callback.is_some();
             let needs_update = shared.needs_visual_update;
-            tracing::debug!(
-                "Stateful::build - needs_visual_update={}, has_callback={}",
-                needs_update,
-                has_callback
-            );
             if needs_update && has_callback {
                 let callback = Arc::clone(shared.state_callback.as_ref().unwrap());
                 let state_copy = shared.state;
                 drop(shared); // Release lock before calling callback
 
-                tracing::debug!("Stateful::build - applying callback");
                 // Apply callback to the inner div
                 callback(&state_copy, &mut *self.inner.borrow_mut());
-
-                // Check children count after callback
-                let children_count = self.inner.borrow().children.len();
-                tracing::debug!("Stateful::build - after callback, children count={}", children_count);
 
                 // Mark as updated
                 self.shared_state.lock().unwrap().needs_visual_update = false;
@@ -1870,13 +1867,18 @@ impl<S: StateTransitions> ElementBuilder for Stateful<S> {
     }
 
     fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
-        // SAFETY: We use a raw pointer here because we need to return a reference
-        // to the children in the cache. The cache is stable during rendering.
-        // This is safe as long as children_builders() is only called during the
-        // render phase after build() has populated the cache.
+        // First check if cache is populated (after build)
+        // If not, return children from inner Div directly
+        // This is needed for incremental update analysis which calls children_builders()
+        // BEFORE build() is called on new element instances.
         unsafe {
             let cache = self.children_cache.as_ptr();
-            (*cache).as_slice()
+            if !(*cache).is_empty() {
+                return (*cache).as_slice();
+            }
+            // Cache is empty - return from inner Div directly
+            let inner = self.inner.as_ptr();
+            (*inner).children.as_slice()
         }
     }
 
@@ -1897,6 +1899,15 @@ impl<S: StateTransitions> ElementBuilder for Stateful<S> {
             } else {
                 Some(handlers)
             }
+        }
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        // SAFETY: Similar to children_builders - we use a raw pointer because
+        // RefCell can't return a reference to inner data directly.
+        unsafe {
+            let inner = self.inner.as_ptr();
+            Some(&(*inner).style)
         }
     }
 }
