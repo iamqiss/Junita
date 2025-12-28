@@ -121,7 +121,6 @@ fn build_ui(ctx: &mut WindowedContext) -> impl ElementBuilder {
         // Instructions
         .child(
             div()
-                .mt(20.0)
                 .p(20.0)
                 .rounded(12.0)
                 .bg(Color::rgba(1.0, 1.0, 1.0, 0.05))
@@ -229,13 +228,12 @@ fn modal_content(mgr: OverlayManager) -> Div {
 
 fn toast_content() -> Div {
     div()
-        .px(20.0)
-        .py(12.0)
-        .rounded(8.0)
+        .p(4.0)
+        .rounded(16.0)
         .bg(Color::rgba(0.2, 0.2, 0.25, 0.95))
         .shadow_lg()
         .flex_row()
-        .gap(12.0)
+        .gap(8.0)
         .items_center()
         .child(
             div()
@@ -250,7 +248,7 @@ fn toast_content() -> Div {
         .child(
             text("Action completed successfully!")
                 .size(14.0)
-                .color(Color::WHITE),
+                .color(Color::WHITE).v_center(),
         )
 }
 

@@ -600,6 +600,10 @@ impl ElementBuilder for Image {
             filter: self.filter.to_array(),
         })
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
+    }
 }
 
 /// Convenience function to create a new image element

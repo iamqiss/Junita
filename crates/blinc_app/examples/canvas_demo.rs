@@ -42,8 +42,8 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
         .h(ctx.height)
         .bg(Color::rgba(0.08, 0.08, 0.12, 1.0))
         .flex_col()
-        .gap(20.0)
-        .p(30.0)
+        .gap(10.0)
+        .p(10.0)
         // Title
         .child(text("Canvas Element Demo").size(28.0).color(Color::WHITE))
         .child(
@@ -57,7 +57,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                 .w_fit()
                 .flex_row()
                 .flex_wrap()
-                .gap(20.0)
+                .gap(10.0)
                 .child(demo_card("Simple Rectangle", simple_rectangle_canvas()))
                 .child(demo_card("Gradient Fill", gradient_canvas()))
                 .child(demo_card("Nested Shapes", nested_shapes_canvas()))
@@ -357,6 +357,7 @@ fn animated_demo_card(ctx: &WindowedContext) -> Div {
             .h(80.0),
         )
         .on_click(move |_| {
+            println!("Canvas clicked - toggling ball direction");
             // Toggle direction
             let mut is_right = click_is_right.borrow_mut();
             *is_right = !*is_right;

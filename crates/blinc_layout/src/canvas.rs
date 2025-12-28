@@ -237,6 +237,10 @@ impl ElementBuilder for Canvas {
     fn canvas_render_info(&self) -> Option<CanvasRenderFn> {
         self.render_fn.clone()
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
+    }
 }
 
 /// Data stored in the render tree for canvas elements

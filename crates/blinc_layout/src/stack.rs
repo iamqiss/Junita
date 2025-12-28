@@ -4,7 +4,7 @@
 //! and stack on top of each other. The last child in document order appears on top.
 
 use blinc_core::{Brush, Color, Shadow, Transform};
-use taffy::{Dimension, LengthPercentageAuto, Overflow, Position, Rect, Style};
+use taffy::{LengthPercentageAuto, Overflow, Position, Rect, Style};
 
 use crate::div::Div;
 use crate::element::{Material, RenderLayer, RenderProps};
@@ -892,26 +892,22 @@ impl ElementBuilder for Stack {
             Some(&self.inner.event_handlers)
         }
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
 }
 
 /// Internal wrapper that makes a child absolutely positioned
 struct StackChild {
     /// The actual child element, stored in a Vec for children_builders() to return a slice
     children: Vec<Box<dyn ElementBuilder>>,
+    /// The style for absolute positioning (stored for layout_style())
+    style: Style,
 }
 
 impl StackChild {
     fn new(child: Box<dyn ElementBuilder>) -> Self {
-        Self {
-            children: vec![child],
-        }
-    }
-}
-
-impl ElementBuilder for StackChild {
-    fn build(&self, tree: &mut LayoutTree) -> LayoutNodeId {
-        // Create a wrapper node with absolute positioning that fills the entire Stack
-        // Using inset: 0 on all sides makes the wrapper fill the containing block
         let mut style = Style::default();
         style.position = Position::Absolute;
         // Set all inset values to 0 to fill the entire containing block
@@ -926,10 +922,19 @@ impl ElementBuilder for StackChild {
         // Each Stack layer clips its own content so text doesn't bleed through
         style.overflow.x = Overflow::Clip;
         style.overflow.y = Overflow::Clip;
-        // With inset: 0 on all sides, size is determined by the inset, not explicit size
-        // So we leave size as Auto
 
-        let wrapper = tree.create_node(style);
+        Self {
+            children: vec![child],
+            style,
+        }
+    }
+}
+
+impl ElementBuilder for StackChild {
+    fn build(&self, tree: &mut LayoutTree) -> LayoutNodeId {
+        // Create a wrapper node with absolute positioning that fills the entire Stack
+        // Use the stored style so layout_style() returns the same style
+        let wrapper = tree.create_node(self.style.clone());
 
         // Build the child and add it to wrapper
         if let Some(child) = self.children.first() {
@@ -953,6 +958,11 @@ impl ElementBuilder for StackChild {
     fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
         // Return the wrapped child so render traversal can continue
         &self.children
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        // Return the stored style so incremental updates can update the taffy node
+        Some(&self.style)
     }
 }
 

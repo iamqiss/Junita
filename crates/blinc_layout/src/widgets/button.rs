@@ -564,4 +564,8 @@ impl ElementBuilder for Button {
         // Delegate to the inner Stateful which has the cached event handlers
         self.inner.event_handlers()
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
 }

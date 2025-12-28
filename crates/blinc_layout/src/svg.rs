@@ -268,6 +268,10 @@ impl ElementBuilder for Svg {
             tint: self.tint,
         })
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
+    }
 }
 
 /// Convenience function to create a new SVG element

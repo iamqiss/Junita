@@ -668,6 +668,10 @@ impl ElementBuilder for Motion {
     fn motion_bindings(&self) -> Option<MotionBindings> {
         self.get_motion_bindings()
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
+    }
 }
 
 #[cfg(test)]

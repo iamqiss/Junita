@@ -620,7 +620,16 @@ fn hash_element(element: &dyn ElementBuilder, hasher: &mut impl Hasher) {
     // Hash element type using discriminant
     std::mem::discriminant(&element.element_type_id()).hash(hasher);
 
-    // Hash render props
+    // Hash layout style (size, padding, margin, flex, etc.)
+    // This is critical for detecting layout changes like resize
+    if let Some(style) = element.layout_style() {
+        1u8.hash(hasher); // Marker that style is present
+        hash_style(style, hasher);
+    } else {
+        0u8.hash(hasher); // Marker that style is absent
+    }
+
+    // Hash render props (visual properties)
     hash_render_props(&element.render_props(), hasher);
 
     // Hash type-specific data
@@ -1182,7 +1191,11 @@ fn material_shadow_eq(a: &Option<crate::element::MaterialShadow>, b: &Option<cra
     }
 }
 
-fn render_props_eq(a: &RenderProps, b: &RenderProps) -> bool {
+/// Compare two RenderProps for equality.
+///
+/// This is used for visual change detection - comparing render-only
+/// properties to determine if only visual aspects changed.
+pub fn render_props_eq(a: &RenderProps, b: &RenderProps) -> bool {
     brush_eq(&a.background, &b.background)
         && a.border_radius == b.border_radius
         && a.layer == b.layer

@@ -471,6 +471,10 @@ impl ElementBuilder for Text {
             word_spacing: self.word_spacing,
         })
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
+    }
 }
 
 /// Convenience function to create a new text element

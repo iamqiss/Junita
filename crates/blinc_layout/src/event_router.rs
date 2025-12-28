@@ -345,6 +345,13 @@ impl EventRouter {
 
         // Hit test for the topmost element
         if let Some(hit) = self.hit_test(tree, x, y) {
+            tracing::debug!(
+                "on_mouse_down: hit node {:?} at ({:.1}, {:.1}), ancestors={:?}",
+                hit.node,
+                x,
+                y,
+                hit.ancestors
+            );
             self.pressed_target = Some(hit.node);
             // Store ancestors for bubbling on release
             self.pressed_ancestors = hit.ancestors.clone();
@@ -395,6 +402,14 @@ impl EventRouter {
         // Check if we were dragging
         let was_dragging = self.is_dragging;
 
+        tracing::debug!(
+            "on_mouse_up: pressed_target={:?}, was_dragging={}, pos=({:.1}, {:.1})",
+            self.pressed_target,
+            was_dragging,
+            x,
+            y
+        );
+
         // Release goes to the element where press started
         if let Some(target) = self.pressed_target.take() {
             // If we were dragging, emit DRAG_END before POINTER_UP
@@ -404,6 +419,7 @@ impl EventRouter {
             }
 
             // Emit to the target first
+            tracing::debug!("on_mouse_up: emitting POINTER_UP to target {:?}", target);
             self.emit_event(target, event_types::POINTER_UP);
             events.push((target, event_types::POINTER_UP));
 
@@ -433,11 +449,46 @@ impl EventRouter {
     /// Handle mouse leaving the window
     ///
     /// Emits POINTER_LEAVE to all currently hovered elements.
+    /// Also emits POINTER_UP to the pressed target if there is one (mouse left while dragging).
     pub fn on_mouse_leave(&mut self) -> Vec<(LayoutNodeId, u32)> {
-        // Collect nodes first to avoid borrow conflict
-        let nodes: Vec<_> = self.hovered.iter().copied().collect();
-        let mut events = Vec::with_capacity(nodes.len());
+        let mut events = Vec::new();
 
+        // If we were pressing/dragging, emit POINTER_UP to clean up state
+        // This handles the case where mouse leaves the window while dragging
+        if let Some(target) = self.pressed_target.take() {
+            tracing::debug!(
+                "on_mouse_leave: emitting POINTER_UP to pressed_target {:?} (mouse left window while pressing)",
+                target
+            );
+
+            // If we were dragging, emit DRAG_END before POINTER_UP
+            if self.is_dragging {
+                self.emit_event(target, event_types::DRAG_END);
+                events.push((target, event_types::DRAG_END));
+            }
+
+            self.emit_event(target, event_types::POINTER_UP);
+            events.push((target, event_types::POINTER_UP));
+
+            // Bubble through ancestors
+            let ancestors = std::mem::take(&mut self.pressed_ancestors);
+            for &ancestor in ancestors.iter().rev().skip(1) {
+                if self.is_dragging {
+                    self.emit_event(ancestor, event_types::DRAG_END);
+                    events.push((ancestor, event_types::DRAG_END));
+                }
+                self.emit_event(ancestor, event_types::POINTER_UP);
+                events.push((ancestor, event_types::POINTER_UP));
+            }
+
+            // Reset drag state
+            self.is_dragging = false;
+            self.drag_delta_x = 0.0;
+            self.drag_delta_y = 0.0;
+        }
+
+        // Emit POINTER_LEAVE to all hovered elements
+        let nodes: Vec<_> = self.hovered.iter().copied().collect();
         for node in nodes {
             self.emit_event(node, event_types::POINTER_LEAVE);
             events.push((node, event_types::POINTER_LEAVE));
@@ -824,6 +875,12 @@ impl EventRouter {
 
     /// Emit an event via the callback
     fn emit_event(&mut self, node: LayoutNodeId, event_type: u32) {
+        tracing::debug!(
+            "emit_event: node={:?}, event_type={}, has_callback={}",
+            node,
+            event_type,
+            self.event_callback.is_some()
+        );
         if let Some(ref mut callback) = self.event_callback {
             callback(node, event_type);
         }

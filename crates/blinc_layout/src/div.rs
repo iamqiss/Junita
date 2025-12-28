@@ -1901,6 +1901,14 @@ pub trait ElementBuilder {
     fn motion_bindings(&self) -> Option<crate::motion::MotionBindings> {
         None
     }
+
+    /// Get the layout style for this element
+    ///
+    /// This is used for hashing layout-affecting properties like size,
+    /// padding, margin, flex properties, etc.
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        None
+    }
 }
 
 impl ElementBuilder for Div {
@@ -1947,6 +1955,10 @@ impl ElementBuilder for Div {
         } else {
             Some(&self.event_handlers)
         }
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        Some(&self.style)
     }
 }
 

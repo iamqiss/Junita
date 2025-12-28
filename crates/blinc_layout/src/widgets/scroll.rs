@@ -1186,6 +1186,10 @@ impl ElementBuilder for Scroll {
     fn scroll_physics(&self) -> Option<SharedScrollPhysics> {
         Some(Arc::clone(&self.physics))
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
 }
 
 // ============================================================================

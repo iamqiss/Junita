@@ -932,6 +932,10 @@ impl ElementBuilder for Code {
     fn event_handlers(&self) -> Option<&crate::event_handler::EventHandlers> {
         ElementBuilder::event_handlers(&self.inner)
     }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
 }
 
 // ============================================================================
