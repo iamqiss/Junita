@@ -37,6 +37,7 @@ pub mod code;
 pub mod cursor;
 pub mod overlay;
 pub mod scroll;
+pub mod table;
 pub mod text_area;
 pub mod text_input;
 
@@ -102,4 +103,10 @@ pub use overlay::{
     overlay_events, overlay_manager, BackdropConfig, ContextMenuBuilder, Corner, DialogBuilder,
     DropdownBuilder, ModalBuilder, OverlayAnimation, OverlayConfig, OverlayHandle, OverlayKind,
     OverlayManager, OverlayManagerExt, OverlayPosition, OverlayState, ToastBuilder,
+};
+
+// Re-export table widget
+pub use table::{
+    cell, striped_tr, table, tbody, td, td_text, tfoot, th, th_text, thead, tr, TableBuilder,
+    TableCell,
 };

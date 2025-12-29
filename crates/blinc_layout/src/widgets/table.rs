@@ -59,25 +59,39 @@
 //! ```
 
 use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::div::{div, Div};
 use crate::text::{text, Text};
 
 // ============================================================================
-// Default Table Styling
+// Default Table Styling (from Theme)
 // ============================================================================
 
-/// Default background color for table headers
-const HEADER_BG: Color = Color::rgba(0.15, 0.15, 0.18, 1.0);
+/// Get header background color from theme
+fn header_bg() -> Color {
+    ThemeState::get().color(ColorToken::SurfaceOverlay)
+}
 
-/// Default border color
-const BORDER_COLOR: Color = Color::rgba(0.3, 0.3, 0.35, 1.0);
+/// Get border color from theme
+fn border_color() -> Color {
+    ThemeState::get().color(ColorToken::Border)
+}
 
-/// Default text color for header cells
-const HEADER_TEXT_COLOR: Color = Color::rgba(0.9, 0.9, 0.95, 1.0);
+/// Get header text color from theme
+fn header_text_color() -> Color {
+    ThemeState::get().color(ColorToken::TextPrimary)
+}
 
-/// Default text color for data cells
-const CELL_TEXT_COLOR: Color = Color::rgba(0.8, 0.8, 0.85, 1.0);
+/// Get cell text color from theme
+fn cell_text_color() -> Color {
+    ThemeState::get().color(ColorToken::TextSecondary)
+}
+
+/// Get alternating row color from theme (subtle accent)
+fn striped_bg() -> Color {
+    ThemeState::get().color(ColorToken::AccentSubtle)
+}
 
 /// Default cell padding (in pixels)
 const CELL_PADDING: f32 = 12.0;
@@ -126,7 +140,7 @@ pub fn table() -> Div {
 ///         .child(th("Value")))
 /// ```
 pub fn thead() -> Div {
-    div().flex_col().bg(HEADER_BG)
+    div().flex_col().bg(header_bg())
 }
 
 /// Create a table body section
@@ -156,7 +170,7 @@ pub fn tbody() -> Div {
 ///     .child(tr().child(td("Total: 100")))
 /// ```
 pub fn tfoot() -> Div {
-    div().flex_col().bg(HEADER_BG)
+    div().flex_col().bg(header_bg())
 }
 
 // ============================================================================
@@ -284,7 +298,7 @@ impl TableCell {
         div()
             .flex_row()
             .child(self)
-            .child(div().w(1.0).h_full().bg(BORDER_COLOR))
+            .child(div().w(1.0).h_full().bg(border_color()))
     }
 
     /// Convert to the underlying Div (for advanced customization)
@@ -324,7 +338,7 @@ impl crate::div::ElementBuilder for TableCell {
 pub fn th(content: impl Into<String>) -> TableCell {
     let txt = text(content)
         .size(DEFAULT_FONT_SIZE)
-        .color(HEADER_TEXT_COLOR)
+        .color(header_text_color())
         .bold();
 
     TableCell::new().child(txt)
@@ -341,7 +355,9 @@ pub fn th(content: impl Into<String>) -> TableCell {
 /// td("123.45").justify_end()  // Right-align numbers
 /// ```
 pub fn td(content: impl Into<String>) -> TableCell {
-    let txt = text(content).size(DEFAULT_FONT_SIZE).color(CELL_TEXT_COLOR);
+    let txt = text(content)
+        .size(DEFAULT_FONT_SIZE)
+        .color(cell_text_color());
 
     TableCell::new().child(txt)
 }
@@ -380,10 +396,10 @@ pub fn cell() -> TableCell {
 ///     .child(striped_tr(2).child(td("Row 2")))
 /// ```
 pub fn striped_tr(index: usize) -> Div {
-    let bg = if index.is_multiple_of(2) {
+    let bg = if index % 2 == 0 {
         Color::TRANSPARENT
     } else {
-        Color::rgba(0.1, 0.1, 0.12, 1.0)
+        striped_bg()
     };
 
     tr().bg(bg)
@@ -422,8 +438,8 @@ impl TableBuilder {
             headers: Vec::new(),
             rows: Vec::new(),
             striped: false,
-            header_bg: HEADER_BG,
-            border_color: BORDER_COLOR,
+            header_bg: header_bg(),
+            border_color: border_color(),
         }
     }
 
@@ -507,7 +523,7 @@ impl Default for TableBuilder {
 pub fn th_text(content: impl Into<String>) -> Text {
     text(content)
         .size(DEFAULT_FONT_SIZE)
-        .color(HEADER_TEXT_COLOR)
+        .color(header_text_color())
         .bold()
 }
 
@@ -516,7 +532,9 @@ pub fn th_text(content: impl Into<String>) -> Text {
 /// Returns a Text element that you can further style.
 /// Use `td()` if you need cell-level styling (padding, background).
 pub fn td_text(content: impl Into<String>) -> Text {
-    text(content).size(DEFAULT_FONT_SIZE).color(CELL_TEXT_COLOR)
+    text(content)
+        .size(DEFAULT_FONT_SIZE)
+        .color(cell_text_color())
 }
 
 #[cfg(test)]
@@ -525,8 +543,17 @@ mod tests {
     use crate::div::ElementBuilder;
     use crate::tree::LayoutTree;
 
+    fn init_theme() {
+        // Initialize theme if not already done (safe to call multiple times)
+        let _ = ThemeState::try_get().unwrap_or_else(|| {
+            ThemeState::init_default();
+            ThemeState::get()
+        });
+    }
+
     #[test]
     fn test_simple_table() {
+        init_theme();
         let mut tree = LayoutTree::new();
 
         let tbl = table()
@@ -539,6 +566,7 @@ mod tests {
 
     #[test]
     fn test_table_builder() {
+        init_theme();
         let mut tree = LayoutTree::new();
 
         let tbl = TableBuilder::new()
@@ -554,6 +582,7 @@ mod tests {
 
     #[test]
     fn test_cell_methods() {
+        init_theme();
         let mut tree = LayoutTree::new();
 
         let cell = td("Test")

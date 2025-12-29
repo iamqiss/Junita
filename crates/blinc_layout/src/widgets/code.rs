@@ -31,6 +31,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use blinc_core::{Brush, Color, CornerRadius, Rect};
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::canvas::canvas;
 use crate::div::{div, Div, ElementBuilder, ElementTypeId};
@@ -84,6 +85,7 @@ pub struct CodeConfig {
 
 impl Default for CodeConfig {
     fn default() -> Self {
+        let theme = ThemeState::get();
         Self {
             font_size: 13.0,
             line_height: 1.5,
@@ -92,13 +94,13 @@ impl Default for CodeConfig {
             padding: 16.0,
             corner_radius: 8.0,
             editable: false,
-            bg_color: Color::rgba(0.12, 0.12, 0.14, 1.0),
-            text_color: Color::rgba(0.9, 0.9, 0.9, 1.0),
-            line_number_color: Color::rgba(0.45, 0.45, 0.5, 1.0),
-            cursor_color: Color::rgba(0.4, 0.6, 1.0, 1.0),
-            selection_color: Color::rgba(0.4, 0.6, 1.0, 0.3),
-            gutter_bg_color: Color::rgba(0.10, 0.10, 0.12, 1.0),
-            gutter_separator_color: Color::rgba(0.2, 0.2, 0.22, 1.0),
+            bg_color: theme.color(ColorToken::Surface),
+            text_color: theme.color(ColorToken::TextPrimary),
+            line_number_color: theme.color(ColorToken::TextTertiary),
+            cursor_color: theme.color(ColorToken::Accent),
+            selection_color: theme.color(ColorToken::Selection),
+            gutter_bg_color: theme.color(ColorToken::SurfaceOverlay),
+            gutter_separator_color: theme.color(ColorToken::Border),
         }
     }
 }

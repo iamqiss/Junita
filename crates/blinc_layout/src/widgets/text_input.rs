@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::canvas::canvas;
 use crate::div::{div, Div, ElementBuilder};
@@ -840,22 +841,23 @@ pub struct TextInputConfig {
 
 impl Default for TextInputConfig {
     fn default() -> Self {
+        let theme = ThemeState::get();
         Self {
             width: 200.0,
             height: 44.0,
             use_full_width: false,
             font_size: 16.0,
-            text_color: Color::WHITE,
-            placeholder_color: Color::rgba(0.5, 0.5, 0.55, 1.0),
-            bg_color: Color::rgba(0.15, 0.15, 0.2, 1.0),
-            hover_bg_color: Color::rgba(0.18, 0.18, 0.23, 1.0),
-            focused_bg_color: Color::rgba(0.12, 0.12, 0.18, 1.0),
-            border_color: Color::rgba(0.3, 0.3, 0.35, 1.0),
-            hover_border_color: Color::rgba(0.4, 0.4, 0.45, 1.0),
-            focused_border_color: Color::rgba(0.4, 0.6, 1.0, 1.0),
-            error_border_color: Color::rgba(1.0, 0.3, 0.3, 1.0),
-            cursor_color: Color::rgba(0.4, 0.6, 1.0, 1.0),
-            selection_color: Color::rgba(0.3, 0.5, 0.9, 0.4),
+            text_color: theme.color(ColorToken::TextPrimary),
+            placeholder_color: theme.color(ColorToken::TextTertiary),
+            bg_color: theme.color(ColorToken::InputBg),
+            hover_bg_color: theme.color(ColorToken::InputBgHover),
+            focused_bg_color: theme.color(ColorToken::InputBgFocus),
+            border_color: theme.color(ColorToken::Border),
+            hover_border_color: theme.color(ColorToken::BorderHover),
+            focused_border_color: theme.color(ColorToken::BorderFocus),
+            error_border_color: theme.color(ColorToken::BorderError),
+            cursor_color: theme.color(ColorToken::Accent),
+            selection_color: theme.color(ColorToken::Selection),
             corner_radius: 8.0,
             border_width: 1.5,
             padding_x: 12.0,

@@ -11,6 +11,7 @@
 use std::sync::{Arc, Mutex};
 
 use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::canvas::canvas;
 use crate::div::{div, Div, ElementBuilder};
@@ -100,6 +101,7 @@ pub struct TextAreaConfig {
 
 impl Default for TextAreaConfig {
     fn default() -> Self {
+        let theme = ThemeState::get();
         Self {
             placeholder: String::new(),
             width: 300.0,
@@ -109,20 +111,20 @@ impl Default for TextAreaConfig {
             font_size: 14.0,
             line_height: 1.4,
             char_width_ratio: 0.6,
-            text_color: Color::rgba(0.9, 0.9, 0.9, 1.0),
-            placeholder_color: Color::rgba(0.5, 0.5, 0.5, 1.0),
-            bg_color: Color::rgba(0.15, 0.15, 0.2, 1.0),
-            hover_bg_color: Color::rgba(0.18, 0.18, 0.23, 1.0),
-            focused_bg_color: Color::rgba(0.18, 0.18, 0.25, 1.0),
-            border_color: Color::rgba(0.3, 0.3, 0.35, 1.0),
-            hover_border_color: Color::rgba(0.4, 0.4, 0.45, 1.0),
-            focused_border_color: Color::rgba(0.4, 0.6, 1.0, 1.0),
+            text_color: theme.color(ColorToken::TextPrimary),
+            placeholder_color: theme.color(ColorToken::TextTertiary),
+            bg_color: theme.color(ColorToken::InputBg),
+            hover_bg_color: theme.color(ColorToken::InputBgHover),
+            focused_bg_color: theme.color(ColorToken::InputBgFocus),
+            border_color: theme.color(ColorToken::Border),
+            hover_border_color: theme.color(ColorToken::BorderHover),
+            focused_border_color: theme.color(ColorToken::BorderFocus),
             border_width: 1.5,
             corner_radius: 8.0,
             padding_x: 12.0,
             padding_y: 10.0,
-            cursor_color: Color::rgba(0.4, 0.6, 1.0, 1.0),
-            selection_color: Color::rgba(0.4, 0.6, 1.0, 0.3),
+            cursor_color: theme.color(ColorToken::Accent),
+            selection_color: theme.color(ColorToken::Selection),
             disabled: false,
             max_length: 0,
             // Default to wrapping since we now have visual lines computed for proper

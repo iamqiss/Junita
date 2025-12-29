@@ -48,7 +48,6 @@ pub mod style;
 pub mod styled_text;
 pub mod svg;
 pub mod syntax;
-pub mod table;
 pub mod text;
 pub mod text_measure;
 pub mod text_selection;
@@ -296,7 +295,7 @@ pub mod prelude {
     };
 
     // Table elements
-    pub use crate::table::{
+    pub use crate::widgets::{
         cell, striped_tr, table, tbody, td, td_text, tfoot, th, th_text, thead, tr, TableBuilder,
         TableCell,
     };

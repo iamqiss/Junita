@@ -28,6 +28,7 @@ use std::sync::{Arc, Mutex};
 
 use blinc_core::reactive::SignalId;
 use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::div::{div, Div, ElementBuilder};
 use crate::element::RenderProps;
@@ -53,14 +54,15 @@ pub struct ButtonConfig {
 
 impl Default for ButtonConfig {
     fn default() -> Self {
+        let theme = ThemeState::get();
         Self {
             label: None,
-            text_color: Color::WHITE,
+            text_color: theme.color(ColorToken::TextInverse),
             text_size: 16.0,
-            bg_color: Color::rgba(0.2, 0.5, 0.9, 1.0),
-            hover_color: Color::rgba(0.3, 0.6, 1.0, 1.0),
-            pressed_color: Color::rgba(0.15, 0.4, 0.8, 1.0),
-            disabled_color: Color::rgba(0.3, 0.3, 0.35, 0.5),
+            bg_color: theme.color(ColorToken::Primary),
+            hover_color: theme.color(ColorToken::PrimaryHover),
+            pressed_color: theme.color(ColorToken::PrimaryActive),
+            disabled_color: theme.color(ColorToken::InputBgDisabled),
             disabled: false,
         }
     }

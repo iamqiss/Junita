@@ -20,6 +20,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::div::{div, Div, ElementBuilder};
 use crate::element::RenderProps;
@@ -82,18 +83,19 @@ pub struct CheckboxConfig {
 
 impl Default for CheckboxConfig {
     fn default() -> Self {
+        let theme = ThemeState::get();
         Self {
             label: None,
             size: 20.0,
             gap: 8.0,
-            unchecked_bg: Color::rgba(0.15, 0.15, 0.2, 1.0),
-            checked_bg: Color::rgba(0.2, 0.5, 0.9, 1.0),
+            unchecked_bg: theme.color(ColorToken::InputBg),
+            checked_bg: theme.color(ColorToken::Primary),
             hover_tint: 0.1,
-            check_color: Color::WHITE,
-            label_color: Color::rgba(0.9, 0.9, 0.9, 1.0),
+            check_color: theme.color(ColorToken::TextInverse),
+            label_color: theme.color(ColorToken::TextPrimary),
             label_font_size: 14.0,
             corner_radius: 4.0,
-            border_color: Color::rgba(0.3, 0.3, 0.35, 1.0),
+            border_color: theme.color(ColorToken::Border),
             border_width: 1.0,
             disabled_opacity: 0.5,
         }
