@@ -1,0 +1,28 @@
+[package]
+name = "blinc_theme"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+blinc_core = { path = "../blinc_core" }
+blinc_animation = { path = "../blinc_animation" }
+
+# Utilities
+tracing = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+# Data structures
+rustc-hash = { workspace = true }
+
+# Platform-specific dependencies for color scheme detection
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true, optional = true }
+objc2-foundation = { workspace = true, optional = true }
+
+[features]
+default = []
+platform-macos = ["objc2", "objc2-foundation"]
+# Enable system color scheme watcher (polls for system theme changes)
+watcher = []

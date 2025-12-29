@@ -47,6 +47,7 @@ pub const CURSOR_BLINK_INTERVAL_MS: u64 = 400;
 
 static GLOBAL_FOCUS_COUNT: AtomicU64 = AtomicU64::new(0);
 static NEEDS_REBUILD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static NEEDS_RELAYOUT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static NEEDS_CONTINUOUS_REDRAW: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 static FOCUSED_TEXT_INPUT: Mutex<Option<Weak<Mutex<TextInputData>>>> = Mutex::new(None);
@@ -103,6 +104,26 @@ pub fn take_needs_rebuild() -> bool {
 
 pub fn request_rebuild() {
     NEEDS_REBUILD.store(true, Ordering::SeqCst);
+}
+
+/// Check and clear the relayout flag
+pub fn take_needs_relayout() -> bool {
+    NEEDS_RELAYOUT.swap(false, Ordering::SeqCst)
+}
+
+/// Request a full rebuild with relayout
+///
+/// This triggers all three phases:
+/// 1. Tree rebuild - UI tree is reconstructed from builder functions
+/// 2. Layout recompute - Flexbox layout is recalculated
+/// 3. Visual redraw - Frame is rendered
+///
+/// Use this for theme changes or other global state that affects the entire UI.
+pub fn request_full_rebuild() {
+    NEEDS_REBUILD.store(true, Ordering::SeqCst);
+    NEEDS_RELAYOUT.store(true, Ordering::SeqCst);
+    // Also trigger stateful redraw to ensure visual updates
+    crate::stateful::request_redraw();
 }
 
 pub(crate) fn increment_focus_count() {

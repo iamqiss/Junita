@@ -92,4 +92,7 @@ pub mod prelude {
 
     // Derive macro for components
     pub use blinc_macros::BlincComponent;
+
+    // Theme types
+    pub use blinc_theme::{ColorScheme, ColorToken, RadiusToken, SpacingToken, ThemeState};
 }

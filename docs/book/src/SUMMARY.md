@@ -12,6 +12,7 @@
 
 - [Elements & Layout](./core/elements-layout.md)
 - [Styling & Materials](./core/styling-materials.md)
+- [Theming](./core/theming.md)
 - [Event Handling](./core/events.md)
 - [State Management](./core/state.md)
 

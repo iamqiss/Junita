@@ -851,6 +851,89 @@ impl WindowedContext {
             timeline
         }
     }
+
+    // =========================================================================
+    // Theme API
+    // =========================================================================
+
+    /// Get the current color scheme (light or dark)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let scheme = ctx.color_scheme();
+    /// match scheme {
+    ///     ColorScheme::Light => println!("Light mode"),
+    ///     ColorScheme::Dark => println!("Dark mode"),
+    /// }
+    /// ```
+    pub fn color_scheme(&self) -> blinc_theme::ColorScheme {
+        blinc_theme::ThemeState::get().scheme()
+    }
+
+    /// Set the color scheme (triggers smooth theme transition)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// ctx.set_color_scheme(ColorScheme::Dark);
+    /// ```
+    pub fn set_color_scheme(&self, scheme: blinc_theme::ColorScheme) {
+        blinc_theme::ThemeState::get().set_scheme(scheme);
+    }
+
+    /// Toggle between light and dark mode
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// button("Toggle Theme").on_click(|ctx| {
+    ///     ctx.toggle_color_scheme();
+    /// })
+    /// ```
+    pub fn toggle_color_scheme(&self) {
+        blinc_theme::ThemeState::get().toggle_scheme();
+    }
+
+    /// Get a color from the current theme
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_theme::ColorToken;
+    ///
+    /// let primary = ctx.theme_color(ColorToken::Primary);
+    /// let bg = ctx.theme_color(ColorToken::Background);
+    /// ```
+    pub fn theme_color(&self, token: blinc_theme::ColorToken) -> blinc_core::Color {
+        blinc_theme::ThemeState::get().color(token)
+    }
+
+    /// Get spacing from the current theme
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_theme::SpacingToken;
+    ///
+    /// let padding = ctx.theme_spacing(SpacingToken::Space4); // 16px
+    /// ```
+    pub fn theme_spacing(&self, token: blinc_theme::SpacingToken) -> f32 {
+        blinc_theme::ThemeState::get().spacing_value(token)
+    }
+
+    /// Get border radius from the current theme
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_theme::RadiusToken;
+    ///
+    /// let radius = ctx.theme_radius(RadiusToken::Lg); // 8px
+    /// ```
+    pub fn theme_radius(&self, token: blinc_theme::RadiusToken) -> f32 {
+        blinc_theme::ThemeState::get().radius(token)
+    }
 }
 
 /// Windowed application runner
@@ -873,6 +956,36 @@ impl WindowedApp {
 
         // Try to set the global loader (ignore error if already set)
         let _ = set_global_asset_loader(Box::new(loader));
+    }
+
+    /// Initialize the theme system with platform detection
+    ///
+    /// This sets up the global ThemeState with:
+    /// - Platform-appropriate theme bundle (macOS, Windows, Linux, etc.)
+    /// - System color scheme detection (light/dark mode)
+    /// - Redraw callback to trigger UI updates on theme changes
+    #[cfg(all(feature = "windowed", not(target_os = "android")))]
+    fn init_theme() {
+        use blinc_theme::{
+            detect_system_color_scheme, platform_theme_bundle, set_redraw_callback, ThemeState,
+        };
+
+        // Only initialize if not already initialized
+        if ThemeState::try_get().is_none() {
+            let bundle = platform_theme_bundle();
+            let scheme = detect_system_color_scheme();
+            ThemeState::init(bundle, scheme);
+        }
+
+        // Set up the redraw callback to trigger full UI rebuilds when theme changes
+        // We use request_full_rebuild() to trigger all three phases:
+        // 1. Tree rebuild - reconstruct UI with new theme values
+        // 2. Layout recompute - recalculate flexbox layout
+        // 3. Visual redraw - render the frame
+        set_redraw_callback(|| {
+            tracing::info!("Theme changed - requesting full rebuild");
+            blinc_layout::widgets::request_full_rebuild();
+        });
     }
 
     /// Run a windowed Blinc application on desktop platforms
@@ -920,6 +1033,9 @@ impl WindowedApp {
         // Initialize the text measurer for accurate text layout
         crate::text_measurer::init_text_measurer();
 
+        // Initialize the theme system with platform detection
+        Self::init_theme();
+
         let platform = DesktopPlatform::new().map_err(|e| BlincError::Platform(e.to_string()))?;
         let event_loop = platform
             .create_event_loop_with_config(config)
@@ -965,6 +1081,10 @@ impl WindowedApp {
                 }
             });
         }
+
+        // Connect theme animation to the animation scheduler
+        // This enables smooth color transitions when switching between light/dark mode
+        blinc_theme::ThemeState::get().set_scheduler(&animations);
 
         // Render state: dynamic properties that update every frame without tree rebuild
         // This includes cursor blink, animated colors, hover states, etc.
@@ -1600,6 +1720,12 @@ impl WindowedApp {
                                 needs_rebuild = true;
                             }
 
+                            // Check if a full relayout was requested (e.g., theme changes)
+                            if blinc_layout::widgets::take_needs_relayout() {
+                                tracing::debug!("Relayout triggered by: theme or global state change");
+                                needs_relayout = true;
+                            }
+
                             // Check if stateful elements requested a redraw (hover/press changes)
                             // Apply incremental prop updates without full rebuild
                             if blinc_layout::take_needs_redraw() {
@@ -1736,6 +1862,9 @@ impl WindowedApp {
                             let current_time = elapsed_ms();
                             let _animations_active = rs.tick(current_time);
 
+                            // Tick theme animation (handles color interpolation during theme transitions)
+                            let theme_animating = blinc_theme::ThemeState::get().tick();
+
                             // Tick scroll physics for bounce-back animations
                             let scroll_animating = if let Some(ref mut tree) = render_tree {
                                 tree.tick_scroll_physics(current_time)
@@ -1823,7 +1952,7 @@ impl WindowedApp {
                                 mgr.take_dirty() || mgr.has_visible_overlays()
                             };
 
-                            if needs_animation_redraw || needs_cursor_redraw || needs_motion_redraw || scroll_animating || needs_overlay_redraw {
+                            if needs_animation_redraw || needs_cursor_redraw || needs_motion_redraw || scroll_animating || needs_overlay_redraw || theme_animating {
                                 // Request another frame to render updated animation values
                                 // For cursor blink, also re-request continuous redraw for next frame
                                 if needs_cursor_redraw {
