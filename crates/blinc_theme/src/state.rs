@@ -127,12 +127,17 @@ impl ThemeState {
         *self.scheduler_handle.write().unwrap() = Some(handle);
     }
 
-    /// Initialize with default Blinc theme and system color scheme
+    /// Initialize with platform-native theme and system color scheme
+    ///
+    /// Detects the current OS and uses the appropriate native theme:
+    /// - macOS: Apple Human Interface Guidelines theme
+    /// - Windows: Fluent Design System 2 theme
+    /// - Linux: GNOME Adwaita theme
     pub fn init_default() {
         use crate::platform::detect_system_color_scheme;
-        use crate::themes::BlincTheme;
+        use crate::themes::platform::platform_theme_bundle;
 
-        let bundle = BlincTheme::bundle();
+        let bundle = platform_theme_bundle();
         let scheme = detect_system_color_scheme();
         Self::init(bundle, scheme);
     }
