@@ -48,8 +48,7 @@
 //! Built-in themes:
 //!
 //! - [`BlincTheme`]: Default theme derived from Catppuccin design system
-//! - [`MacOSTheme`]: macOS Aqua/Big Sur design language (when compiled for macOS)
-//! - Platform-specific themes for Windows, Linux, iOS, Android
+//! - Platform-specific themes for macOS, Windows, Linux, iOS, Android
 //!
 //! # Dynamic Overrides
 //!

@@ -111,10 +111,12 @@ impl Default for FontFamily {
 /// Font weight values
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
+#[derive(Default)]
 pub enum FontWeight {
     Thin = 100,
     ExtraLight = 200,
     Light = 300,
+    #[default]
     Normal = 400,
     Medium = 500,
     Semibold = 600,
@@ -126,12 +128,6 @@ pub enum FontWeight {
 impl FontWeight {
     pub fn as_u16(self) -> u16 {
         self as u16
-    }
-}
-
-impl Default for FontWeight {
-    fn default() -> Self {
-        Self::Normal
     }
 }
 

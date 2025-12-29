@@ -121,10 +121,7 @@ impl SystemSchemeWatcher {
     fn watch_loop(stop_signal: Arc<AtomicBool>, interval: Duration) {
         let mut last_scheme: Option<ColorScheme> = None;
 
-        tracing::debug!(
-            "System scheme watcher started (interval: {:?})",
-            interval
-        );
+        tracing::debug!("System scheme watcher started (interval: {:?})", interval);
 
         while !stop_signal.load(Ordering::SeqCst) {
             // Detect current system scheme
@@ -144,10 +141,7 @@ impl SystemSchemeWatcher {
                         theme.set_scheme(current_scheme);
                     }
                 } else {
-                    tracing::debug!(
-                        "Initial system color scheme detected: {:?}",
-                        current_scheme
-                    );
+                    tracing::debug!("Initial system color scheme detected: {:?}", current_scheme);
                 }
 
                 last_scheme = Some(current_scheme);

@@ -33,6 +33,7 @@ fn trigger_redraw() {
 }
 
 /// Theme transition animation state
+#[derive(Default)]
 struct ThemeTransition {
     /// Animated progress value (0.0 = old theme, 1.0 = new theme)
     /// Uses AnimatedValue which is automatically ticked by the animation scheduler
@@ -41,16 +42,6 @@ struct ThemeTransition {
     from_colors: Option<ColorTokens>,
     /// Colors from the new theme (target)
     to_colors: Option<ColorTokens>,
-}
-
-impl Default for ThemeTransition {
-    fn default() -> Self {
-        Self {
-            progress: None,
-            from_colors: None,
-            to_colors: None,
-        }
-    }
 }
 
 /// Global theme state - accessed directly by widgets during render

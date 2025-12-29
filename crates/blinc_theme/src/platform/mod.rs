@@ -66,7 +66,7 @@ impl Platform {
 pub fn detect_system_color_scheme() -> ColorScheme {
     #[cfg(target_os = "macos")]
     {
-        return macos::detect_color_scheme();
+        macos::detect_color_scheme()
     }
 
     #[cfg(target_os = "windows")]

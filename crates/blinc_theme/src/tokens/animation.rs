@@ -14,10 +14,11 @@ pub enum AnimationToken {
 }
 
 /// Easing function type
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum Easing {
     Linear,
     EaseIn,
+    #[default]
     EaseOut,
     EaseInOut,
     /// Custom cubic bezier (x1, y1, x2, y2)
@@ -44,12 +45,6 @@ impl Easing {
                 cubic_bezier_approximate(t, *x1, *y1, *x2, *y2)
             }
         }
-    }
-}
-
-impl Default for Easing {
-    fn default() -> Self {
-        Easing::EaseOut
     }
 }
 
