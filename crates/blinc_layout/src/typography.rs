@@ -50,7 +50,7 @@
 //!     .shadow(Shadow::new(0.0, 2.0, 4.0, Color::BLACK.with_alpha(0.5)))
 //! ```
 
-use blinc_core::Color;
+use blinc_theme::{ColorToken, ThemeState};
 
 use crate::text::{text, Text};
 
@@ -250,8 +250,9 @@ pub fn label(content: impl Into<String>) -> Text {
 /// muted("Less important information")
 /// ```
 pub fn muted(content: impl Into<String>) -> Text {
+    let theme = ThemeState::get();
     text(content)
-        .color(Color::rgba(0.6, 0.6, 0.65, 1.0))
+        .color(theme.color(ColorToken::TextSecondary))
         .no_wrap()
 }
 
@@ -278,9 +279,10 @@ pub fn p(content: impl Into<String>) -> Text {
 /// caption("Figure 1: Architecture diagram")
 /// ```
 pub fn caption(content: impl Into<String>) -> Text {
+    let theme = ThemeState::get();
     text(content)
         .size(12.0)
-        .color(Color::rgba(0.5, 0.5, 0.55, 1.0))
+        .color(theme.color(ColorToken::TextTertiary))
         .no_wrap()
 }
 

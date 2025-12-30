@@ -8,8 +8,12 @@
 //! - Built-in styling that just works
 //! - Inherits ALL Div methods for full layout control via Deref
 
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 
+use blinc_core::reactive::SignalId;
 use blinc_core::Color;
 use blinc_theme::{ColorToken, ThemeState};
 
@@ -215,6 +219,13 @@ pub struct TextAreaState {
     /// This is used to accurately determine which line was clicked when local_y
     /// is relative to the clicked line element rather than the whole text area.
     pub(crate) clicked_visual_line: Option<usize>,
+    /// Change version counter - increments on each text change
+    /// Use this with `signal_id()` to depend on text changes from external components
+    pub(crate) change_version: Arc<AtomicU64>,
+    /// Signal ID for the change version (set externally when binding to reactive system)
+    pub(crate) change_signal_id: Option<SignalId>,
+    /// Layout bounds storage - updated after layout to get actual rendered dimensions
+    pub layout_bounds_storage: crate::renderer::LayoutBoundsStorage,
 }
 
 impl std::fmt::Debug for TextAreaState {
@@ -254,6 +265,9 @@ impl Default for TextAreaState {
             visual_lines: Vec::new(), // Computed on first layout
             stateful_state: None,
             clicked_visual_line: None, // Set by line click handlers
+            change_version: Arc::new(AtomicU64::new(0)),
+            change_signal_id: None,
+            layout_bounds_storage: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -330,6 +344,44 @@ impl TextAreaState {
         self.visual.is_focused()
     }
 
+    /// Get the signal ID for text change notifications
+    ///
+    /// Use this to depend on text changes from external components.
+    /// Returns None if no signal has been set.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let text_state = ctx.use_state_keyed("editor", || Arc::new(Mutex::new(TextAreaState::new())));
+    /// let state = text_state.get();
+    ///
+    /// // Set up a signal for the text area
+    /// let change_signal = ctx.use_signal(0u64);
+    /// state.lock().unwrap().set_change_signal(change_signal.id());
+    ///
+    /// // Use the signal as a dependency for live preview
+    /// stateful(preview_state)
+    ///     .deps(&[state.lock().unwrap().signal_id().unwrap()])
+    ///     .child(markdown_light(&state.lock().unwrap().value()))
+    /// ```
+    pub fn signal_id(&self) -> Option<SignalId> {
+        self.change_signal_id
+    }
+
+    /// Set the signal ID for text change notifications
+    ///
+    /// When text changes, this signal will be notified (via check_stateful_deps).
+    pub fn set_change_signal(&mut self, signal_id: SignalId) {
+        self.change_signal_id = Some(signal_id);
+    }
+
+    /// Get the current change version
+    ///
+    /// This increments each time text is modified.
+    pub fn change_version(&self) -> u64 {
+        self.change_version.load(Ordering::SeqCst)
+    }
+
     /// Check if cursor should be visible based on current time
     /// Returns true if cursor is in the "on" phase of blinking
     pub fn is_cursor_visible(&self, current_time_ms: u64) -> bool {
@@ -357,7 +409,7 @@ impl TextAreaState {
         if text.contains('\n') {
             for (i, part) in text.split('\n').enumerate() {
                 if i > 0 {
-                    self.insert_newline();
+                    self.insert_newline_internal();
                 }
                 self.insert_text(part);
             }
@@ -375,6 +427,11 @@ impl TextAreaState {
 
     /// Insert a newline at cursor
     pub fn insert_newline(&mut self) {
+        self.insert_newline_internal();
+    }
+
+    /// Internal newline insertion (no notify)
+    fn insert_newline_internal(&mut self) {
         self.delete_selection();
 
         let line_idx = self.cursor.line.min(self.lines.len().saturating_sub(1));
@@ -1408,7 +1465,7 @@ impl TextArea {
             })
             // Handle text input
             .on_event(event_types::TEXT_INPUT, move |ctx| {
-                let needs_refresh = {
+                let (needs_refresh, change_signal) = {
                     let mut d = match data_for_text.lock() {
                         Ok(d) => d,
                         Err(_) => return,
@@ -1428,15 +1485,20 @@ impl TextArea {
                         let viewport_height = d.viewport_height;
                         d.ensure_cursor_visible(line_height, viewport_height);
                         tracing::debug!("TextArea received char: {:?}, value: {}", c, d.value());
-                        true
+                        (true, d.change_signal_id)
                     } else {
-                        false
+                        (false, None)
                     }
                 }; // Lock released here
 
                 // Trigger incremental refresh AFTER releasing the data lock
                 if needs_refresh {
                     refresh_stateful(&shared_for_text);
+                }
+
+                // Notify external listeners of text change
+                if let Some(signal_id) = change_signal {
+                    crate::stateful::check_stateful_deps(&[signal_id]);
                 }
             })
             // Handle key down for navigation and deletion
@@ -1519,7 +1581,14 @@ impl TextArea {
                         d.ensure_cursor_visible(line_height, viewport_height);
                     }
 
-                    (cursor_changed, should_blur)
+                    // Get change signal ID if text changed
+                    let change_signal = if text_changed {
+                        d.change_signal_id
+                    } else {
+                        None
+                    };
+
+                    (cursor_changed, should_blur, change_signal)
                 }; // Lock released here
 
                 // Handle blur (Escape key)
@@ -1528,6 +1597,11 @@ impl TextArea {
                 } else if needs_refresh.0 {
                     // Trigger incremental refresh AFTER releasing the data lock
                     refresh_stateful(&shared_for_key);
+                }
+
+                // Notify external listeners of text change
+                if let Some(signal_id) = needs_refresh.2 {
+                    crate::stateful::check_stateful_deps(&[signal_id]);
                 }
             })
         // Note: Scroll events are handled by the scroll() widget inside build_content
@@ -2240,6 +2314,36 @@ impl TextArea {
         self.inner = std::mem::take(&mut self.inner).on_scroll(handler);
         self
     }
+
+    /// Set a signal ID to be notified when text content changes
+    ///
+    /// When the text area content is modified (typing, deletion, paste, etc.),
+    /// this signal will be triggered via `check_stateful_deps`, causing any
+    /// stateful elements that depend on this signal to rebuild.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let markdown_state = ctx.use_state_keyed("editor", || {
+    ///     Arc::new(Mutex::new(TextAreaState::new()))
+    /// });
+    ///
+    /// // Editor panel
+    /// text_area(&markdown_state.get())
+    ///     .on_change_signal(markdown_state.signal_id())
+    ///
+    /// // Preview panel - will rebuild when text changes
+    /// stateful(preview_state)
+    ///     .deps(&[markdown_state.signal_id()])
+    ///     .on_state(|_, container| { ... })
+    /// ```
+    pub fn on_change_signal(self, signal_id: SignalId) -> Self {
+        // Store the signal ID in the TextAreaState
+        if let Ok(mut state) = self.state.lock() {
+            state.set_change_signal(signal_id);
+        }
+        self
+    }
 }
 
 /// Create a ready-to-use multi-line text area
@@ -2294,6 +2398,73 @@ impl ElementBuilder for TextArea {
 
     fn layout_style(&self) -> Option<&taffy::Style> {
         self.inner.layout_style()
+    }
+
+    fn layout_bounds_storage(&self) -> Option<crate::renderer::LayoutBoundsStorage> {
+        // Return the layout bounds storage from the state so it gets updated after layout
+        if let Ok(data) = self.state.lock() {
+            Some(Arc::clone(&data.layout_bounds_storage))
+        } else {
+            None
+        }
+    }
+
+    fn layout_bounds_callback(&self) -> Option<crate::renderer::LayoutBoundsCallback> {
+        // When layout bounds change, update config dimensions and trigger refresh
+        let config = Arc::clone(&self.config);
+        let state = Arc::clone(&self.state);
+        let stateful_state = self.inner.shared_state();
+        Some(Arc::new(move |bounds| {
+            let mut needs_refresh = false;
+
+            if let Ok(mut cfg) = config.lock() {
+                let new_width = bounds.width;
+                let new_height = bounds.height;
+
+                // Check if width changed significantly
+                let width_changed = (cfg.width - new_width).abs() > 1.0;
+                // Check if height changed significantly
+                let height_changed = (cfg.height - new_height).abs() > 1.0;
+
+                if width_changed || height_changed {
+                    if width_changed {
+                        cfg.width = new_width;
+                    }
+                    if height_changed {
+                        cfg.height = new_height;
+                    }
+
+                    // Update state with new dimensions
+                    if let Ok(mut data) = state.lock() {
+                        if width_changed {
+                            data.available_width =
+                                new_width - cfg.padding_x * 2.0 - cfg.border_width * 2.0;
+                            // Recompute visual lines with new width
+                            data.compute_visual_lines();
+                        }
+
+                        if height_changed {
+                            // Update viewport height for scroll calculations
+                            let viewport_height =
+                                new_height - cfg.padding_y * 2.0 - cfg.border_width * 2.0;
+                            data.viewport_height = viewport_height;
+
+                            // Update scroll physics viewport
+                            if let Ok(mut p) = data.scroll_physics.lock() {
+                                p.viewport_height = viewport_height;
+                            }
+                        }
+                    }
+
+                    needs_refresh = true;
+                }
+            }
+
+            if needs_refresh {
+                // Trigger a visual update
+                crate::stateful::refresh_stateful(&stateful_state);
+            }
+        }))
     }
 }
 

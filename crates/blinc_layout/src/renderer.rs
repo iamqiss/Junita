@@ -83,7 +83,7 @@ pub struct TextData {
     pub word_spacing: f32,
 }
 
-/// A color span within styled text
+/// A styled span within rich text
 #[derive(Clone, Debug)]
 pub struct StyledTextSpan {
     /// Start byte index in text
@@ -92,6 +92,46 @@ pub struct StyledTextSpan {
     pub end: usize,
     /// RGBA color
     pub color: [f32; 4],
+    /// Whether text is bold
+    pub bold: bool,
+    /// Whether text is italic
+    pub italic: bool,
+    /// Whether text has underline decoration
+    pub underline: bool,
+    /// Whether text has strikethrough decoration
+    pub strikethrough: bool,
+    /// Optional link URL (for clickable spans)
+    pub link_url: Option<String>,
+}
+
+impl StyledTextSpan {
+    /// Create a new styled text span with just color (no decorations)
+    pub fn new(start: usize, end: usize, color: [f32; 4]) -> Self {
+        Self {
+            start,
+            end,
+            color,
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            link_url: None,
+        }
+    }
+
+    /// Create from a TextSpan (from styled_text module)
+    pub fn from_text_span(span: &crate::styled_text::TextSpan) -> Self {
+        Self {
+            start: span.start,
+            end: span.end,
+            color: span.color.to_array(),
+            bold: span.bold,
+            italic: span.italic,
+            underline: span.underline,
+            strikethrough: span.strikethrough,
+            link_url: span.link_url.clone(),
+        }
+    }
 }
 
 /// Styled text data for rendering with multiple color spans

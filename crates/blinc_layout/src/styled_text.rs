@@ -36,6 +36,14 @@ pub struct TextSpan {
     pub color: Color,
     /// Whether text is bold
     pub bold: bool,
+    /// Whether text is italic
+    pub italic: bool,
+    /// Whether text has underline decoration
+    pub underline: bool,
+    /// Whether text has strikethrough decoration
+    pub strikethrough: bool,
+    /// Optional link URL (for clickable text spans)
+    pub link_url: Option<String>,
     /// Token type (for intellisense callbacks)
     pub token_type: Option<TokenType>,
 }
@@ -48,6 +56,10 @@ impl TextSpan {
             end,
             color,
             bold,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            link_url: None,
             token_type: None,
         }
     }
@@ -61,6 +73,47 @@ impl TextSpan {
     pub fn with_token_type(mut self, token_type: TokenType) -> Self {
         self.token_type = Some(token_type);
         self
+    }
+
+    /// Set italic style
+    pub fn with_italic(mut self, italic: bool) -> Self {
+        self.italic = italic;
+        self
+    }
+
+    /// Set underline decoration
+    pub fn with_underline(mut self, underline: bool) -> Self {
+        self.underline = underline;
+        self
+    }
+
+    /// Set strikethrough decoration
+    pub fn with_strikethrough(mut self, strikethrough: bool) -> Self {
+        self.strikethrough = strikethrough;
+        self
+    }
+
+    /// Set link URL for clickable span
+    pub fn with_link(mut self, url: impl Into<String>) -> Self {
+        self.link_url = Some(url.into());
+        self
+    }
+
+    /// Create an italic span
+    pub fn italic(start: usize, end: usize, color: Color) -> Self {
+        Self::new(start, end, color, false).with_italic(true)
+    }
+
+    /// Create a bold italic span
+    pub fn bold_italic(start: usize, end: usize, color: Color) -> Self {
+        Self::new(start, end, color, true).with_italic(true)
+    }
+
+    /// Create a link span (underlined by default)
+    pub fn link(start: usize, end: usize, color: Color, url: impl Into<String>) -> Self {
+        Self::new(start, end, color, false)
+            .with_underline(true)
+            .with_link(url)
     }
 }
 

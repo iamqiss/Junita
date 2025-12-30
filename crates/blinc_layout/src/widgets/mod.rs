@@ -31,10 +31,14 @@
 //! }
 //! ```
 
+pub mod blockquote;
 pub mod button;
 pub mod checkbox;
 pub mod code;
 pub mod cursor;
+pub mod hr;
+pub mod link;
+pub mod list;
 pub mod overlay;
 pub mod scroll;
 pub mod table;
@@ -109,4 +113,19 @@ pub use overlay::{
 pub use table::{
     cell, striped_tr, table, tbody, td, td_text, tfoot, th, th_text, thead, tr, TableBuilder,
     TableCell,
+};
+
+// Re-export blockquote widget
+pub use blockquote::{blockquote, blockquote_with_config, Blockquote, BlockquoteConfig};
+
+// Re-export horizontal rule widget
+pub use hr::{hr, hr_color, hr_thick, hr_with_config, HrConfig};
+
+// Re-export link widget
+pub use link::{link, Link, LinkConfig};
+
+// Re-export list widgets
+pub use list::{
+    li, ol, ol_start, ol_start_with_config, ol_with_config, task_item, task_item_with_config, ul,
+    ul_with_config, ListConfig, ListItem, ListMarker, OrderedList, TaskListItem, UnorderedList,
 };

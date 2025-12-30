@@ -28,3 +28,6 @@ tracing.workspace = true
 
 # Regex for syntax highlighting
 regex.workspace = true
+
+# Markdown parsing
+pulldown-cmark = "0.10"

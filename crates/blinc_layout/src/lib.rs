@@ -55,6 +55,9 @@ pub mod tree;
 pub mod typography;
 pub mod widgets;
 
+// Markdown rendering
+pub mod markdown;
+
 // Core types
 pub use element::{
     DynRenderProps, ElementBounds, MotionAnimation, MotionKeyframe, RenderLayer, RenderProps,
@@ -305,5 +308,17 @@ pub mod prelude {
         overlay_events, overlay_manager, BackdropConfig, ContextMenuBuilder, Corner, DialogBuilder,
         DropdownBuilder, ModalBuilder, OverlayAnimation, OverlayConfig, OverlayHandle, OverlayKind,
         OverlayManager, OverlayManagerExt, OverlayPosition, OverlayState, ToastBuilder,
+    };
+
+    // Markdown rendering
+    pub use crate::markdown::{
+        markdown, markdown_light, markdown_with_config, MarkdownConfig, MarkdownRenderer,
+    };
+
+    // Additional markdown widgets
+    pub use crate::widgets::{
+        blockquote, blockquote_with_config, hr, hr_color, hr_thick, hr_with_config, li, link, ol,
+        ol_start, task_item, ul, Blockquote, BlockquoteConfig, HrConfig, Link, LinkConfig,
+        ListConfig, ListItem, ListMarker, OrderedList, TaskListItem, UnorderedList,
     };
 }
