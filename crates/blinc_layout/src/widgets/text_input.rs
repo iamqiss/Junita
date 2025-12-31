@@ -1175,6 +1175,8 @@ impl TextInput {
                     refresh_stateful(&stateful_for_key);
                 }
             })
+            // Set text cursor (I-beam) for text input
+            .cursor_text()
     }
 
     /// Build the content div based on current visual state and data

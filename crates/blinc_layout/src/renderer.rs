@@ -3306,6 +3306,45 @@ impl RenderTree {
         self.render_nodes.get(&node)
     }
 
+    /// Get the cursor style for a node
+    ///
+    /// Returns the cursor style if set on this node, None if not set.
+    pub fn get_cursor(&self, node: LayoutNodeId) -> Option<crate::element::CursorStyle> {
+        self.render_nodes
+            .get(&node)
+            .and_then(|n| n.props.cursor)
+    }
+
+    /// Get the cursor style for the topmost hovered element at a point
+    ///
+    /// Walks up the ancestor chain starting from the topmost element,
+    /// returning the first cursor style found. This allows child elements
+    /// to override parent cursor styles.
+    pub fn get_cursor_at(
+        &self,
+        router: &crate::event_router::EventRouter,
+        x: f32,
+        y: f32,
+    ) -> Option<crate::element::CursorStyle> {
+        // Hit test to find topmost element
+        let hit = router.hit_test(self, x, y)?;
+
+        // Check the hit node first
+        if let Some(cursor) = self.get_cursor(hit.node) {
+            return Some(cursor);
+        }
+
+        // Walk up ancestors (from leaf towards root) to find first cursor
+        // Ancestors are stored from root to leaf, so iterate in reverse
+        for &ancestor in hit.ancestors.iter().rev() {
+            if let Some(cursor) = self.get_cursor(ancestor) {
+                return Some(cursor);
+            }
+        }
+
+        None
+    }
+
     /// Iterate over all nodes with their bounds and render props
     pub fn iter_nodes(&self) -> impl Iterator<Item = (LayoutNodeId, &RenderNode)> {
         self.render_nodes.iter().map(|(&id, node)| (id, node))

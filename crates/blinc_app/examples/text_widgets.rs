@@ -74,6 +74,8 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .size(20.0)
                         .color(Color::rgba(0.7, 0.7, 0.7, 1.0)),
                 )
+                // Link test - clicking opens URL in browser by default
+                .child(link("Visit documentation", "https://docs.rs"))
                 // Content row
                 .child(
                     div()

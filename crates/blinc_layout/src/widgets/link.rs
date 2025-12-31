@@ -1,16 +1,20 @@
 //! Link widget for clickable text
 //!
 //! A styled text element that acts as a hyperlink with hover states,
-//! equivalent to `<a>` in HTML. Links are underlined by default.
+//! equivalent to `<a>` in HTML. Links are underlined by default and
+//! clicking opens the URL in the system browser.
 //!
 //! # Example
 //!
 //! ```ignore
 //! use blinc_layout::prelude::*;
 //!
-//! // Default link with underline
+//! // Default link - clicking opens URL in browser
 //! link("Click here", "https://example.com")
-//!     .on_click(|url, ctx| open_url(url))
+//!
+//! // Custom click handler (replaces default behavior)
+//! link("Custom action", "https://example.com")
+//!     .on_click(|url, ctx| println!("Custom handler: {}", url))
 //!
 //! // Link without underline
 //! link("No underline", "https://example.com")
@@ -31,6 +35,15 @@ use crate::div::{div, Div, ElementBuilder};
 use crate::element::RenderProps;
 use crate::text::text;
 use crate::tree::{LayoutNodeId, LayoutTree};
+
+/// Open a URL in the system's default browser
+///
+/// This is the default action for links when clicked.
+pub fn open_url(url: &str) {
+    if let Err(e) = open::that(url) {
+        tracing::warn!("Failed to open URL '{}': {}", url, e);
+    }
+}
 
 /// Configuration for link styling
 #[derive(Clone, Debug)]
@@ -66,83 +79,160 @@ type LinkClickHandler = Arc<dyn Fn(&str, &crate::event_handler::EventContext) + 
 pub struct Link {
     inner: Div,
     url: String,
-    label: String,
-    config: LinkConfig,
-    click_handler: Option<LinkClickHandler>,
 }
 
 impl Link {
     /// Create a new link with text and URL
+    ///
+    /// By default, clicking the link opens the URL in the system browser.
+    /// Use `.on_click()` to override this behavior.
     pub fn new(label: impl Into<String>, url: impl Into<String>) -> Self {
         let config = LinkConfig::default();
         let label = label.into();
         let url = url.into();
 
-        // Build the inner div with text
-        let text_element = text(&label)
+        // Build the inner div with text - include all final styling here
+        // so that build() and render_props()/children_builders() are consistent
+        let mut text_element = text(&label)
             .size(config.font_size)
-            .color(config.text_color);
+            .color(config.text_color)
+            .no_cursor(); // Text inside link shouldn't override pointer cursor
 
-        let inner = div().child(text_element);
-
-        Self {
-            inner,
-            url,
-            label,
-            config,
-            click_handler: None,
+        // Apply underline by default (not hover-only)
+        if config.underline && !config.underline_on_hover_only {
+            text_element = text_element.underline();
         }
+
+        // Default click handler opens URL in system browser
+        let url_for_click = url.clone();
+        let inner = div()
+            .child(text_element)
+            .cursor_pointer()
+            .on_click(move |_ctx| {
+                open_url(&url_for_click);
+            });
+
+        Self { inner, url }
     }
 
-    /// Set the click handler (receives URL and event context)
-    pub fn on_click<F>(mut self, handler: F) -> Self
+    /// Set a custom click handler (receives URL and event context)
+    ///
+    /// This replaces the default behavior of opening the URL in the browser.
+    pub fn on_click<F>(self, handler: F) -> Self
     where
         F: Fn(&str, &crate::event_handler::EventContext) + Send + Sync + 'static,
     {
-        self.click_handler = Some(Arc::new(handler));
-        self
+        // Rebuild without the default handler and add the custom one
+        let label = self.extract_label();
+        let url = self.url;
+        let config = LinkConfig::default();
+
+        let mut text_element = text(&label)
+            .size(config.font_size)
+            .color(config.text_color)
+            .no_cursor();
+
+        if config.underline && !config.underline_on_hover_only {
+            text_element = text_element.underline();
+        }
+
+        // Use custom click handler instead of default
+        let url_for_click = url.clone();
+        let inner = div()
+            .child(text_element)
+            .cursor_pointer()
+            .on_click(move |ctx| {
+                handler(&url_for_click, ctx);
+            });
+
+        Self { inner, url }
     }
 
     /// Set the text color
-    pub fn text_color(mut self, color: Color) -> Self {
-        self.config.text_color = color;
-        self
+    ///
+    /// Note: This rebuilds the inner structure.
+    pub fn text_color(self, color: Color) -> Self {
+        self.rebuild_with_config(|cfg| cfg.text_color = color)
     }
 
     /// Set the hover color
-    pub fn hover_color(mut self, color: Color) -> Self {
-        self.config.hover_color = color;
-        self
+    pub fn hover_color(self, color: Color) -> Self {
+        self.rebuild_with_config(|cfg| cfg.hover_color = color)
     }
 
     /// Set the font size
-    pub fn font_size(mut self, size: f32) -> Self {
-        self.config.font_size = size;
-        self
+    pub fn font_size(self, size: f32) -> Self {
+        self.rebuild_with_config(|cfg| cfg.font_size = size)
     }
 
     /// Enable or disable underline
-    pub fn underline(mut self, enabled: bool) -> Self {
-        self.config.underline = enabled;
-        self
+    pub fn underline(self, enabled: bool) -> Self {
+        self.rebuild_with_config(|cfg| cfg.underline = enabled)
     }
 
     /// Remove underline decoration (convenience for `.underline(false)`)
-    pub fn no_underline(mut self) -> Self {
-        self.config.underline = false;
-        self
+    pub fn no_underline(self) -> Self {
+        self.underline(false)
     }
 
     /// Show underline only on hover
-    pub fn underline_on_hover(mut self) -> Self {
-        self.config.underline = true;
-        self.config.underline_on_hover_only = true;
-        self
+    pub fn underline_on_hover(self) -> Self {
+        self.rebuild_with_config(|cfg| {
+            cfg.underline = true;
+            cfg.underline_on_hover_only = true;
+        })
     }
 
     /// Get the URL
     pub fn url(&self) -> &str {
         &self.url
+    }
+
+    /// Helper to rebuild the link with a modified config
+    fn rebuild_with_config<F>(self, modify: F) -> Self
+    where
+        F: FnOnce(&mut LinkConfig),
+    {
+        // Extract text content from inner (we need to rebuild anyway)
+        // For simplicity, we'll extract from URL since we have it
+        // Get the label from the text child if possible
+        let label = self.extract_label();
+        let url = self.url;
+
+        let mut config = LinkConfig::default();
+        modify(&mut config);
+
+        let mut text_element = text(&label)
+            .size(config.font_size)
+            .color(config.text_color)
+            .no_cursor();
+
+        if config.underline && !config.underline_on_hover_only {
+            text_element = text_element.underline();
+        }
+
+        // Default click handler opens URL in system browser
+        let url_for_click = url.clone();
+        let inner = div()
+            .child(text_element)
+            .cursor_pointer()
+            .on_click(move |_ctx| {
+                open_url(&url_for_click);
+            });
+
+        Self { inner, url }
+    }
+
+    /// Extract label text from the inner structure
+    fn extract_label(&self) -> String {
+        // The first child should be the text element
+        // We can get its content via text_render_info
+        if let Some(child) = self.inner.children_builders().first() {
+            if let Some(info) = child.text_render_info() {
+                return info.content;
+            }
+        }
+        String::new()
     }
 }
 
@@ -162,29 +252,8 @@ impl DerefMut for Link {
 
 impl ElementBuilder for Link {
     fn build(&self, tree: &mut LayoutTree) -> LayoutNodeId {
-        // Build with text styling
-        // Note: Hover state visual changes would need Stateful for efficient updates
-        let mut text_element = text(&self.label)
-            .size(self.config.font_size)
-            .color(self.config.text_color);
-
-        // Apply underline if enabled (and not hover-only mode)
-        if self.config.underline && !self.config.underline_on_hover_only {
-            text_element = text_element.underline();
-        }
-
-        let mut inner = div().child(text_element);
-
-        // Add click handler
-        if let Some(handler) = &self.click_handler {
-            let handler = Arc::clone(handler);
-            let url = self.url.clone();
-            inner = inner.on_click(move |ctx| {
-                handler(&url, ctx);
-            });
-        }
-
-        inner.build(tree)
+        // Simply build the inner div - it already has all properties set
+        self.inner.build(tree)
     }
 
     fn render_props(&self) -> RenderProps {
@@ -199,6 +268,14 @@ impl ElementBuilder for Link {
         self.inner.element_type_id()
     }
 
+    fn event_handlers(&self) -> Option<&crate::event_handler::EventHandlers> {
+        // Delegate to inner's event_handlers implementation
+        ElementBuilder::event_handlers(&self.inner)
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
 }
 
 /// Create a link with text and URL
@@ -216,6 +293,7 @@ pub fn link(label: impl Into<String>, url: impl Into<String>) -> Link {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::element::CursorStyle;
 
     fn init_theme() {
         let _ = ThemeState::try_get().unwrap_or_else(|| {
@@ -238,5 +316,13 @@ mod tests {
         init_theme();
         let lnk = link("Test", "https://example.com");
         assert_eq!(lnk.url(), "https://example.com");
+    }
+
+    #[test]
+    fn test_link_has_pointer_cursor() {
+        init_theme();
+        let lnk = link("Test", "https://example.com");
+        let props = lnk.render_props();
+        assert_eq!(props.cursor, Some(CursorStyle::Pointer));
     }
 }

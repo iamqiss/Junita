@@ -1343,6 +1343,22 @@ impl<S: StateTransitions> Stateful<S> {
         self
     }
 
+    /// Set cursor style (builder pattern)
+    pub fn cursor(self, cursor: crate::element::CursorStyle) -> Self {
+        self.merge_into_inner(Div::new().cursor(cursor));
+        self
+    }
+
+    /// Set cursor to pointer (hand) - convenience for clickable elements
+    pub fn cursor_pointer(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Pointer)
+    }
+
+    /// Set cursor to text (I-beam) - for text input areas
+    pub fn cursor_text(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Text)
+    }
+
     /// Add child (builder pattern)
     pub fn child(self, child: impl ElementBuilder + 'static) -> Self {
         self.merge_into_inner(Div::new().child(child));
@@ -1747,6 +1763,21 @@ impl<S: StateTransitions> BoundStateful<S> {
     /// Set overflow to clip (clips children to container bounds)
     pub fn overflow_clip(self) -> Self {
         self.transform_inner(|s| s.overflow_clip())
+    }
+
+    /// Set cursor style (builder pattern)
+    pub fn cursor(self, cursor: crate::element::CursorStyle) -> Self {
+        self.transform_inner(|s| s.cursor(cursor))
+    }
+
+    /// Set cursor to pointer (hand) - convenience for clickable elements
+    pub fn cursor_pointer(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Pointer)
+    }
+
+    /// Set cursor to text (I-beam) - for text input areas
+    pub fn cursor_text(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Text)
     }
 
     /// Add child (builder pattern)

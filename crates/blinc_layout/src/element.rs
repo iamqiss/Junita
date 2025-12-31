@@ -11,6 +11,49 @@ use taffy::Layout;
 use crate::tree::LayoutNodeId;
 
 // ============================================================================
+// Cursor Style
+// ============================================================================
+
+/// Mouse cursor style for an element
+///
+/// When the cursor hovers over an element with a cursor style set,
+/// the window cursor will change to this style.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum CursorStyle {
+    /// Default arrow cursor
+    #[default]
+    Default,
+    /// Pointer/hand cursor (for clickable elements like links, buttons)
+    Pointer,
+    /// Text/I-beam cursor (for text input)
+    Text,
+    /// Crosshair cursor
+    Crosshair,
+    /// Move cursor (for dragging)
+    Move,
+    /// Not allowed cursor
+    NotAllowed,
+    /// North-South resize cursor
+    ResizeNS,
+    /// East-West resize cursor
+    ResizeEW,
+    /// Northeast-Southwest resize cursor
+    ResizeNESW,
+    /// Northwest-Southeast resize cursor
+    ResizeNWSE,
+    /// Grab cursor (open hand)
+    Grab,
+    /// Grabbing cursor (closed hand)
+    Grabbing,
+    /// Wait/loading cursor
+    Wait,
+    /// Progress cursor (arrow with spinner)
+    Progress,
+    /// Hidden cursor
+    None,
+}
+
+// ============================================================================
 // Material System
 // ============================================================================
 
@@ -817,6 +860,8 @@ pub struct RenderProps {
     /// Whether this is a Stack layer that increments z_layer for proper z-ordering
     /// When true, entering this node increments the DrawContext's z_layer
     pub is_stack_layer: bool,
+    /// Cursor style when hovering over this element (None = inherit from parent)
+    pub cursor: Option<CursorStyle>,
 }
 
 impl Default for RenderProps {
@@ -836,6 +881,7 @@ impl Default for RenderProps {
             clips_content: false,
             motion: None,
             is_stack_layer: false,
+            cursor: None,
         }
     }
 }
@@ -922,6 +968,12 @@ impl RenderProps {
     /// Set whether this element clips its children
     pub fn with_clips_content(mut self, clips: bool) -> Self {
         self.clips_content = clips;
+        self
+    }
+
+    /// Set cursor style for hover
+    pub fn with_cursor(mut self, cursor: CursorStyle) -> Self {
+        self.cursor = Some(cursor);
         self
     }
 

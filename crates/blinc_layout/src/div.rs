@@ -375,6 +375,7 @@ pub struct Div {
     pub(crate) shadow: Option<Shadow>,
     pub(crate) transform: Option<Transform>,
     pub(crate) opacity: f32,
+    pub(crate) cursor: Option<crate::element::CursorStyle>,
     pub(crate) event_handlers: crate::event_handler::EventHandlers,
 }
 
@@ -400,6 +401,7 @@ impl Div {
             shadow: None,
             transform: None,
             opacity: 1.0,
+            cursor: None,
             event_handlers: crate::event_handler::EventHandlers::new(),
         }
     }
@@ -1545,6 +1547,56 @@ impl Div {
     }
 
     // =========================================================================
+    // Cursor Style
+    // =========================================================================
+
+    /// Set the cursor style when hovering over this element
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// div()
+    ///     .w(100.0).h(50.0)
+    ///     .bg(Color::BLUE)
+    ///     .cursor(CursorStyle::Pointer) // Hand cursor for clickable elements
+    ///     .on_click(|_| println!("Clicked!"))
+    /// ```
+    pub fn cursor(mut self, cursor: crate::element::CursorStyle) -> Self {
+        self.cursor = Some(cursor);
+        self
+    }
+
+    /// Set cursor to pointer (hand) - convenience for clickable elements
+    pub fn cursor_pointer(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Pointer)
+    }
+
+    /// Set cursor to text (I-beam) - for text input areas
+    pub fn cursor_text(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Text)
+    }
+
+    /// Set cursor to move - for draggable elements
+    pub fn cursor_move(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Move)
+    }
+
+    /// Set cursor to grab (open hand) - for grabbable elements
+    pub fn cursor_grab(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Grab)
+    }
+
+    /// Set cursor to grabbing (closed hand) - while dragging
+    pub fn cursor_grabbing(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Grabbing)
+    }
+
+    /// Set cursor to not-allowed - for disabled elements
+    pub fn cursor_not_allowed(self) -> Self {
+        self.cursor(crate::element::CursorStyle::NotAllowed)
+    }
+
+    // =========================================================================
     // Children
     // =========================================================================
 
@@ -2148,6 +2200,7 @@ impl ElementBuilder for Div {
             clips_content,
             motion: None,
             is_stack_layer: false,
+            cursor: self.cursor,
         }
     }
 

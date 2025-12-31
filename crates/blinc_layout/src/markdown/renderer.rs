@@ -7,7 +7,7 @@ use crate::image::img;
 use crate::text::text;
 use crate::typography::{h1, h2, h3, h4, h5, h6};
 use crate::widgets::{
-    code, li, ol_start_with_config, ol_with_config, striped_tr, table, task_item,
+    code, li, link, ol_start_with_config, ol_with_config, striped_tr, table, task_item,
     task_item_with_config, tbody, td, th, thead, tr, ul_with_config, ListConfig, ListItem,
     OrderedList, TaskListItem, UnorderedList,
 };
@@ -601,6 +601,15 @@ impl<'a> RenderState<'a> {
                 continue;
             }
 
+            // If this is a link, use the link widget for proper cursor support
+            if let Some(url) = &segment.link_url {
+                let link_elem = link(&segment.text, url)
+                    .font_size(self.config.body_size)
+                    .text_color(segment.color);
+                self.inline_elements.push(Box::new(link_elem));
+                continue;
+            }
+
             // Build text with styles set BEFORE no_wrap() so measurement includes correct weight/style
             let mut txt = text(&segment.text)
                 .size(self.config.body_size)
@@ -725,7 +734,7 @@ impl<'a> RenderState<'a> {
     }
 
     fn into_container(self) -> Div {
-        self.container
+        self.container.w_full()
     }
 }
 

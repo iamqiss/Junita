@@ -122,7 +122,7 @@ pub use blockquote::{blockquote, blockquote_with_config, Blockquote, BlockquoteC
 pub use hr::{hr, hr_color, hr_thick, hr_with_config, HrConfig};
 
 // Re-export link widget
-pub use link::{link, Link, LinkConfig};
+pub use link::{link, open_url, Link, LinkConfig};
 
 // Re-export list widgets
 pub use list::{

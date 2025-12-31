@@ -1306,6 +1306,12 @@ impl WindowedApp {
                                             event.mouse_x = lx;
                                             event.mouse_y = ly;
                                         }
+
+                                        // Update cursor based on hovered element
+                                        let cursor = tree
+                                            .get_cursor_at(router, lx, ly)
+                                            .unwrap_or(CursorStyle::Default);
+                                        window.set_cursor(convert_cursor_style(cursor));
                                     }
                                     MouseEvent::ButtonPressed { button, x, y } => {
                                         let lx = x / scale;
@@ -1353,6 +1359,8 @@ impl WindowedApp {
                                         // on_mouse_leave now emits POINTER_UP if there was a pressed target
                                         // This handles the case where mouse leaves window while dragging
                                         router.on_mouse_leave();
+                                        // Reset cursor to default when mouse leaves window
+                                        window.set_cursor(blinc_platform::Cursor::Default);
                                         // Events are collected via the callback set above
                                     }
                                     MouseEvent::Entered => {
@@ -1362,6 +1370,12 @@ impl WindowedApp {
                                             event.mouse_x = mx;
                                             event.mouse_y = my;
                                         }
+
+                                        // Update cursor based on hovered element
+                                        let cursor = tree
+                                            .get_cursor_at(router, mx, my)
+                                            .unwrap_or(CursorStyle::Default);
+                                        window.set_cursor(convert_cursor_style(cursor));
                                     }
                                 },
                                 InputEvent::Keyboard(kb_event) => {
@@ -2004,6 +2018,28 @@ fn convert_mouse_button(button: blinc_platform::MouseButton) -> MouseButton {
         blinc_platform::MouseButton::Back => MouseButton::Back,
         blinc_platform::MouseButton::Forward => MouseButton::Forward,
         blinc_platform::MouseButton::Other(n) => MouseButton::Other(n),
+    }
+}
+
+/// Convert layout cursor style to platform cursor
+#[cfg(all(feature = "windowed", not(target_os = "android")))]
+fn convert_cursor_style(cursor: CursorStyle) -> blinc_platform::Cursor {
+    match cursor {
+        CursorStyle::Default => blinc_platform::Cursor::Default,
+        CursorStyle::Pointer => blinc_platform::Cursor::Pointer,
+        CursorStyle::Text => blinc_platform::Cursor::Text,
+        CursorStyle::Crosshair => blinc_platform::Cursor::Crosshair,
+        CursorStyle::Move => blinc_platform::Cursor::Move,
+        CursorStyle::NotAllowed => blinc_platform::Cursor::NotAllowed,
+        CursorStyle::ResizeNS => blinc_platform::Cursor::ResizeNS,
+        CursorStyle::ResizeEW => blinc_platform::Cursor::ResizeEW,
+        CursorStyle::ResizeNESW => blinc_platform::Cursor::ResizeNESW,
+        CursorStyle::ResizeNWSE => blinc_platform::Cursor::ResizeNWSE,
+        CursorStyle::Grab => blinc_platform::Cursor::Grab,
+        CursorStyle::Grabbing => blinc_platform::Cursor::Grabbing,
+        CursorStyle::Wait => blinc_platform::Cursor::Wait,
+        CursorStyle::Progress => blinc_platform::Cursor::Progress,
+        CursorStyle::None => blinc_platform::Cursor::None,
     }
 }
 

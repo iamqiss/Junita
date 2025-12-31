@@ -60,8 +60,8 @@ pub mod markdown;
 
 // Core types
 pub use element::{
-    BorderSide, BorderSides, DynRenderProps, ElementBounds, MotionAnimation, MotionKeyframe,
-    RenderLayer, RenderProps, ResolvedRenderProps,
+    BorderSide, BorderSides, CursorStyle, DynRenderProps, ElementBounds, MotionAnimation,
+    MotionKeyframe, RenderLayer, RenderProps, ResolvedRenderProps,
 };
 
 // Diff and reconciliation
@@ -144,7 +144,7 @@ pub mod prelude {
     // Reference binding for external element access
     pub use crate::div::{DivRef, ElementRef};
     pub use crate::element::{
-        DynRenderProps, ElementBounds, RenderLayer, RenderProps, ResolvedRenderProps,
+        CursorStyle, DynRenderProps, ElementBounds, RenderLayer, RenderProps, ResolvedRenderProps,
     };
     // Event handlers
     pub use crate::event_handler::{EventCallback, EventContext, EventHandlers, HandlerRegistry};

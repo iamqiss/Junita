@@ -254,6 +254,7 @@ impl ElementBuilder for Svg {
             clips_content: false,
             motion: None,
             is_stack_layer: false,
+            cursor: None,
         }
     }
 

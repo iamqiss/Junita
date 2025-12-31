@@ -1604,6 +1604,8 @@ impl TextArea {
                     crate::stateful::check_stateful_deps(&[signal_id]);
                 }
             })
+            // Set text cursor (I-beam) for text area
+            .cursor_text()
         // Note: Scroll events are handled by the scroll() widget inside build_content
     }
 

@@ -581,6 +581,7 @@ impl ElementBuilder for Image {
             clips_content: false,
             motion: None,
             is_stack_layer: false,
+            cursor: None,
         }
     }
 

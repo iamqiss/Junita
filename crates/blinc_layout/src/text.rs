@@ -60,6 +60,8 @@ pub struct Text {
     strikethrough: bool,
     /// Whether text has underline decoration
     underline: bool,
+    /// Cursor style when hovering over this text (default: Text cursor)
+    cursor: Option<crate::element::CursorStyle>,
 }
 
 impl Text {
@@ -85,6 +87,7 @@ impl Text {
             ascender: 14.0 * 0.8, // will be set by update_size_estimate
             strikethrough: false,
             underline: false,
+            cursor: Some(crate::element::CursorStyle::Text), // Text cursor by default
         };
         text.update_size_estimate();
         text
@@ -259,6 +262,23 @@ impl Text {
     /// Check if text has underline decoration
     pub fn is_underline(&self) -> bool {
         self.underline
+    }
+
+    /// Set cursor style for this text
+    pub fn cursor(mut self, cursor: crate::element::CursorStyle) -> Self {
+        self.cursor = Some(cursor);
+        self
+    }
+
+    /// Remove cursor style (use default cursor from parent or window)
+    pub fn no_cursor(mut self) -> Self {
+        self.cursor = None;
+        self
+    }
+
+    /// Set cursor to default arrow (removes text cursor)
+    pub fn cursor_default(self) -> Self {
+        self.cursor(crate::element::CursorStyle::Default)
     }
 
     // =========================================================================
@@ -524,6 +544,7 @@ impl ElementBuilder for Text {
             clips_content: false,
             motion: None,
             is_stack_layer: false,
+            cursor: self.cursor,
         }
     }
 
