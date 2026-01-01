@@ -41,7 +41,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                 .w_full()
                 .bg(Color::rgba(0.08, 0.08, 0.1, 1.0))
                 .flex_col()
-                .gap(24.0)
+                .gap(5.0)
                 .p(24.0)
                 // Title
                 .child(
