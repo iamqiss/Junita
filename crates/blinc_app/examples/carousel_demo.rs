@@ -12,6 +12,7 @@ use blinc_app::prelude::*;
 use blinc_app::windowed::{State, WindowedApp, WindowedContext};
 use blinc_core::Color;
 use blinc_layout::selector::{ScrollBehavior, ScrollBlock, ScrollOptions, ScrollRef};
+use blinc_layout::units::px;
 
 const CARD_COUNT: usize = 5;
 const CARD_WIDTH: f32 = 280.0;
@@ -151,14 +152,16 @@ fn build_carousel(
                         .w(VIEWPORT_WIDTH)
                         .h(CARD_HEIGHT + 20.0)
                         .items_start()
+                        .justify_start() // Ensure content starts at beginning
                         .child(
                             // Cards container - STATIC, no stateful needed
                             div()
                                 .flex_row()
                                 .gap(CARD_GAP)
-                                // Padding to center first and last cards
-                                .px((VIEWPORT_WIDTH - CARD_WIDTH) / 2.0)
                                 .items_start()
+                                // Padding to center first and last cards in viewport
+                                // px() gives raw pixels, sp() gives scaled spacing units
+                                .padding_x(px((VIEWPORT_WIDTH - CARD_WIDTH) / 2.0))
                                 .children(
                                     cards
                                         .iter()

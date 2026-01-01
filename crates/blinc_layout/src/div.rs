@@ -1162,6 +1162,46 @@ impl Div {
         self
     }
 
+    // =========================================================================
+    // Semantic Length-based API (uses Length type for clarity)
+    // =========================================================================
+
+    /// Set padding using a semantic Length value
+    ///
+    /// # Examples
+    /// ```rust,ignore
+    /// use blinc_layout::prelude::*;
+    ///
+    /// div().padding(px(16.0))  // 16 raw pixels
+    /// div().padding(sp(4.0))   // 4 spacing units = 16px
+    /// ```
+    pub fn padding(mut self, len: crate::units::Length) -> Self {
+        let val: LengthPercentage = len.into();
+        self.style.padding = Rect {
+            left: val,
+            right: val,
+            top: val,
+            bottom: val,
+        };
+        self
+    }
+
+    /// Set horizontal padding using a semantic Length value
+    pub fn padding_x(mut self, len: crate::units::Length) -> Self {
+        let val: LengthPercentage = len.into();
+        self.style.padding.left = val;
+        self.style.padding.right = val;
+        self
+    }
+
+    /// Set vertical padding using a semantic Length value
+    pub fn padding_y(mut self, len: crate::units::Length) -> Self {
+        let val: LengthPercentage = len.into();
+        self.style.padding.top = val;
+        self.style.padding.bottom = val;
+        self
+    }
+
     /// Set margin on all sides (in 4px units)
     pub fn m(mut self, units: f32) -> Self {
         let px = LengthPercentageAuto::Length(units * 4.0);

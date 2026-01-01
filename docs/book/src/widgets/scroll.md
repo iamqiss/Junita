@@ -305,6 +305,7 @@ Here's a complete example of a horizontal carousel with clickable navigation dot
 ```rust
 use blinc_app::prelude::*;
 use blinc_layout::selector::{ScrollBehavior, ScrollBlock, ScrollOptions, ScrollRef};
+use blinc_layout::units::px;  // Semantic unit for raw pixels
 
 fn carousel(ctx: &WindowedContext) -> impl ElementBuilder {
     let scroll_ref = ctx.use_scroll_ref("carousel_scroll");
@@ -325,7 +326,7 @@ fn carousel(ctx: &WindowedContext) -> impl ElementBuilder {
                     div()
                         .flex_row()
                         .gap(20.0)
-                        .px(60.0)  // Padding to center first/last cards
+                        .padding_x(px(60.0))  // Padding to center first/last cards
                         .children(
                             (0..5).map(|i| {
                                 div()

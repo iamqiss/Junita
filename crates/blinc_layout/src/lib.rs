@@ -53,6 +53,7 @@ pub mod text_measure;
 pub mod text_selection;
 pub mod tree;
 pub mod typography;
+pub mod units;
 pub mod widgets;
 
 // Markdown rendering
@@ -120,6 +121,9 @@ pub use stateful::{
 
 // Animation integration
 pub use animated::{AnimatedProperties, AnimationBuilder};
+
+// CSS-like units
+pub use units::{pct, px, sp, Length, Unit};
 
 // Motion container for entry/exit animations
 pub use motion::{
@@ -258,6 +262,9 @@ pub mod prelude {
 
     // Code block widget with syntax highlighting
     pub use crate::widgets::{code, pre, Code, CodeConfig};
+
+    // CSS-like units for layout dimensions
+    pub use crate::units::{pct, px, sp, Length, Unit};
 
     // Syntax highlighting
     pub use crate::syntax::{

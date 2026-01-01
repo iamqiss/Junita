@@ -1500,10 +1500,7 @@ mod tests {
         use taffy::{AvailableSpace, Size};
 
         // Create a scroll container with a smaller child
-        let s = scroll()
-            .w(400.0)
-            .h(300.0)
-            .child(div().w(200.0).h(100.0));
+        let s = scroll().w(400.0).h(300.0).child(div().w(200.0).h(100.0));
 
         let mut tree = LayoutTree::new();
         let root_id = s.build(&mut tree);
@@ -1629,16 +1626,11 @@ mod tests {
             .w(400.0)
             .h(300.0)
             .items_start() // Cross axis (Y) alignment
-            .child(
-                div()
-                    .flex_row()
-                    .gap(20.0)
-                    .children(vec![
-                        div().w(280.0).h(280.0),
-                        div().w(280.0).h(280.0),
-                        div().w(280.0).h(280.0),
-                    ]),
-            );
+            .child(div().flex_row().gap(20.0).children(vec![
+                div().w(280.0).h(280.0),
+                div().w(280.0).h(280.0),
+                div().w(280.0).h(280.0),
+            ]));
 
         let mut tree = LayoutTree::new();
         let root_id = s.build(&mut tree);
@@ -1655,7 +1647,9 @@ mod tests {
         let children = tree.children(root_id);
         assert!(!children.is_empty(), "Scroll should have content");
         let content_id = children[0];
-        let content_layout = tree.get_layout(content_id).expect("Content should have layout");
+        let content_layout = tree
+            .get_layout(content_id)
+            .expect("Content should have layout");
 
         // Print for debugging
         println!(

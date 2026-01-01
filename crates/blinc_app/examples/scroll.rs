@@ -14,7 +14,7 @@
 //! Run with: cargo run -p blinc_app --example scroll --features windowed
 
 use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use blinc_app::windowed::{State, WindowedApp, WindowedContext};
 use blinc_layout::prelude::{ButtonState, Scroll, ScrollPhysics, SharedScrollPhysics};
 use std::sync::{Arc, Mutex};
 
@@ -78,16 +78,20 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                 .color(Color::rgba(1.0, 1.0, 1.0, 0.7)),
         )
         // Direction toggle button
-        .child(build_direction_toggle(ctx, current_direction))
+        .child(build_direction_toggle(ctx, &direction_state))
         // Scroll container with shared physics
-        .child(build_scroll_container(ctx, current_direction, physics))
+        .child(build_scroll_container(ctx, &direction_state, physics))
 }
 
 /// Build the direction toggle button
-fn build_direction_toggle(ctx: &WindowedContext, _current: ScrollDirection) -> impl ElementBuilder {
+fn build_direction_toggle(
+    ctx: &WindowedContext,
+    current: &State<ScrollDirection>,
+) -> impl ElementBuilder {
     // Get the direction state to update it on click
-    let direction_state = ctx.use_state_keyed("scroll_direction", || ScrollDirection::Vertical);
-    let direction_for_label = direction_state.clone();
+    let direction_signal_id = current.signal_id();
+    let direction_for_label = current.clone();
+    let direction_state_for_click = current.clone();
 
     // Create a button state for proper click handling
     let button_state = ctx.use_state_for("direction_toggle_btn", ButtonState::Idle);
@@ -105,7 +109,7 @@ fn build_direction_toggle(ctx: &WindowedContext, _current: ScrollDirection) -> i
                 .justify_center()
                 .items_center()
                 // When direction_state changes, refresh this element's on_state
-                .deps(&[direction_state.signal_id()])
+                .deps(&[direction_signal_id])
                 .on_state(move |state, container| {
                     let bg = match state {
                         ButtonState::Idle => Color::rgba(0.3, 0.5, 1.0, 0.8),
@@ -132,13 +136,13 @@ fn build_direction_toggle(ctx: &WindowedContext, _current: ScrollDirection) -> i
                     );
                 })
                 .on_click(move |_| {
-                    let current = direction_state.get();
+                    let current = direction_state_for_click.get();
                     let next = match current {
                         ScrollDirection::Vertical => ScrollDirection::Horizontal,
                         ScrollDirection::Horizontal => ScrollDirection::Both,
                         ScrollDirection::Both => ScrollDirection::Vertical,
                     };
-                    direction_state.set(next);
+                    direction_state_for_click.set(next);
                     tracing::info!("Switched to {:?} scroll", next);
                 }),
         )
@@ -147,7 +151,7 @@ fn build_direction_toggle(ctx: &WindowedContext, _current: ScrollDirection) -> i
 /// Build the scroll container with content
 fn build_scroll_container(
     ctx: &WindowedContext,
-    direction: ScrollDirection,
+    direction: &State<ScrollDirection>,
     physics: SharedScrollPhysics,
 ) -> impl ElementBuilder {
     // Calculate scroll viewport size
@@ -161,22 +165,35 @@ fn build_scroll_container(
         p.viewport_height = viewport_height;
     }
 
-    // The scroll container with shared physics for state persistence
-    Scroll::with_physics(physics)
-        .w(viewport_width)
-        .h(viewport_height)
-        .rounded(24.0)
-        .bg(Color::rgba(0.15, 0.15, 0.2, 1.0))
-        .direction(direction)
-        .on_scroll(|e| {
-            tracing::info!(
-                "Scroll delta: ({:.1}, {:.1})",
-                e.scroll_delta_x,
-                e.scroll_delta_y
+    let direction_clone = direction.clone();
+    let direction_signal_id = direction.signal_id();
+
+    let handle = ctx.use_state_for("scroll_state_handle", ());
+
+    stateful(handle)
+        .deps(&[direction_signal_id])
+        .on_state(move |_, container| {
+            let direction = direction_clone.get();
+
+            // The scroll container with shared physics for state persistence
+            *container = div().child(
+                Scroll::with_physics(physics.clone())
+                    .w(viewport_width)
+                    .h(viewport_height)
+                    .rounded(24.0)
+                    .bg(Color::rgba(0.15, 0.15, 0.2, 1.0))
+                    .direction(direction)
+                    .on_scroll(|e| {
+                        tracing::info!(
+                            "Scroll delta: ({:.1}, {:.1})",
+                            e.scroll_delta_x,
+                            e.scroll_delta_y
+                        );
+                    })
+                    // Scrollable content - layout differs based on direction
+                    .child(build_scroll_content(direction)),
             );
         })
-        // Scrollable content - layout differs based on direction
-        .child(build_scroll_content(direction))
 }
 
 /// Build the scrollable content (cards list)

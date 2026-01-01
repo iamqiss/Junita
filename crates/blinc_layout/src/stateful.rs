@@ -499,6 +499,29 @@ impl StateTransitions for TextFieldState {
     }
 }
 
+/// Unit type implements StateTransitions as a no-op state
+///
+/// Use `()` as a dummy handle for stateful elements when you need
+/// reactive rebuilding via `.deps()` but don't need state transitions.
+///
+/// # Example
+///
+/// ```ignore
+/// let counter = ctx.use_state_keyed("counter", || 0);
+///
+/// // Use () when no explicit state type is needed
+/// stateful(ctx.use_state(()))
+///     .deps(&[counter.signal_id()])
+///     .on_state(move |_, div| {
+///         div.merge(text(&format!("Count: {}", counter.get())));
+///     })
+/// ```
+impl StateTransitions for () {
+    fn on_event(&self, _event: u32) -> Option<Self> {
+        None // No state transitions - always stays as ()
+    }
+}
+
 // =========================================================================
 // Stateful<S> - Generic Stateful Element
 // =========================================================================
@@ -2342,5 +2365,29 @@ mod tests {
         assert!(!btn.handle_event(event_types::POINTER_UP));
 
         assert_eq!(btn.state(), ButtonState::Disabled);
+    }
+
+    #[test]
+    fn test_unit_state_ignores_all_events() {
+        // Unit type () as a dummy state for stateful elements
+        let elem: Stateful<()> = Stateful::new(())
+            .w(100.0)
+            .h(40.0)
+            .bg(Color::BLUE)
+            .on_state(|_state, div| {
+                div.set_bg(Color::RED);
+            });
+
+        // State should always be ()
+        assert_eq!(elem.state(), ());
+
+        // No events should cause state transitions
+        assert!(!elem.handle_event(event_types::POINTER_ENTER));
+        assert!(!elem.handle_event(event_types::POINTER_DOWN));
+        assert!(!elem.handle_event(event_types::POINTER_UP));
+        assert!(!elem.handle_event(event_types::POINTER_LEAVE));
+
+        // State should still be ()
+        assert_eq!(elem.state(), ());
     }
 }

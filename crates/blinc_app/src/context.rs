@@ -979,6 +979,7 @@ impl RenderContext {
                 _ => (0.0, 0.0),
             })
             .unwrap_or((0.0, 0.0));
+
         let new_offset = (
             abs_x + scroll_offset.0 + motion_offset.0,
             abs_y + scroll_offset.1 + motion_offset.1,
