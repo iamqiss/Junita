@@ -116,12 +116,15 @@ pub fn is_emoji(c: char) -> bool {
         0x2B55 | // Circle
 
         // Specific other emoji characters
-        0x203C | // Double exclamation
-        0x2049 | // Exclamation question
-        0x2139 | // Information
-        0x2194..=0x2199 | // Arrows
-        0x21A9..=0x21AA | // Arrows with hook
-        0x2934..=0x2935 | // Curved arrows
+        0x203C | // Double exclamation ‼️
+        0x2049 | // Exclamation question ⁉️
+        0x2139 | // Information ℹ️
+
+        // Note: We intentionally EXCLUDE the following arrows as they should render
+        // as text with the user's specified color:
+        // - 0x2194..=0x2199 (↔ ↕ ↖ ↗ ↘ ↙) - directional arrows
+        // - 0x21A9..=0x21AA (↩ ↪) - arrows with hook
+        // - 0x2934..=0x2935 (⤴ ⤵) - curved arrows
 
         // CJK special emoji
         0x3030 | // Wavy dash

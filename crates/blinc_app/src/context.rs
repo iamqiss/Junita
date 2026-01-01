@@ -482,20 +482,37 @@ impl RenderContext {
 
             // Check if lazy loading is enabled (loading_strategy == 1)
             if image.loading_strategy == 1 {
-                // Check if image is visible in viewport (with buffer for prefetching)
-                let viewport_left = -VISIBILITY_BUFFER;
-                let viewport_top = -VISIBILITY_BUFFER;
-                let viewport_right = viewport_width + VISIBILITY_BUFFER;
-                let viewport_bottom = viewport_height + VISIBILITY_BUFFER;
+                // If image has clip bounds from a scroll container, use those for visibility check
+                // The clip bounds represent the visible area of the parent scroll container
+                let is_visible = if let Some([clip_x, clip_y, clip_w, clip_h]) = image.clip_bounds {
+                    // Check if image intersects with its clip region (+ buffer for prefetching)
+                    let clip_left = clip_x - VISIBILITY_BUFFER;
+                    let clip_top = clip_y - VISIBILITY_BUFFER;
+                    let clip_right = clip_x + clip_w + VISIBILITY_BUFFER;
+                    let clip_bottom = clip_y + clip_h + VISIBILITY_BUFFER;
 
-                let image_right = image.x + image.width;
-                let image_bottom = image.y + image.height;
+                    let image_right = image.x + image.width;
+                    let image_bottom = image.y + image.height;
 
-                // Check intersection (image visible in extended viewport)
-                let is_visible = image.x < viewport_right
-                    && image_right > viewport_left
-                    && image.y < viewport_bottom
-                    && image_bottom > viewport_top;
+                    image.x < clip_right
+                        && image_right > clip_left
+                        && image.y < clip_bottom
+                        && image_bottom > clip_top
+                } else {
+                    // No clip bounds - check against viewport
+                    let viewport_left = -VISIBILITY_BUFFER;
+                    let viewport_top = -VISIBILITY_BUFFER;
+                    let viewport_right = viewport_width + VISIBILITY_BUFFER;
+                    let viewport_bottom = viewport_height + VISIBILITY_BUFFER;
+
+                    let image_right = image.x + image.width;
+                    let image_bottom = image.y + image.height;
+
+                    image.x < viewport_right
+                        && image_right > viewport_left
+                        && image.y < viewport_bottom
+                        && image_bottom > viewport_top
+                };
 
                 if !is_visible {
                     // Skip loading - image is not yet visible
@@ -1064,6 +1081,25 @@ impl RenderContext {
         let mut glyphs_by_layer: std::collections::BTreeMap<u32, Vec<GpuGlyph>> =
             std::collections::BTreeMap::new();
         for text in &texts {
+            // Skip text that's completely outside its clip bounds (visibility culling)
+            // This prevents loading emoji fonts for off-screen text in scroll containers
+            if let Some([clip_x, clip_y, clip_w, clip_h]) = text.clip_bounds {
+                let text_right = text.x + text.width;
+                let text_bottom = text.y + text.height;
+                let clip_right = clip_x + clip_w;
+                let clip_bottom = clip_y + clip_h;
+
+                // Check if text is completely outside clip bounds
+                if text.x >= clip_right
+                    || text_right <= clip_x
+                    || text.y >= clip_bottom
+                    || text_bottom <= clip_y
+                {
+                    // Text is not visible, skip rendering entirely
+                    continue;
+                }
+            }
+
             let alignment = match text.align {
                 TextAlign::Left => TextAlignment::Left,
                 TextAlign::Center => TextAlignment::Center,

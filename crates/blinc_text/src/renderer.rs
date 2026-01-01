@@ -305,16 +305,16 @@ impl TextRenderer {
             )
         };
 
-        // Try to get emoji and symbol fonts for fallback (optional - may not exist)
-        let (emoji_font, symbol_font) = {
-            let mut registry = self.font_registry.lock().unwrap();
-            (
-                registry.load_generic(GenericFont::Emoji).ok(),
-                registry.load_generic(GenericFont::Symbol).ok(),
-            )
-        };
-        let emoji_font_id = self.font_id(None, GenericFont::Emoji);
-        let symbol_font_id = self.font_id(None, GenericFont::Symbol);
+        // Lazy-loaded fallback fonts: only load emoji/symbol fonts when actually needed
+        // This saves ~180MB of memory when text doesn't contain emoji
+        // Emoji font and symbol font are loaded separately - symbol font is small,
+        // but emoji font (Apple Color Emoji) is ~180MB, so we only load it for actual emoji
+        let mut emoji_font: Option<Arc<FontFace>> = None;
+        let mut symbol_font: Option<Arc<FontFace>> = None;
+        let mut emoji_font_id: u32 = 0;
+        let mut symbol_font_id: u32 = 0;
+        let mut emoji_font_loaded = false;
+        let mut symbol_font_loaded = false;
 
         // Layout the text
         let layout = self.layout_engine.layout(text, &font, font_size, options);
@@ -378,11 +378,31 @@ impl TextRenderer {
                 }
             }
 
-            let needs_fallback = is_emoji_char
-                || positioned.glyph_id == 0
-                || !font.has_glyph(positioned.codepoint);
+            // Check if fallback is needed:
+            // - Primary font doesn't have this glyph (glyph_id == 0 or has_glyph returns false)
+            // - For emoji, always try emoji font to get color rendering (even if primary has glyph)
+            let primary_has_glyph = positioned.glyph_id != 0 && font.has_glyph(positioned.codepoint);
+            let needs_fallback = !primary_has_glyph || is_emoji_char;
 
             if needs_fallback {
+                // Lazy load symbol font for non-emoji fallback (small, fast to load)
+                if !symbol_font_loaded {
+                    let mut registry = self.font_registry.lock().unwrap();
+                    symbol_font = registry.load_generic(GenericFont::Symbol).ok();
+                    drop(registry);
+                    symbol_font_id = self.font_id(None, GenericFont::Symbol);
+                    symbol_font_loaded = true;
+                }
+
+                // Only load emoji font (~180MB) when we actually encounter an emoji character
+                if is_emoji_char && !emoji_font_loaded {
+                    let mut registry = self.font_registry.lock().unwrap();
+                    emoji_font = registry.load_generic(GenericFont::Emoji).ok();
+                    drop(registry);
+                    emoji_font_id = self.font_id(None, GenericFont::Emoji);
+                    emoji_font_loaded = true;
+                }
+
                 // Build fallback font chain: try emoji first (for emoji), then symbol (for Unicode symbols)
                 // For non-emoji characters, prefer symbol font to get text-colored glyphs
                 let fallback_fonts: Vec<(&Arc<FontFace>, u32, bool)> = if is_emoji_char {
@@ -395,10 +415,9 @@ impl TextRenderer {
                     .flatten()
                     .collect()
                 } else {
-                    // Non-emoji: try symbol font first (text-colored), then emoji (grayscale fallback)
+                    // Non-emoji: only use symbol font (don't load emoji font for non-emoji characters)
                     [
                         symbol_font.as_ref().map(|f| (f, symbol_font_id, false)),
-                        emoji_font.as_ref().map(|f| (f, emoji_font_id, false)), // Use grayscale for emoji font fallback
                     ]
                     .into_iter()
                     .flatten()
