@@ -88,6 +88,93 @@ image(src)
     .blur(2.0)           // Blur radius
 ```
 
+### Lazy Loading
+
+For content-heavy applications with many images (galleries, feeds, chat apps), lazy loading defers image loading until the image is visible in the viewport. This reduces initial memory usage and load time.
+
+```rust
+use blinc_layout::prelude::*;
+use std::time::Duration;
+
+// Basic lazy loading
+img("large-photo.jpg")
+    .lazy()
+    .w(300.0)
+    .h(200.0)
+
+// With placeholder color
+img("photo.jpg")
+    .lazy()
+    .placeholder_color(Color::rgba(0.2, 0.2, 0.2, 1.0))
+    .w(300.0)
+    .h(200.0)
+
+// With thumbnail placeholder
+img("large-photo.jpg")
+    .lazy()
+    .placeholder_image("thumbnail.jpg")
+    .fade_in(Duration::from_millis(300))
+    .w(300.0)
+    .h(200.0)
+
+// Skeleton loading animation
+img("photo.jpg")
+    .lazy()
+    .skeleton()
+    .fade_in(Duration::from_millis(250))
+    .w(300.0)
+    .h(200.0)
+
+// Disable fade animation
+img("photo.jpg")
+    .lazy()
+    .no_fade()
+    .w(300.0)
+    .h(200.0)
+```
+
+#### Loading Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `Eager` (default) | Load immediately when element is created |
+| `Lazy` | Load only when visible in viewport |
+
+#### Placeholder Types
+
+| Placeholder | Description |
+|-------------|-------------|
+| `None` | No placeholder (blank until loaded) |
+| `Color(color)` | Solid color background |
+| `Image(url)` | Another image (e.g., low-res thumbnail, blur hash) |
+| `Skeleton` | Shimmer loading animation |
+
+---
+
+## Emoji Images
+
+Render emoji as images at arbitrary sizes using the system emoji font. Emoji images are **automatically lazy-loaded** for memory efficiency.
+
+```rust
+use blinc_layout::image::{emoji, emoji_sized};
+
+// Default size (64px)
+emoji("😀")
+
+// Custom size
+emoji_sized("🚀", 128.0)
+
+// In a layout
+div()
+    .flex_row()
+    .gap(8.0)
+    .child(emoji_sized("👍", 32.0))
+    .child(emoji_sized("🎉", 32.0))
+    .child(emoji_sized("✨", 32.0))
+```
+
+Emoji images use the system color emoji font (Apple Color Emoji on macOS, Segoe UI Emoji on Windows, Noto Color Emoji on Linux).
+
 ---
 
 ## SVG
@@ -289,3 +376,7 @@ fn image_with_placeholder(url: Option<&str>) -> impl ElementBuilder {
 5. **Use SVG for icons** - Scales perfectly at any size.
 
 6. **Optimize images** - Use appropriate formats and compression for web.
+
+7. **Use lazy loading for galleries** - In scroll containers with many images, use `.lazy()` to reduce memory usage and improve initial load time.
+
+8. **Use emoji images for large emoji** - For emoji larger than ~24px, use `emoji_sized()` instead of text for crisp rendering.

@@ -144,6 +144,40 @@ let large_struct = expensive_struct.clone();
 div().on_click(move |_| use_struct(&large_struct))
 ```
 
+## Lazy Loading for Images
+
+For applications with many images (galleries, feeds, chat), use lazy loading to defer loading until images are visible:
+
+```rust
+// Images in a scrollable gallery
+scroll()
+    .h(600.0)
+    .child(
+        div()
+            .flex_row()
+            .flex_wrap()
+            .gap(8.0)
+            .child(
+                image_urls.iter().map(|url| {
+                    img(*url)
+                        .lazy()  // Only loads when scrolled into view
+                        .placeholder_color(Color::rgba(0.2, 0.2, 0.2, 1.0))
+                        .w(150.0)
+                        .h(150.0)
+                        .cover()
+                })
+            )
+    )
+```
+
+Benefits:
+
+- **Reduced initial memory** - Only visible images are loaded
+- **Faster startup** - No waiting for off-screen images
+- **Automatic cleanup** - LRU cache evicts old images
+
+Emoji images (`emoji()` and `emoji_sized()`) are automatically lazy-loaded. The ~180MB system emoji font is only loaded when emoji characters actually appear on screen.
+
 ## Debugging Performance
 
 Enable tracing to identify bottlenecks:
