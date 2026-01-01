@@ -43,10 +43,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use blinc_animation::{AnimationScheduler, SchedulerHandle, Spring, SpringConfig, SpringId};
-use blinc_core::{Color, Transform};
+use blinc_core::{Color, Rect, Transform};
 
 use crate::element::{MotionAnimation, MotionKeyframe};
 use crate::tree::LayoutNodeId;
+
+/// Buffer zone around viewport for prefetching content
+/// This prevents pop-in when scrolling slowly
+const VIEWPORT_BUFFER: f32 = 100.0;
 
 /// State of a motion animation
 #[derive(Clone, Debug)]
@@ -221,6 +225,7 @@ pub enum Overlay {
 /// - Cursor blink state
 /// - Scroll positions (from physics)
 /// - Hover/focus visual state
+/// - Viewport for visibility culling
 pub struct RenderState {
     /// Per-node animated properties
     node_states: HashMap<LayoutNodeId, NodeRenderState>,
@@ -242,6 +247,13 @@ pub struct RenderState {
 
     /// Last tick time (for calculating delta time)
     last_tick_time: Option<u64>,
+
+    /// Current viewport bounds for visibility culling
+    /// Updated each frame based on window size and scroll position
+    viewport: Rect,
+
+    /// Whether viewport has been set (false = no culling)
+    viewport_set: bool,
 }
 
 impl RenderState {
@@ -255,6 +267,8 @@ impl RenderState {
             cursor_blink_time: 0,
             cursor_blink_interval: 400,
             last_tick_time: None,
+            viewport: Rect::new(0.0, 0.0, 0.0, 0.0),
+            viewport_set: false,
         }
     }
 
@@ -760,6 +774,78 @@ impl RenderState {
     /// Check if any nodes have active motion animations
     pub fn has_active_motions(&self) -> bool {
         self.node_states.values().any(|s| s.has_active_motion())
+    }
+
+    // =========================================================================
+    // Viewport / Visibility Culling
+    // =========================================================================
+
+    /// Set the current viewport bounds
+    ///
+    /// Call this each frame with the visible area (window size).
+    /// Used for visibility culling of emoji and lazy-loaded images.
+    pub fn set_viewport(&mut self, x: f32, y: f32, width: f32, height: f32) {
+        self.viewport = Rect::new(x, y, width, height);
+        self.viewport_set = true;
+    }
+
+    /// Set the viewport from window dimensions (assumes origin at 0,0)
+    pub fn set_viewport_size(&mut self, width: f32, height: f32) {
+        self.set_viewport(0.0, 0.0, width, height);
+    }
+
+    /// Get the current viewport bounds
+    pub fn viewport(&self) -> Rect {
+        self.viewport
+    }
+
+    /// Get the viewport expanded by buffer zone for prefetching
+    ///
+    /// Content within this area should be loaded to prevent pop-in during scroll.
+    pub fn viewport_with_buffer(&self) -> Rect {
+        Rect::new(
+            self.viewport.x() - VIEWPORT_BUFFER,
+            self.viewport.y() - VIEWPORT_BUFFER,
+            self.viewport.width() + 2.0 * VIEWPORT_BUFFER,
+            self.viewport.height() + 2.0 * VIEWPORT_BUFFER,
+        )
+    }
+
+    /// Check if a rect is visible in the current viewport
+    ///
+    /// Returns true if the rect intersects with the viewport.
+    /// If viewport hasn't been set, always returns true (no culling).
+    pub fn is_visible(&self, bounds: &Rect) -> bool {
+        if !self.viewport_set {
+            return true; // No culling if viewport not set
+        }
+        self.viewport.intersects(bounds)
+    }
+
+    /// Check if a rect is visible with buffer zone (for prefetching)
+    ///
+    /// Returns true if the rect intersects with the expanded viewport.
+    /// Use this for deciding what to load ahead of time.
+    pub fn is_visible_with_buffer(&self, bounds: &Rect) -> bool {
+        if !self.viewport_set {
+            return true; // No culling if viewport not set
+        }
+        self.viewport_with_buffer().intersects(bounds)
+    }
+
+    /// Check if a rect is fully clipped (completely outside viewport)
+    ///
+    /// Returns true if the rect does not intersect with the viewport at all.
+    pub fn is_clipped(&self, bounds: &Rect) -> bool {
+        if !self.viewport_set {
+            return false; // Nothing clipped if viewport not set
+        }
+        !self.viewport.intersects(bounds)
+    }
+
+    /// Check if viewport has been set
+    pub fn has_viewport(&self) -> bool {
+        self.viewport_set
     }
 }
 

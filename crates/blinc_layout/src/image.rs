@@ -3,19 +3,64 @@
 //! Provides a builder for image elements that participate in layout:
 //! ```rust
 //! use blinc_layout::prelude::*;
+//! use blinc_core::Color;
 //!
 //! let photo = img("https://example.com/photo.jpg")
 //!     .size(200.0, 150.0)
 //!     .cover()
 //!     .rounded(8.0);
+//!
+//! // Lazy loading (only loads when visible in viewport)
+//! let lazy_photo = img("https://example.com/large.jpg")
+//!     .lazy()
+//!     .placeholder_color(Color::GRAY);
 //! ```
 
-use blinc_core::{Shadow, Transform};
+use std::time::Duration;
+
+use blinc_core::{Color, Shadow, Transform};
 use taffy::prelude::*;
 
 use crate::div::{ElementBuilder, ElementTypeId, ImageRenderInfo};
 use crate::element::{RenderLayer, RenderProps};
 use crate::tree::{LayoutNodeId, LayoutTree};
+
+// ============================================================================
+// Loading Strategy
+// ============================================================================
+
+/// Image loading strategy
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LoadingStrategy {
+    /// Load immediately when element is created (default, backwards compatible)
+    #[default]
+    Eager,
+    /// Load only when visible in viewport
+    Lazy,
+}
+
+// ============================================================================
+// Placeholder
+// ============================================================================
+
+/// Placeholder configuration for lazy-loaded images
+#[derive(Debug, Clone)]
+pub enum Placeholder {
+    /// No placeholder (blank until loaded)
+    None,
+    /// Solid color placeholder
+    Color(Color),
+    /// Another image as placeholder (e.g., low-res thumbnail, blur hash)
+    Image(String),
+    /// Skeleton loading animation (shimmer effect)
+    Skeleton,
+}
+
+impl Default for Placeholder {
+    fn default() -> Self {
+        Placeholder::Color(Color::rgba(0.15, 0.15, 0.15, 0.5))
+    }
+}
 
 // ============================================================================
 // Object Fit (mirroring blinc_image for layout purposes)
@@ -160,6 +205,12 @@ pub struct Image {
     shadow: Option<Shadow>,
     /// Transform
     transform: Option<Transform>,
+    /// Loading strategy (eager or lazy)
+    loading: LoadingStrategy,
+    /// Placeholder for lazy loading
+    placeholder: Placeholder,
+    /// Fade-in duration when image loads (for lazy loading)
+    fade_duration: Duration,
 }
 
 impl Image {
@@ -190,6 +241,9 @@ impl Image {
             render_layer: RenderLayer::default(),
             shadow: None,
             transform: None,
+            loading: LoadingStrategy::default(),
+            placeholder: Placeholder::default(),
+            fade_duration: Duration::from_millis(200),
         }
     }
 
@@ -541,6 +595,109 @@ impl Image {
     }
 
     // =========================================================================
+    // Lazy Loading
+    // =========================================================================
+
+    /// Enable lazy loading (load only when visible in viewport)
+    ///
+    /// When enabled, the image will only start loading when it becomes
+    /// visible in the viewport. A placeholder will be shown until loaded,
+    /// with an optional fade-in animation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// img("large-photo.jpg")
+    ///     .lazy()
+    ///     .placeholder_color(Color::GRAY)
+    ///     .fade_in(Duration::from_millis(300))
+    /// ```
+    pub fn lazy(mut self) -> Self {
+        self.loading = LoadingStrategy::Lazy;
+        self
+    }
+
+    /// Set the loading strategy
+    pub fn loading_strategy(mut self, strategy: LoadingStrategy) -> Self {
+        self.loading = strategy;
+        self
+    }
+
+    /// Set placeholder for lazy loading
+    ///
+    /// The placeholder is shown while the image is loading.
+    pub fn placeholder(mut self, placeholder: Placeholder) -> Self {
+        self.placeholder = placeholder;
+        self
+    }
+
+    /// Set a solid color placeholder
+    ///
+    /// # Example
+    /// ```ignore
+    /// img("photo.jpg")
+    ///     .lazy()
+    ///     .placeholder_color(Color::rgba(0.2, 0.2, 0.2, 1.0))
+    /// ```
+    pub fn placeholder_color(mut self, color: Color) -> Self {
+        self.placeholder = Placeholder::Color(color);
+        self
+    }
+
+    /// Set an image as placeholder (e.g., low-res thumbnail, blur hash)
+    ///
+    /// # Example
+    /// ```ignore
+    /// img("large-photo.jpg")
+    ///     .lazy()
+    ///     .placeholder_image("thumbnail.jpg")
+    /// ```
+    pub fn placeholder_image(mut self, source: impl Into<String>) -> Self {
+        self.placeholder = Placeholder::Image(source.into());
+        self
+    }
+
+    /// Use skeleton placeholder (shimmer animation)
+    pub fn skeleton(mut self) -> Self {
+        self.placeholder = Placeholder::Skeleton;
+        self
+    }
+
+    /// Set fade-in duration when image loads
+    ///
+    /// When the image finishes loading, it will fade in over this duration.
+    /// Default is 200ms.
+    pub fn fade_in(mut self, duration: Duration) -> Self {
+        self.fade_duration = duration;
+        self
+    }
+
+    /// Disable fade-in animation
+    pub fn no_fade(mut self) -> Self {
+        self.fade_duration = Duration::ZERO;
+        self
+    }
+
+    /// Get the loading strategy
+    pub fn get_loading_strategy(&self) -> LoadingStrategy {
+        self.loading
+    }
+
+    /// Get the placeholder configuration
+    pub fn get_placeholder(&self) -> &Placeholder {
+        &self.placeholder
+    }
+
+    /// Get the fade-in duration
+    pub fn get_fade_duration(&self) -> Duration {
+        self.fade_duration
+    }
+
+    /// Check if this image uses lazy loading
+    pub fn is_lazy(&self) -> bool {
+        matches!(self.loading, LoadingStrategy::Lazy)
+    }
+
+    // =========================================================================
     // Getters
     // =========================================================================
 
@@ -594,6 +751,13 @@ impl ElementBuilder for Image {
     }
 
     fn image_render_info(&self) -> Option<ImageRenderInfo> {
+        let (placeholder_type, placeholder_color, placeholder_image) = match &self.placeholder {
+            Placeholder::None => (0, [0.0, 0.0, 0.0, 0.0], None),
+            Placeholder::Color(c) => (1, [c.r, c.g, c.b, c.a], None),
+            Placeholder::Image(src) => (2, [0.0, 0.0, 0.0, 0.0], Some(src.clone())),
+            Placeholder::Skeleton => (3, [0.0, 0.0, 0.0, 0.0], None),
+        };
+
         Some(ImageRenderInfo {
             source: self.source.clone(),
             object_fit: self.object_fit.to_u8(),
@@ -602,6 +766,14 @@ impl ElementBuilder for Image {
             border_radius: self.border_radius,
             tint: self.tint,
             filter: self.filter.to_array(),
+            loading_strategy: match self.loading {
+                LoadingStrategy::Eager => 0,
+                LoadingStrategy::Lazy => 1,
+            },
+            placeholder_type,
+            placeholder_color,
+            placeholder_image,
+            fade_duration_ms: self.fade_duration.as_millis() as u32,
         })
     }
 
@@ -631,6 +803,10 @@ pub fn image(source: impl Into<String>) -> Image {
 /// This is useful for displaying emoji at arbitrary sizes with proper
 /// color rendering.
 ///
+/// Emoji images are automatically lazy-loaded - they only load when
+/// visible in the viewport. This optimizes memory usage when displaying
+/// many emoji (e.g., in chat applications or emoji pickers).
+///
 /// # Examples
 ///
 /// ```ignore
@@ -644,17 +820,25 @@ pub fn image(source: impl Into<String>) -> Image {
 /// ```
 pub fn emoji(emoji_char: impl Into<String>) -> Image {
     let emoji_str = emoji_char.into();
-    Image::new(format!("emoji://{}", emoji_str)).size(64.0, 64.0)
+    Image::new(format!("emoji://{}", emoji_str))
+        .size(64.0, 64.0)
+        .lazy() // Emoji are always lazy-loaded for memory efficiency
+        .no_fade() // Emoji should appear instantly (no fade animation)
 }
 
 /// Create an emoji image element with custom size
+///
+/// Emoji images are automatically lazy-loaded for memory efficiency.
 ///
 /// # Arguments
 /// * `emoji_char` - The emoji character or string (e.g., "😀", "🇺🇸")
 /// * `size` - The size in pixels (used for both width and height)
 pub fn emoji_sized(emoji_char: impl Into<String>, size: f32) -> Image {
     let emoji_str = emoji_char.into();
-    Image::new(format!("emoji://{}?size={}", emoji_str, size)).size(size, size)
+    Image::new(format!("emoji://{}?size={}", emoji_str, size))
+        .size(size, size)
+        .lazy() // Emoji are always lazy-loaded for memory efficiency
+        .no_fade() // Emoji should appear instantly (no fade animation)
 }
 
 #[cfg(test)]
@@ -692,5 +876,60 @@ mod tests {
         let _node = i.build(&mut tree);
 
         assert_eq!(tree.len(), 1);
+    }
+
+    #[test]
+    fn test_lazy_loading() {
+        // Test lazy loading builder
+        let i = img("large-photo.jpg")
+            .lazy()
+            .placeholder_color(Color::GRAY)
+            .fade_in(Duration::from_millis(300));
+
+        assert!(i.is_lazy());
+        assert_eq!(i.get_fade_duration(), Duration::from_millis(300));
+
+        let info = i.image_render_info().unwrap();
+        assert_eq!(info.loading_strategy, 1); // Lazy
+        assert_eq!(info.placeholder_type, 1); // Color
+        assert_eq!(info.fade_duration_ms, 300);
+    }
+
+    #[test]
+    fn test_eager_loading_default() {
+        // Test that images are eager by default
+        let i = img("photo.jpg");
+
+        assert!(!i.is_lazy());
+
+        let info = i.image_render_info().unwrap();
+        assert_eq!(info.loading_strategy, 0); // Eager
+    }
+
+    #[test]
+    fn test_placeholder_image() {
+        let i = img("large.jpg")
+            .lazy()
+            .placeholder_image("thumbnail.jpg");
+
+        let info = i.image_render_info().unwrap();
+        assert_eq!(info.placeholder_type, 2); // Image
+        assert_eq!(info.placeholder_image, Some("thumbnail.jpg".to_string()));
+    }
+
+    #[test]
+    fn test_skeleton_placeholder() {
+        let i = img("large.jpg").lazy().skeleton();
+
+        let info = i.image_render_info().unwrap();
+        assert_eq!(info.placeholder_type, 3); // Skeleton
+    }
+
+    #[test]
+    fn test_no_fade() {
+        let i = img("photo.jpg").lazy().no_fade();
+
+        assert_eq!(i.get_fade_duration(), Duration::ZERO);
+        assert_eq!(i.image_render_info().unwrap().fade_duration_ms, 0);
     }
 }

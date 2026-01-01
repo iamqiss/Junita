@@ -1714,6 +1714,10 @@ impl WindowedApp {
                             // Update context from window
                             windowed_ctx.update_from_window(window);
 
+                            // Update viewport for lazy loading visibility checks
+                            // Uses logical pixels (width/height) as that's what layout uses
+                            rs.set_viewport_size(windowed_ctx.width, windowed_ctx.height);
+
                             // =========================================================
                             // PHASE 1: Check if tree structure needs rebuild
                             // Only structural changes require tree rebuild

@@ -2,7 +2,7 @@
 //!
 //! Wraps the GPU rendering pipeline with a clean API.
 
-use blinc_core::{Brush, Color, CornerRadius, DrawCommand, Rect, Stroke};
+use blinc_core::{Brush, Color, CornerRadius, DrawCommand, DrawContextExt, Rect, Stroke};
 use blinc_gpu::{
     FontRegistry, GenericFont as GpuGenericFont, GpuGlyph, GpuImage, GpuImageInstance,
     GpuPaintContext, GpuPrimitive, GpuRenderer, ImageRenderingContext, PrimitiveBatch,
@@ -104,6 +104,12 @@ struct ImageElement {
     clip_radius: [f32; 4],
     /// Which layer this image renders in
     layer: RenderLayer,
+    /// Loading strategy: 0 = Eager (load immediately), 1 = Lazy (load when visible)
+    loading_strategy: u8,
+    /// Placeholder type: 0 = None, 1 = Color, 2 = Image, 3 = Skeleton
+    placeholder_type: u8,
+    /// Placeholder color [r, g, b, a]
+    placeholder_color: [f32; 4],
 }
 
 impl RenderContext {
@@ -163,7 +169,7 @@ impl RenderContext {
         let (texts, svgs, images) = self.collect_render_elements(tree);
 
         // Pre-load all images into cache before rendering
-        self.preload_images(&images);
+        self.preload_images(&images, width as f32, height as f32);
 
         // Prepare text glyphs
         let mut all_glyphs = Vec::new();
@@ -325,7 +331,7 @@ impl RenderContext {
                 .render_with_clear(target, &bg_batch, [0.0, 0.0, 0.0, 1.0]);
 
             // Render images after background primitives
-            self.render_images(target, &images);
+            self.render_images(target, &images, width as f32, height as f32);
 
             // Render foreground with MSAA for smooth SVG edges
             if !fg_batch.is_empty() {
@@ -461,11 +467,40 @@ impl RenderContext {
     }
 
     /// Pre-load images into cache (call before rendering)
-    fn preload_images(&mut self, images: &[ImageElement]) {
+    ///
+    /// Images with lazy loading strategy are only loaded when visible in the viewport.
+    /// A buffer zone extends the viewport to preload images that are about to become visible.
+    fn preload_images(&mut self, images: &[ImageElement], viewport_width: f32, viewport_height: f32) {
+        // Buffer zone: load images that are within 100px of becoming visible
+        const VISIBILITY_BUFFER: f32 = 100.0;
+
         for image in images {
             // LruCache::contains also promotes to most-recently-used
             if self.image_cache.contains(&image.source) {
                 continue;
+            }
+
+            // Check if lazy loading is enabled (loading_strategy == 1)
+            if image.loading_strategy == 1 {
+                // Check if image is visible in viewport (with buffer for prefetching)
+                let viewport_left = -VISIBILITY_BUFFER;
+                let viewport_top = -VISIBILITY_BUFFER;
+                let viewport_right = viewport_width + VISIBILITY_BUFFER;
+                let viewport_bottom = viewport_height + VISIBILITY_BUFFER;
+
+                let image_right = image.x + image.width;
+                let image_bottom = image.y + image.height;
+
+                // Check intersection (image visible in extended viewport)
+                let is_visible = image.x < viewport_right
+                    && image_right > viewport_left
+                    && image.y < viewport_bottom
+                    && image_bottom > viewport_top;
+
+                if !is_visible {
+                    // Skip loading - image is not yet visible
+                    continue;
+                }
             }
 
             // Try to load the image - use from_uri to handle emoji://, data:, and file paths
@@ -492,12 +527,55 @@ impl RenderContext {
     }
 
     /// Render images to target (images must be preloaded first)
-    fn render_images(&mut self, target: &wgpu::TextureView, images: &[ImageElement]) {
+    fn render_images(
+        &mut self,
+        target: &wgpu::TextureView,
+        images: &[ImageElement],
+        viewport_width: f32,
+        viewport_height: f32,
+    ) {
         use blinc_image::{calculate_fit_rects, src_rect_to_uv, ObjectFit, ObjectPosition};
 
         for image in images {
             // Get cached GPU image
-            let Some(gpu_image) = self.image_cache.get(&image.source) else {
+            let gpu_image = self.image_cache.get(&image.source);
+
+            // If image is not loaded and has a placeholder, render placeholder
+            if gpu_image.is_none() && image.placeholder_type != 0 {
+                // Placeholder type 1 = Color
+                if image.placeholder_type == 1 {
+                    // Render a solid color rectangle as placeholder
+                    let color = blinc_core::Color::rgba(
+                        image.placeholder_color[0],
+                        image.placeholder_color[1],
+                        image.placeholder_color[2],
+                        image.placeholder_color[3],
+                    );
+
+                    // Create a simple rectangle for the placeholder
+                    let mut ctx = GpuPaintContext::new(viewport_width, viewport_height);
+
+                    let rect = blinc_core::Rect::new(
+                        image.x,
+                        image.y,
+                        image.width,
+                        image.height,
+                    );
+
+                    ctx.fill_rounded_rect(
+                        rect,
+                        blinc_core::CornerRadius::uniform(image.border_radius),
+                        color,
+                    );
+
+                    let batch = ctx.take_batch();
+                    self.renderer.render_overlay(target, &batch);
+                }
+                // TODO: Placeholder type 2 = Image (thumbnail), 3 = Skeleton (shimmer)
+                continue;
+            }
+
+            let Some(gpu_image) = gpu_image else {
                 continue; // Skip images that failed to load
             };
 
@@ -856,6 +934,9 @@ impl RenderContext {
                         clip_bounds: scaled_clip,
                         clip_radius: [0.0; 4],
                         layer: effective_layer,
+                        loading_strategy: image_data.loading_strategy,
+                        placeholder_type: image_data.placeholder_type,
+                        placeholder_color: image_data.placeholder_color,
                     });
                 }
                 // Canvas elements are rendered inline during tree traversal (in render_layer)
@@ -976,7 +1057,7 @@ impl RenderContext {
             self.collect_render_elements_with_state(tree, Some(render_state));
 
         // Pre-load all images into cache before rendering
-        self.preload_images(&images);
+        self.preload_images(&images, width as f32, height as f32);
 
         // Prepare text glyphs with z_layer information
         // Store (z_layer, glyphs) to enable interleaved rendering
@@ -1184,13 +1265,13 @@ impl RenderContext {
                 }
 
                 // Images render on top (existing behavior)
-                self.render_images(target, &images);
+                self.render_images(target, &images, width as f32, height as f32);
             } else {
                 // No z-layers, use original fast path
                 self.renderer
                     .render_with_clear(target, &batch, [0.0, 0.0, 0.0, 1.0]);
 
-                self.render_images(target, &images);
+                self.render_images(target, &images, width as f32, height as f32);
 
                 // Collect all glyphs for flat rendering
                 let all_glyphs: Vec<_> = glyphs_by_layer.values().flatten().cloned().collect();
@@ -1245,7 +1326,7 @@ impl RenderContext {
             self.collect_render_elements_with_state(tree, Some(render_state));
 
         // Pre-load all images into cache before rendering
-        self.preload_images(&images);
+        self.preload_images(&images, width as f32, height as f32);
 
         // Prepare text glyphs with z_layer information
         let mut glyphs_by_layer: std::collections::BTreeMap<u32, Vec<GpuGlyph>> =
@@ -1374,7 +1455,7 @@ impl RenderContext {
         }
 
         // Images render on top
-        self.render_images(target, &images);
+        self.render_images(target, &images, width as f32, height as f32);
 
         // Poll the device to free completed command buffers
         self.renderer.poll();

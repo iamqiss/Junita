@@ -187,6 +187,12 @@ pub struct ImageData {
     pub tint: [f32; 4],
     /// Filter: [grayscale, sepia, brightness, contrast, saturate, hue_rotate, invert, blur]
     pub filter: [f32; 8],
+    /// Loading strategy: 0 = Eager (default), 1 = Lazy
+    pub loading_strategy: u8,
+    /// Placeholder type: 0 = None, 1 = Color, 2 = Image, 3 = Skeleton
+    pub placeholder_type: u8,
+    /// Placeholder color [r, g, b, a]
+    pub placeholder_color: [f32; 4],
 }
 
 /// Node data for rendering
@@ -1036,6 +1042,9 @@ impl RenderTree {
                         border_radius: info.border_radius,
                         tint: info.tint,
                         filter: info.filter,
+                        loading_strategy: info.loading_strategy,
+                        placeholder_type: info.placeholder_type,
+                        placeholder_color: info.placeholder_color,
                     })
                 } else {
                     ElementType::Div
@@ -1175,6 +1184,9 @@ impl RenderTree {
                         border_radius: info.border_radius,
                         tint: info.tint,
                         filter: info.filter,
+                        loading_strategy: info.loading_strategy,
+                        placeholder_type: info.placeholder_type,
+                        placeholder_color: info.placeholder_color,
                     })
                 } else {
                     ElementType::Div
@@ -1277,6 +1289,9 @@ impl RenderTree {
                         border_radius: info.border_radius,
                         tint: info.tint,
                         filter: info.filter,
+                        loading_strategy: info.loading_strategy,
+                        placeholder_type: info.placeholder_type,
+                        placeholder_color: info.placeholder_color,
                     })
                 } else {
                     ElementType::Div
@@ -1336,6 +1351,9 @@ impl RenderTree {
                         border_radius: info.border_radius,
                         tint: info.tint,
                         filter: info.filter,
+                        loading_strategy: info.loading_strategy,
+                        placeholder_type: info.placeholder_type,
+                        placeholder_color: info.placeholder_color,
                     })
                 } else {
                     ElementType::Div

@@ -2049,6 +2049,16 @@ pub struct ImageRenderInfo {
     pub tint: [f32; 4],
     /// Filter: [grayscale, sepia, brightness, contrast, saturate, hue_rotate, invert, blur]
     pub filter: [f32; 8],
+    /// Loading strategy: 0 = Eager (default), 1 = Lazy
+    pub loading_strategy: u8,
+    /// Placeholder type: 0 = None, 1 = Color, 2 = Image, 3 = Skeleton
+    pub placeholder_type: u8,
+    /// Placeholder color (only used when placeholder_type == 1)
+    pub placeholder_color: [f32; 4],
+    /// Placeholder image source (only used when placeholder_type == 2)
+    pub placeholder_image: Option<String>,
+    /// Fade-in duration in milliseconds
+    pub fade_duration_ms: u32,
 }
 
 impl Default for ImageRenderInfo {
@@ -2061,6 +2071,11 @@ impl Default for ImageRenderInfo {
             border_radius: 0.0,
             tint: [1.0, 1.0, 1.0, 1.0],
             filter: [0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0], // identity filter
+            loading_strategy: 0,                              // Eager
+            placeholder_type: 1,                              // Color (default)
+            placeholder_color: [0.15, 0.15, 0.15, 0.5],       // Default gray
+            placeholder_image: None,
+            fade_duration_ms: 200,
         }
     }
 }

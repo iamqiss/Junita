@@ -190,6 +190,40 @@ impl Rect {
             size: Size::new(max_x - min_x, max_y - min_y),
         }
     }
+
+    /// Check if this rect intersects with another
+    ///
+    /// Returns true if the two rects overlap at any point.
+    pub fn intersects(&self, other: &Rect) -> bool {
+        let self_right = self.origin.x + self.size.width;
+        let self_bottom = self.origin.y + self.size.height;
+        let other_right = other.origin.x + other.size.width;
+        let other_bottom = other.origin.y + other.size.height;
+
+        self.origin.x < other_right
+            && self_right > other.origin.x
+            && self.origin.y < other_bottom
+            && self_bottom > other.origin.y
+    }
+
+    /// Get the intersection of two rects (if they overlap)
+    ///
+    /// Returns None if the rects don't overlap.
+    pub fn intersection(&self, other: &Rect) -> Option<Self> {
+        if !self.intersects(other) {
+            return None;
+        }
+
+        let x = self.origin.x.max(other.origin.x);
+        let y = self.origin.y.max(other.origin.y);
+        let right = (self.origin.x + self.size.width).min(other.origin.x + other.size.width);
+        let bottom = (self.origin.y + self.size.height).min(other.origin.y + other.size.height);
+
+        Some(Rect {
+            origin: Point::new(x, y),
+            size: Size::new(right - x, bottom - y),
+        })
+    }
 }
 
 /// 2D vector
