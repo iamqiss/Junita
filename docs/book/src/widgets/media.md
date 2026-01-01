@@ -109,6 +109,20 @@ img("photo.jpg")
     .w(300.0)
     .h(200.0)
 
+// With gradient placeholder using Brush
+img("photo.jpg")
+    .lazy()
+    .placeholder_brush(Brush::linear_gradient(
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 1.0),
+        vec![
+            GradientStop::new(0.0, Color::rgba(0.1, 0.1, 0.15, 1.0)),
+            GradientStop::new(1.0, Color::rgba(0.2, 0.2, 0.25, 1.0)),
+        ],
+    ))
+    .w(300.0)
+    .h(200.0)
+
 // With thumbnail placeholder
 img("large-photo.jpg")
     .lazy()
@@ -146,6 +160,7 @@ img("photo.jpg")
 |-------------|-------------|
 | `None` | No placeholder (blank until loaded) |
 | `Color(color)` | Solid color background |
+| `Brush(brush)` | Any brush (gradient, glass effect, etc.) |
 | `Image(url)` | Another image (e.g., low-res thumbnail, blur hash) |
 | `Skeleton` | Shimmer loading animation |
 

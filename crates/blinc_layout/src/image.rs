@@ -18,7 +18,7 @@
 
 use std::time::Duration;
 
-use blinc_core::{Color, Shadow, Transform};
+use blinc_core::{Brush, Color, Shadow, Transform};
 use taffy::prelude::*;
 
 use crate::div::{ElementBuilder, ElementTypeId, ImageRenderInfo};
@@ -50,6 +50,8 @@ pub enum Placeholder {
     None,
     /// Solid color placeholder
     Color(Color),
+    /// Brush placeholder (supports gradients, glass effects, etc.)
+    Brush(Brush),
     /// Another image as placeholder (e.g., low-res thumbnail, blur hash)
     Image(String),
     /// Skeleton loading animation (shimmer effect)
@@ -59,6 +61,18 @@ pub enum Placeholder {
 impl Default for Placeholder {
     fn default() -> Self {
         Placeholder::Color(Color::rgba(0.15, 0.15, 0.15, 0.5))
+    }
+}
+
+impl From<Color> for Placeholder {
+    fn from(color: Color) -> Self {
+        Placeholder::Color(color)
+    }
+}
+
+impl From<Brush> for Placeholder {
+    fn from(brush: Brush) -> Self {
+        Placeholder::Brush(brush)
     }
 }
 
@@ -643,6 +657,28 @@ impl Image {
         self
     }
 
+    /// Set a brush as placeholder (supports gradients, glass effects, etc.)
+    ///
+    /// # Example
+    /// ```ignore
+    /// use blinc_core::{Brush, Gradient, GradientStop};
+    ///
+    /// // Gradient placeholder
+    /// let gradient = Gradient::linear(0.0, 0.0, 0.0, 1.0)
+    ///     .with_stops(vec![
+    ///         GradientStop::new(0.0, Color::rgba(0.2, 0.2, 0.3, 1.0)),
+    ///         GradientStop::new(1.0, Color::rgba(0.1, 0.1, 0.15, 1.0)),
+    ///     ]);
+    ///
+    /// img("photo.jpg")
+    ///     .lazy()
+    ///     .placeholder_brush(Brush::Gradient(gradient))
+    /// ```
+    pub fn placeholder_brush(mut self, brush: impl Into<Brush>) -> Self {
+        self.placeholder = Placeholder::Brush(brush.into());
+        self
+    }
+
     /// Set an image as placeholder (e.g., low-res thumbnail, blur hash)
     ///
     /// # Example
@@ -754,6 +790,25 @@ impl ElementBuilder for Image {
         let (placeholder_type, placeholder_color, placeholder_image) = match &self.placeholder {
             Placeholder::None => (0, [0.0, 0.0, 0.0, 0.0], None),
             Placeholder::Color(c) => (1, [c.r, c.g, c.b, c.a], None),
+            Placeholder::Brush(brush) => {
+                // Extract representative color from brush for rendering
+                // TODO: Full brush rendering support in image pipeline
+                let color = match brush {
+                    Brush::Solid(c) => [c.r, c.g, c.b, c.a],
+                    Brush::Gradient(g) => {
+                        // Use first gradient stop color
+                        if let Some(stop) = g.stops().first() {
+                            let c = &stop.color;
+                            [c.r, c.g, c.b, c.a]
+                        } else {
+                            [0.2, 0.2, 0.2, 1.0]
+                        }
+                    }
+                    Brush::Glass(_) => [0.1, 0.1, 0.1, 0.5], // Semi-transparent for glass
+                    Brush::Image(_) => [0.0, 0.0, 0.0, 0.0],
+                };
+                (4, color, None) // Type 4 = Brush (treated as color for now)
+            }
             Placeholder::Image(src) => (2, [0.0, 0.0, 0.0, 0.0], Some(src.clone())),
             Placeholder::Skeleton => (3, [0.0, 0.0, 0.0, 0.0], None),
         };
