@@ -909,6 +909,24 @@ impl Div {
         self
     }
 
+    /// Align content to start (for multi-line flex containers)
+    pub fn content_start(mut self) -> Self {
+        self.style.align_content = Some(taffy::AlignContent::Start);
+        self
+    }
+
+    /// Align content to center (for multi-line flex containers)
+    pub fn content_center(mut self) -> Self {
+        self.style.align_content = Some(taffy::AlignContent::Center);
+        self
+    }
+
+    /// Align content to end (for multi-line flex containers)
+    pub fn content_end(mut self) -> Self {
+        self.style.align_content = Some(taffy::AlignContent::End);
+        self
+    }
+
     // =========================================================================
     // Sizing (pixel values)
     // =========================================================================

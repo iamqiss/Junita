@@ -420,6 +420,8 @@ impl RenderTree {
         registry: Arc<ElementRegistry>,
     ) -> Self {
         let mut tree = Self::new();
+        // Clear the shared registry before building to avoid duplicate ID warnings
+        registry.clear();
         // Set shared registry BEFORE building so IDs are registered correctly
         tree.element_registry = registry;
         // Compute tree hash for change detection
