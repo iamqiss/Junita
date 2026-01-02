@@ -10,7 +10,9 @@
 //! - **Timelines**: Orchestrate multiple animations with offsets
 //! - **Interruptible**: Animations inherit velocity when interrupted
 //! - **Animation Presets**: Common entry/exit animations
+//! - **AnimationContext**: Platform-agnostic animation management trait
 
+pub mod context;
 pub mod easing;
 pub mod keyframe;
 pub mod presets;
@@ -18,6 +20,7 @@ pub mod scheduler;
 pub mod spring;
 pub mod timeline;
 
+pub use context::{AnimationContext, AnimationContextExt, SharedAnimatedTimeline, SharedAnimatedValue};
 pub use easing::Easing;
 pub use keyframe::{
     FillMode, Keyframe, KeyframeAnimation, KeyframeProperties, MultiKeyframe,

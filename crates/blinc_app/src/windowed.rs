@@ -30,9 +30,10 @@ use std::sync::{
 };
 
 use blinc_animation::{
-    AnimatedTimeline, AnimatedValue, AnimationScheduler, SchedulerHandle, SpringConfig,
+    AnimatedTimeline, AnimatedValue, AnimationContext, AnimationScheduler, SchedulerHandle,
+    SharedAnimatedTimeline, SharedAnimatedValue, SpringConfig,
 };
-use blinc_core::reactive::{Derived, ReactiveGraph, Signal};
+use blinc_core::reactive::{Derived, ReactiveGraph, Signal, State, StatefulDepsCallback};
 use blinc_layout::prelude::*;
 use blinc_layout::widgets::overlay::{overlay_manager, OverlayManager, OverlayManagerExt};
 use blinc_platform::{
@@ -46,11 +47,7 @@ use crate::error::{BlincError, Result};
 /// Shared animation scheduler for the application (thread-safe)
 pub type SharedAnimationScheduler = Arc<Mutex<AnimationScheduler>>;
 
-/// Shared animated value for persisting across UI rebuilds (thread-safe)
-pub type SharedAnimatedValue = Arc<Mutex<AnimatedValue>>;
-
-/// Shared animated timeline for persisting across UI rebuilds (thread-safe)
-pub type SharedAnimatedTimeline = Arc<Mutex<AnimatedTimeline>>;
+// SharedAnimatedValue and SharedAnimatedTimeline are re-exported from blinc_animation
 
 #[cfg(all(feature = "windowed", not(target_os = "android")))]
 use blinc_platform_desktop::DesktopPlatform;
@@ -119,87 +116,6 @@ impl HookState {
 
 /// Shared hook state for the application
 pub type SharedHookState = Arc<Mutex<HookState>>;
-
-/// A bound state value with direct get/set methods
-///
-/// This is returned by `use_state` and provides a convenient API for
-/// reading and writing state without needing to access the reactive graph directly.
-#[derive(Clone)]
-pub struct State<T> {
-    signal: Signal<T>,
-    reactive: SharedReactiveGraph,
-    dirty_flag: RefDirtyFlag,
-}
-
-impl<T: Clone + Send + 'static> State<T> {
-    /// Get the current value
-    pub fn get(&self) -> T
-    where
-        T: Default,
-    {
-        self.reactive
-            .lock()
-            .unwrap()
-            .get(self.signal)
-            .unwrap_or_default()
-    }
-
-    /// Get the current value, returning None if not found
-    pub fn try_get(&self) -> Option<T> {
-        self.reactive.lock().unwrap().get(self.signal)
-    }
-
-    /// Set a new value
-    ///
-    /// This updates the value without triggering a tree rebuild.
-    /// The renderer reads values at render time, so changes are
-    /// reflected on the next frame automatically.
-    ///
-    /// Use `set_rebuild()` only when the change affects tree structure
-    /// (adding/removing elements, changing text content, etc.)
-    pub fn set(&self, value: T) {
-        self.reactive.lock().unwrap().set(self.signal, value);
-        // Check if any stateful elements depend on this signal
-        blinc_layout::check_stateful_deps(&[self.signal.id()]);
-    }
-
-    /// Set a new value AND trigger a UI tree rebuild
-    ///
-    /// Only use this when the state change affects tree structure:
-    /// - Adding or removing elements
-    /// - Changing text content
-    /// - Changing layout-affecting properties (size, padding, etc.)
-    ///
-    /// For visual-only changes (colors, opacity, animations), use `set()`.
-    pub fn set_rebuild(&self, value: T) {
-        self.reactive.lock().unwrap().set(self.signal, value);
-        self.dirty_flag.store(true, Ordering::SeqCst);
-    }
-
-    /// Update the value using a function
-    ///
-    /// Does not trigger rebuild. Use `update_rebuild()` for structural changes.
-    pub fn update(&self, f: impl FnOnce(T) -> T) {
-        self.reactive.lock().unwrap().update(self.signal, f);
-        // No rebuild by default
-    }
-
-    /// Update the value AND trigger a UI tree rebuild
-    pub fn update_rebuild(&self, f: impl FnOnce(T) -> T) {
-        self.reactive.lock().unwrap().update(self.signal, f);
-        self.dirty_flag.store(true, Ordering::SeqCst);
-    }
-
-    /// Get the underlying signal (for advanced use cases)
-    pub fn signal(&self) -> Signal<T> {
-        self.signal
-    }
-
-    /// Get the signal ID (for dependency tracking)
-    pub fn signal_id(&self) -> blinc_core::reactive::SignalId {
-        self.signal.id()
-    }
-}
 
 /// Context passed to the UI builder function
 pub struct WindowedContext {
@@ -358,11 +274,17 @@ impl WindowedContext {
             signal
         };
 
-        State {
+        // Create callback for stateful deps notification
+        let callback: StatefulDepsCallback = Arc::new(|signal_ids| {
+            blinc_layout::check_stateful_deps(signal_ids);
+        });
+
+        State::with_stateful_callback(
             signal,
-            reactive: Arc::clone(&self.reactive),
-            dirty_flag: Arc::clone(&self.ref_dirty_flag),
-        }
+            Arc::clone(&self.reactive),
+            Arc::clone(&self.ref_dirty_flag),
+            callback,
+        )
     }
 
     /// Create a persistent signal that survives across UI rebuilds (keyed)
@@ -1082,6 +1004,107 @@ impl WindowedContext {
     /// ```
     pub fn theme_radius(&self, token: blinc_theme::RadiusToken) -> f32 {
         blinc_theme::ThemeState::get().radius(token)
+    }
+}
+
+// =============================================================================
+// BlincContext Implementation
+// =============================================================================
+
+impl blinc_core::BlincContext for WindowedContext {
+    fn use_state_keyed<T, F>(&self, key: &str, init: F) -> State<T>
+    where
+        T: Clone + Send + 'static,
+        F: FnOnce() -> T,
+    {
+        // Delegate to the existing method
+        WindowedContext::use_state_keyed(self, key, init)
+    }
+
+    fn use_signal_keyed<T, F>(&self, key: &str, init: F) -> Signal<T>
+    where
+        T: Clone + Send + 'static,
+        F: FnOnce() -> T,
+    {
+        WindowedContext::use_signal_keyed(self, key, init)
+    }
+
+    fn use_signal<T: Send + 'static>(&self, initial: T) -> Signal<T> {
+        WindowedContext::use_signal(self, initial)
+    }
+
+    fn get<T: Clone + 'static>(&self, signal: Signal<T>) -> Option<T> {
+        WindowedContext::get(self, signal)
+    }
+
+    fn set<T: Send + 'static>(&self, signal: Signal<T>, value: T) {
+        WindowedContext::set(self, signal, value)
+    }
+
+    fn update<T: Clone + Send + 'static, F: FnOnce(T) -> T>(&self, signal: Signal<T>, f: F) {
+        WindowedContext::update(self, signal, f)
+    }
+
+    fn use_derived<T, F>(&self, compute: F) -> Derived<T>
+    where
+        T: Clone + Send + 'static,
+        F: Fn(&ReactiveGraph) -> T + Send + 'static,
+    {
+        WindowedContext::use_derived(self, compute)
+    }
+
+    fn get_derived<T: Clone + 'static>(&self, derived: Derived<T>) -> Option<T> {
+        WindowedContext::get_derived(self, derived)
+    }
+
+    fn batch<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut ReactiveGraph) -> R,
+    {
+        WindowedContext::batch(self, f)
+    }
+
+    fn dirty_flag(&self) -> blinc_core::DirtyFlag {
+        WindowedContext::dirty_flag(self)
+    }
+
+    fn request_rebuild(&self) {
+        self.ref_dirty_flag.store(true, Ordering::SeqCst);
+    }
+
+    fn width(&self) -> f32 {
+        self.width
+    }
+
+    fn height(&self) -> f32 {
+        self.height
+    }
+
+    fn scale_factor(&self) -> f64 {
+        self.scale_factor
+    }
+}
+
+// =============================================================================
+// AnimationContext Implementation
+// =============================================================================
+
+impl AnimationContext for WindowedContext {
+    fn animation_handle(&self) -> SchedulerHandle {
+        WindowedContext::animation_handle(self)
+    }
+
+    fn use_animated_value_for<K: Hash>(
+        &self,
+        key: K,
+        initial: f32,
+        config: SpringConfig,
+    ) -> SharedAnimatedValue {
+        WindowedContext::use_animated_value_for(self, key, initial, config)
+    }
+
+    fn use_animated_timeline_for<K: Hash>(&self, key: K) -> SharedAnimatedTimeline {
+        WindowedContext::use_animated_timeline_for(self, key)
     }
 }
 

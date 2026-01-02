@@ -5,12 +5,36 @@
 //! - Signals push invalidation notifications to subscribers
 //! - Derived values pull (lazily compute) their values when accessed
 //! - Effects are scheduled and batched for efficiency
+//!
+//! # State
+//!
+//! The [`State<T>`] type provides a convenient wrapper around a signal with
+//! thread-safe access to the reactive graph. It's the primary API for component
+//! state management.
+//!
+//! ```ignore
+//! use blinc_core::reactive::State;
+//!
+//! // State is typically obtained from a context
+//! let counter: State<i32> = ctx.use_state("counter", 0);
+//!
+//! // Read the current value
+//! let value = counter.get();
+//!
+//! // Update the value (triggers reactive updates)
+//! counter.set(value + 1);
+//!
+//! // Update the value and rebuild UI tree
+//! counter.set_rebuild(value + 1);
+//! ```
 
 use slotmap::{new_key_type, SlotMap};
 use smallvec::SmallVec;
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 new_key_type! {
     /// Unique identifier for a signal
@@ -557,6 +581,149 @@ pub struct ReactiveStats {
     pub effect_count: usize,
     pub pending_effects: usize,
     pub global_version: u64,
+}
+
+// =============================================================================
+// STATE - High-level API for component state management
+// =============================================================================
+
+/// Shared reactive graph for thread-safe access
+pub type SharedReactiveGraph = Arc<Mutex<ReactiveGraph>>;
+
+/// Shared dirty flag for triggering UI rebuilds
+pub type DirtyFlag = Arc<AtomicBool>;
+
+/// Callback for notifying stateful elements of signal changes
+pub type StatefulDepsCallback = Arc<dyn Fn(&[SignalId]) + Send + Sync>;
+
+/// A bound state value with direct get/set methods
+///
+/// This is the primary API for component state management. It wraps a signal
+/// with thread-safe access to the reactive graph and provides convenient
+/// methods for reading and writing state.
+///
+/// # Example
+///
+/// ```ignore
+/// // State is typically obtained from a context
+/// let counter: State<i32> = ctx.use_state("counter", 0);
+///
+/// // Read the current value
+/// let value = counter.get();
+///
+/// // Update the value (doesn't trigger tree rebuild)
+/// counter.set(value + 1);
+///
+/// // Update the value AND trigger tree rebuild
+/// counter.set_rebuild(value + 1);
+/// ```
+#[derive(Clone)]
+pub struct State<T> {
+    signal: Signal<T>,
+    reactive: SharedReactiveGraph,
+    dirty_flag: DirtyFlag,
+    /// Optional callback for notifying stateful elements of signal changes
+    stateful_deps_callback: Option<StatefulDepsCallback>,
+}
+
+impl<T: Clone + Send + 'static> State<T> {
+    /// Create a new State wrapper
+    pub fn new(
+        signal: Signal<T>,
+        reactive: SharedReactiveGraph,
+        dirty_flag: DirtyFlag,
+    ) -> Self {
+        Self {
+            signal,
+            reactive,
+            dirty_flag,
+            stateful_deps_callback: None,
+        }
+    }
+
+    /// Create a new State wrapper with a stateful deps callback
+    pub fn with_stateful_callback(
+        signal: Signal<T>,
+        reactive: SharedReactiveGraph,
+        dirty_flag: DirtyFlag,
+        callback: StatefulDepsCallback,
+    ) -> Self {
+        Self {
+            signal,
+            reactive,
+            dirty_flag,
+            stateful_deps_callback: Some(callback),
+        }
+    }
+
+    /// Get the current value
+    pub fn get(&self) -> T
+    where
+        T: Default,
+    {
+        self.reactive
+            .lock()
+            .unwrap()
+            .get(self.signal)
+            .unwrap_or_default()
+    }
+
+    /// Get the current value, returning None if not found
+    pub fn try_get(&self) -> Option<T> {
+        self.reactive.lock().unwrap().get(self.signal)
+    }
+
+    /// Set a new value
+    ///
+    /// This updates the value without triggering a tree rebuild.
+    /// The renderer reads values at render time, so changes are
+    /// reflected on the next frame automatically.
+    ///
+    /// Use `set_rebuild()` only when the change affects tree structure
+    /// (adding/removing elements, changing text content, etc.)
+    pub fn set(&self, value: T) {
+        self.reactive.lock().unwrap().set(self.signal, value);
+        // Notify stateful elements if callback is set
+        if let Some(ref callback) = self.stateful_deps_callback {
+            callback(&[self.signal.id()]);
+        }
+    }
+
+    /// Set a new value AND trigger a UI tree rebuild
+    ///
+    /// Only use this when the state change affects tree structure:
+    /// - Adding or removing elements
+    /// - Changing text content
+    /// - Changing layout-affecting properties (size, padding, etc.)
+    ///
+    /// For visual-only changes (colors, opacity, animations), use `set()`.
+    pub fn set_rebuild(&self, value: T) {
+        self.reactive.lock().unwrap().set(self.signal, value);
+        self.dirty_flag.store(true, Ordering::SeqCst);
+    }
+
+    /// Update the value using a function
+    ///
+    /// Does not trigger rebuild. Use `update_rebuild()` for structural changes.
+    pub fn update(&self, f: impl FnOnce(T) -> T) {
+        self.reactive.lock().unwrap().update(self.signal, f);
+    }
+
+    /// Update the value AND trigger a UI tree rebuild
+    pub fn update_rebuild(&self, f: impl FnOnce(T) -> T) {
+        self.reactive.lock().unwrap().update(self.signal, f);
+        self.dirty_flag.store(true, Ordering::SeqCst);
+    }
+
+    /// Get the underlying signal (for advanced use cases)
+    pub fn signal(&self) -> Signal<T> {
+        self.signal
+    }
+
+    /// Get the signal ID (for dependency tracking)
+    pub fn signal_id(&self) -> SignalId {
+        self.signal.id()
+    }
 }
 
 #[cfg(test)]

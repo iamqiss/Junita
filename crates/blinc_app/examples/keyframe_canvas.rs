@@ -8,9 +8,10 @@
 //!
 //! Run with: cargo run -p blinc_app --example keyframe_canvas --features windowed
 
+use blinc_animation::context::SharedAnimatedTimeline;
 use blinc_animation::timeline::TimelineEntryId;
 use blinc_app::prelude::*;
-use blinc_app::windowed::{SharedAnimatedTimeline, WindowedApp, WindowedContext};
+use blinc_app::windowed::{WindowedApp, WindowedContext};
 use blinc_core::{Brush, Color, CornerRadius, DrawContext, Gradient, Point, Rect};
 use std::f32::consts::PI;
 use std::sync::Arc;
@@ -143,16 +144,19 @@ fn pulsing_dots_demo(ctx: &WindowedContext) -> Div {
     let entry_ids: Vec<(TimelineEntryId, TimelineEntryId)> = timelines
         .iter()
         .enumerate()
-        .map(|(i, timeline)| {
-            timeline.lock().unwrap().configure(|t| {
-                // Stagger start by 200ms per dot
-                let offset = i as i32 * 200;
-                let scale_entry = t.add(offset, 600, 0.5, 1.0);
-                let opacity_entry = t.add(offset, 600, 0.3, 1.0);
-                t.set_loop(-1);
-                t.start();
-                (scale_entry, opacity_entry)
-            })
+        .map(|(i, timeline): (usize, &SharedAnimatedTimeline)| {
+            timeline
+                .lock()
+                .unwrap()
+                .configure(|t: &mut blinc_animation::AnimatedTimeline| {
+                    // Stagger start by 200ms per dot
+                    let offset = i as i32 * 200;
+                    let scale_entry = t.add(offset, 600, 0.5, 1.0);
+                    let opacity_entry = t.add(offset, 600, 0.3, 1.0);
+                    t.set_loop(-1);
+                    t.start();
+                    (scale_entry, opacity_entry)
+                })
         })
         .collect();
 
@@ -168,7 +172,8 @@ fn pulsing_dots_demo(ctx: &WindowedContext) -> Div {
             for (i, (timeline, (scale_entry, opacity_entry))) in
                 timelines_clone.iter().zip(entry_ids.iter()).enumerate()
             {
-                let t = timeline.lock().unwrap();
+                let t: std::sync::MutexGuard<'_, blinc_animation::AnimatedTimeline> =
+                    timeline.lock().unwrap();
                 let scale = t.get(*scale_entry).unwrap_or(1.0);
                 let opacity = t.get(*opacity_entry).unwrap_or(1.0);
 

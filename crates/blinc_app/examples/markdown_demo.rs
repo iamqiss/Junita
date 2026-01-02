@@ -7,8 +7,8 @@
 //! Run with: cargo run -p blinc_app --example markdown_demo --features windowed
 
 use blinc_app::prelude::*;
-use blinc_app::windowed::{State, WindowedApp, WindowedContext};
-use blinc_core::{Color, SignalId};
+use blinc_app::windowed::{WindowedApp, WindowedContext};
+use blinc_core::{Color, SignalId, State};
 use blinc_layout::markdown::markdown_light;
 use std::sync::{Arc, Mutex};
 
@@ -312,6 +312,7 @@ fn build_preview_panel(
                                         let text_state = text_state_handle.get();
                                         let markdown_content = text_state
                                             .lock()
+                                            .ok()
                                             .map(|s| s.value())
                                             .unwrap_or_default();
                                         *container = std::mem::take(container)

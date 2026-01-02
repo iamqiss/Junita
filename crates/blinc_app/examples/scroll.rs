@@ -14,7 +14,8 @@
 //! Run with: cargo run -p blinc_app --example scroll --features windowed
 
 use blinc_app::prelude::*;
-use blinc_app::windowed::{State, WindowedApp, WindowedContext};
+use blinc_app::windowed::{WindowedApp, WindowedContext};
+use blinc_core::State;
 use blinc_layout::prelude::{ButtonState, Scroll, ScrollPhysics, SharedScrollPhysics};
 use std::sync::{Arc, Mutex};
 

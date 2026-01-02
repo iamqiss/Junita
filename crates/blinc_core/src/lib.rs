@@ -33,6 +33,7 @@
 //! assert_eq!(graph.get_derived(doubled), Some(10));
 //! ```
 
+pub mod context;
 pub mod draw;
 pub mod events;
 pub mod fsm;
@@ -56,9 +57,15 @@ pub use layer::{
     PostEffect, Rect, Scene3DCommand, Scene3DCommands, SceneGraph, Shadow, Size, TextureFormat,
     UiNode, Vec2, Vec3,
 };
-pub use reactive::{Derived, DerivedId, Effect, EffectId, ReactiveGraph, Signal, SignalId};
+pub use reactive::{
+    Derived, DerivedId, DirtyFlag, Effect, EffectId, ReactiveGraph, SharedReactiveGraph, Signal,
+    SignalId, State, StatefulDepsCallback,
+};
 pub use runtime::BlincReactiveRuntime;
 pub use value::{
     AnimationAccess, BoxedValue, DynFloat, DynValue, ReactiveAccess, SpringValue, Static, Value,
     ValueContext,
 };
+
+// Re-export context types at crate level for convenience
+pub use context::{BlincContext, BlincContextExt};

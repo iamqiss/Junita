@@ -9,8 +9,8 @@
 //! Run with: cargo run -p blinc_app --example carousel_demo --features windowed
 
 use blinc_app::prelude::*;
-use blinc_app::windowed::{State, WindowedApp, WindowedContext};
-use blinc_core::Color;
+use blinc_app::windowed::{WindowedApp, WindowedContext};
+use blinc_core::{Color, State};
 use blinc_layout::selector::{ScrollBehavior, ScrollBlock, ScrollOptions, ScrollRef};
 use blinc_layout::units::px;
 
