@@ -40,9 +40,9 @@ Form inputs and controls.
 | **Label** | text | ✅ Done |
 | **Textarea** | text_area | ✅ Done |
 | **Checkbox** | Stateful, div, svg | ✅ Done |
-| **Radio Group** | Stateful, div | Planned |
+| **Radio Group** | Stateful, div | ✅ Done |
 | **Switch** | Stateful, motion | ✅ Done |
-| **Slider** | Stateful, div | Planned |
+| **Slider** | Stateful, div | ✅ Done |
 | **Select** | scroll, text, overlay | Planned |
 | **Combobox** | text_input, scroll, overlay | Planned |
 | **Form** | div, validation | Planned |
@@ -495,8 +495,8 @@ crates/blinc_cn/
 
 Next components to implement:
 
-1. **Radio Group** - Radio button group
-2. **Slider** - Range slider input
+1. **Select** - Dropdown select input
+2. **Combobox** - Searchable dropdown
 
 ### Notes
 
@@ -505,4 +505,5 @@ Next components to implement:
 - Checkbox uses State<bool> from context with signal-based reactivity and SVG checkmark
 - Switch uses State<bool> with motion() animation for smooth spring physics (enabled by default)
 - Textarea wraps text_area primitive with size presets (Small/Medium/Large) and rows/cols support
+- Radio Group uses State<String> for selected value with smooth hover/press feedback
 - All components use theme tokens from blinc_theme

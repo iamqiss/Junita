@@ -54,6 +54,7 @@ pub mod cn {
     pub use crate::components::label::label;
     pub use crate::components::radio::radio_group;
     pub use crate::components::separator::separator;
+    pub use crate::components::slider::slider;
     pub use crate::components::skeleton::{skeleton, skeleton_circle};
     pub use crate::components::spinner::spinner;
     pub use crate::components::switch::switch;
@@ -73,6 +74,7 @@ pub mod prelude {
     pub use crate::components::label::{label, Label, LabelSize};
     pub use crate::components::radio::{radio_group, RadioGroup, RadioLayout, RadioSize};
     pub use crate::components::separator::{separator, Separator, SeparatorOrientation};
+    pub use crate::components::slider::{slider, Slider, SliderSize};
     pub use crate::components::skeleton::{skeleton, skeleton_circle, Skeleton};
     pub use crate::components::spinner::{spinner, Spinner, SpinnerSize};
     pub use crate::components::switch::{switch, Switch, SwitchSize};
