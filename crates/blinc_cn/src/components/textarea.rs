@@ -68,8 +68,9 @@ impl TextareaSize {
     }
 }
 
-/// Styled Textarea component
-pub struct Textarea {
+/// Configuration for building a Textarea
+#[derive(Clone)]
+struct TextareaConfig {
     state: SharedTextAreaState,
     size: TextareaSize,
     rows: Option<usize>,
@@ -89,11 +90,10 @@ pub struct Textarea {
     corner_radius: Option<f32>,
 }
 
-impl Textarea {
-    /// Create a new textarea with the given state
-    pub fn new(state: &SharedTextAreaState) -> Self {
+impl TextareaConfig {
+    fn new(state: SharedTextAreaState) -> Self {
         Self {
-            state: state.clone(),
+            state,
             size: TextareaSize::default(),
             rows: None,
             cols: None,
@@ -112,230 +112,284 @@ impl Textarea {
             corner_radius: None,
         }
     }
+}
 
-    /// Set the textarea size preset
-    pub fn size(mut self, size: TextareaSize) -> Self {
-        self.size = size;
-        self
-    }
+/// Styled Textarea component (final built element)
+pub struct Textarea {
+    /// Inner element containing the complete structure
+    inner: Div,
+}
 
-    /// Set number of visible rows (like HTML textarea)
-    pub fn rows(mut self, rows: usize) -> Self {
-        self.rows = Some(rows);
-        self
-    }
-
-    /// Set number of visible columns (like HTML textarea)
-    pub fn cols(mut self, cols: usize) -> Self {
-        self.cols = Some(cols);
-        self
-    }
-
-    /// Set a label above the textarea
-    pub fn label(mut self, label: impl Into<String>) -> Self {
-        self.label = Some(label.into());
-        self
-    }
-
-    /// Set a description/helper text below the textarea
-    pub fn description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
-        self
-    }
-
-    /// Set an error message (shows in red, replaces description)
-    pub fn error(mut self, error: impl Into<String>) -> Self {
-        self.error = Some(error.into());
-        self
-    }
-
-    /// Set placeholder text
-    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
-        self.placeholder = Some(placeholder.into());
-        self
-    }
-
-    /// Set maximum character length
-    pub fn max_length(mut self, max: usize) -> Self {
-        self.max_length = Some(max);
-        self
-    }
-
-    /// Enable or disable text wrapping (default: true)
-    pub fn wrap(mut self, wrap: bool) -> Self {
-        self.wrap = wrap;
-        self
-    }
-
-    /// Disable text wrapping
-    pub fn no_wrap(mut self) -> Self {
-        self.wrap = false;
-        self
-    }
-
-    /// Disable the textarea
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
-        self
-    }
-
-    /// Mark the textarea as required (shows asterisk on label)
-    pub fn required(mut self) -> Self {
-        self.required = true;
-        self
-    }
-
-    /// Set a fixed width
-    pub fn w(mut self, width: f32) -> Self {
-        self.width = Some(width);
-        self.full_width = false;
-        self
-    }
-
-    /// Set a fixed height
-    pub fn h(mut self, height: f32) -> Self {
-        self.height = Some(height);
-        self
-    }
-
-    /// Make the textarea fill its parent width (default)
-    pub fn w_full(mut self) -> Self {
-        self.full_width = true;
-        self.width = None;
-        self
-    }
-
-    /// Set the border width
-    pub fn border_width(mut self, width: f32) -> Self {
-        self.border_width = Some(width);
-        self
-    }
-
-    /// Set the corner radius
-    pub fn rounded(mut self, radius: f32) -> Self {
-        self.corner_radius = Some(radius);
-        self
-    }
-
-    /// Build the textarea element
-    fn build_textarea(&self) -> LayoutTextArea {
+impl Textarea {
+    /// Build from config
+    fn from_config(config: TextareaConfig) -> Self {
         let theme = ThemeState::get();
         let typography = theme.typography();
 
-        let radius = self.corner_radius.unwrap_or_else(|| theme.radius(RadiusToken::Md));
+        // Build the layout TextArea
+        let radius = config.corner_radius.unwrap_or_else(|| theme.radius(RadiusToken::Md));
 
-        // Create base textarea
-        let mut ta = text_area(&self.state)
-            .font_size(self.size.font_size(&typography))
+        let mut ta = text_area(&config.state)
+            .font_size(config.size.font_size(&typography))
             .rounded(radius)
-            .disabled(self.disabled)
-            .wrap(self.wrap);
+            .disabled(config.disabled)
+            .wrap(config.wrap);
 
         // Apply border width if specified
-        if let Some(border) = self.border_width {
+        if let Some(border) = config.border_width {
             ta = ta.border_width(border);
         }
 
         // Apply rows/cols or use size preset
-        if let Some(rows) = self.rows {
+        if let Some(rows) = config.rows {
             ta = ta.rows(rows);
         } else {
-            ta = ta.rows(self.size.default_rows());
+            ta = ta.rows(config.size.default_rows());
         }
 
-        if let Some(cols) = self.cols {
+        if let Some(cols) = config.cols {
             ta = ta.cols(cols);
         }
 
         // Apply explicit dimensions if provided
-        if let Some(w) = self.width {
+        if let Some(w) = config.width {
             ta = ta.w(w);
-        } else if self.full_width {
+        } else if config.full_width {
             ta = ta.w_full();
         }
 
-        if let Some(h) = self.height {
+        if let Some(h) = config.height {
             ta = ta.h(h);
         }
 
         // Apply placeholder
-        if let Some(ref placeholder) = self.placeholder {
+        if let Some(ref placeholder) = config.placeholder {
             ta = ta.placeholder(placeholder.clone());
         }
 
         // Apply max length
-        if let Some(max) = self.max_length {
+        if let Some(max) = config.max_length {
             ta = ta.max_length(max);
         }
 
-        ta
+        // If no label, description, or error, wrap textarea in a div
+        let inner = if config.label.is_none() && config.description.is_none() && config.error.is_none() {
+            div().child(ta)
+        } else {
+            // Build a container with label, textarea, and description/error
+            let spacing = theme.spacing_value(SpacingToken::Space2);
+            let mut container = div().flex_col().gap_px(spacing);
+
+            // Apply width to container
+            if config.full_width {
+                container = container.w_full();
+            } else if let Some(w) = config.width {
+                container = container.w(w);
+            }
+
+            // Label
+            if let Some(ref label_text) = config.label {
+                let mut lbl = label(label_text).size(LabelSize::Medium);
+                if config.required {
+                    lbl = lbl.required();
+                }
+                if config.disabled {
+                    lbl = lbl.disabled(true);
+                }
+                container = container.child(lbl);
+            }
+
+            // Textarea
+            container = container.child(ta);
+
+            // Error or description
+            if let Some(ref error_text) = config.error {
+                let error_color = theme.color(ColorToken::Error);
+                container = container.child(text(error_text).size(typography.text_xs).color(error_color));
+            } else if let Some(ref desc_text) = config.description {
+                let desc_color = theme.color(ColorToken::TextTertiary);
+                container = container.child(text(desc_text).size(typography.text_xs).color(desc_color));
+            }
+
+            container
+        };
+
+        Self { inner }
     }
 }
 
 impl ElementBuilder for Textarea {
     fn build(&self, tree: &mut blinc_layout::tree::LayoutTree) -> blinc_layout::tree::LayoutNodeId {
-        let theme = ThemeState::get();
-
-        // If no label, description, or error, just return the textarea directly
-        if self.label.is_none() && self.description.is_none() && self.error.is_none() {
-            return self.build_textarea().build(tree);
-        }
-
-        // Build a container with label, textarea, and description/error
-        let spacing = theme.spacing_value(SpacingToken::Space2);
-        let mut container = div().flex_col().gap_px(spacing);
-
-        // Apply width to container
-        if self.full_width {
-            container = container.w_full();
-        } else if let Some(w) = self.width {
-            container = container.w(w);
-        }
-
-        let typography = theme.typography();
-
-        // Label
-        if let Some(ref label_text) = self.label {
-            let mut lbl = label(label_text).size(LabelSize::Medium);
-            if self.required {
-                lbl = lbl.required();
-            }
-            if self.disabled {
-                lbl = lbl.disabled(true);
-            }
-            container = container.child(lbl);
-        }
-
-        // Textarea
-        container = container.child(self.build_textarea());
-
-        // Error or description
-        if let Some(ref error_text) = self.error {
-            let error_color = theme.color(ColorToken::Error);
-            container = container.child(text(error_text).size(typography.text_xs).color(error_color));
-        } else if let Some(ref desc_text) = self.description {
-            let desc_color = theme.color(ColorToken::TextTertiary);
-            container = container.child(text(desc_text).size(typography.text_xs).color(desc_color));
-        }
-
-        container.build(tree)
+        self.inner.build(tree)
     }
 
     fn render_props(&self) -> blinc_layout::element::RenderProps {
-        // If we have label/description, we're a container
-        if self.label.is_some() || self.description.is_some() || self.error.is_some() {
-            blinc_layout::element::RenderProps::default()
-        } else {
-            self.build_textarea().render_props()
-        }
+        self.inner.render_props()
     }
 
     fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
-        &[]
+        self.inner.children_builders()
     }
 
     fn element_type_id(&self) -> blinc_layout::div::ElementTypeId {
-        blinc_layout::div::ElementTypeId::Div
+        self.inner.element_type_id()
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.inner.layout_style()
+    }
+}
+
+/// Builder for creating Textarea components with fluent API
+pub struct TextareaBuilder {
+    config: TextareaConfig,
+    /// Cached built Textarea - built lazily on first access
+    built: std::cell::OnceCell<Textarea>,
+}
+
+impl TextareaBuilder {
+    /// Create a new textarea builder with the given state
+    pub fn new(state: &SharedTextAreaState) -> Self {
+        Self {
+            config: TextareaConfig::new(state.clone()),
+            built: std::cell::OnceCell::new(),
+        }
+    }
+
+    /// Get or build the inner Textarea
+    fn get_or_build(&self) -> &Textarea {
+        self.built.get_or_init(|| Textarea::from_config(self.config.clone()))
+    }
+
+    /// Set the textarea size preset
+    pub fn size(mut self, size: TextareaSize) -> Self {
+        self.config.size = size;
+        self
+    }
+
+    /// Set number of visible rows (like HTML textarea)
+    pub fn rows(mut self, rows: usize) -> Self {
+        self.config.rows = Some(rows);
+        self
+    }
+
+    /// Set number of visible columns (like HTML textarea)
+    pub fn cols(mut self, cols: usize) -> Self {
+        self.config.cols = Some(cols);
+        self
+    }
+
+    /// Set a label above the textarea
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.config.label = Some(label.into());
+        self
+    }
+
+    /// Set a description/helper text below the textarea
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.config.description = Some(description.into());
+        self
+    }
+
+    /// Set an error message (shows in red, replaces description)
+    pub fn error(mut self, error: impl Into<String>) -> Self {
+        self.config.error = Some(error.into());
+        self
+    }
+
+    /// Set placeholder text
+    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
+        self.config.placeholder = Some(placeholder.into());
+        self
+    }
+
+    /// Set maximum character length
+    pub fn max_length(mut self, max: usize) -> Self {
+        self.config.max_length = Some(max);
+        self
+    }
+
+    /// Enable or disable text wrapping (default: true)
+    pub fn wrap(mut self, wrap: bool) -> Self {
+        self.config.wrap = wrap;
+        self
+    }
+
+    /// Disable text wrapping
+    pub fn no_wrap(mut self) -> Self {
+        self.config.wrap = false;
+        self
+    }
+
+    /// Disable the textarea
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.config.disabled = disabled;
+        self
+    }
+
+    /// Mark the textarea as required (shows asterisk on label)
+    pub fn required(mut self) -> Self {
+        self.config.required = true;
+        self
+    }
+
+    /// Set a fixed width
+    pub fn w(mut self, width: f32) -> Self {
+        self.config.width = Some(width);
+        self.config.full_width = false;
+        self
+    }
+
+    /// Set a fixed height
+    pub fn h(mut self, height: f32) -> Self {
+        self.config.height = Some(height);
+        self
+    }
+
+    /// Make the textarea fill its parent width (default)
+    pub fn w_full(mut self) -> Self {
+        self.config.full_width = true;
+        self.config.width = None;
+        self
+    }
+
+    /// Set the border width
+    pub fn border_width(mut self, width: f32) -> Self {
+        self.config.border_width = Some(width);
+        self
+    }
+
+    /// Set the corner radius
+    pub fn rounded(mut self, radius: f32) -> Self {
+        self.config.corner_radius = Some(radius);
+        self
+    }
+
+    /// Build the final Textarea component
+    pub fn build_component(self) -> Textarea {
+        Textarea::from_config(self.config)
+    }
+}
+
+impl ElementBuilder for TextareaBuilder {
+    fn build(&self, tree: &mut blinc_layout::tree::LayoutTree) -> blinc_layout::tree::LayoutNodeId {
+        self.get_or_build().build(tree)
+    }
+
+    fn render_props(&self) -> blinc_layout::element::RenderProps {
+        self.get_or_build().render_props()
+    }
+
+    fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
+        self.get_or_build().children_builders()
+    }
+
+    fn element_type_id(&self) -> blinc_layout::div::ElementTypeId {
+        self.get_or_build().element_type_id()
+    }
+
+    fn layout_style(&self) -> Option<&taffy::Style> {
+        self.get_or_build().layout_style()
     }
 }
 
@@ -352,8 +406,8 @@ impl ElementBuilder for Textarea {
 ///     .placeholder("Tell us about yourself...")
 ///     .rows(5)
 /// ```
-pub fn textarea(state: &SharedTextAreaState) -> Textarea {
-    Textarea::new(state)
+pub fn textarea(state: &SharedTextAreaState) -> TextareaBuilder {
+    TextareaBuilder::new(state)
 }
 
 #[cfg(test)]
@@ -387,15 +441,15 @@ mod tests {
     fn test_textarea_builder() {
         init_theme();
         let state = blinc_layout::widgets::text_area::text_area_state();
-        let ta = Textarea::new(&state)
+        let ta = TextareaBuilder::new(&state)
             .label("Description")
             .placeholder("Enter description...")
             .rows(5)
             .size(TextareaSize::Large);
 
-        assert_eq!(ta.size, TextareaSize::Large);
-        assert_eq!(ta.label, Some("Description".to_string()));
-        assert_eq!(ta.rows, Some(5));
+        assert_eq!(ta.config.size, TextareaSize::Large);
+        assert_eq!(ta.config.label, Some("Description".to_string()));
+        assert_eq!(ta.config.rows, Some(5));
     }
 
     #[test]
@@ -403,10 +457,10 @@ mod tests {
         init_theme();
         let state = blinc_layout::widgets::text_area::text_area_state();
 
-        let ta = Textarea::new(&state);
-        assert!(ta.wrap); // Default is wrap enabled
+        let ta = TextareaBuilder::new(&state);
+        assert!(ta.config.wrap); // Default is wrap enabled
 
-        let ta_no_wrap = Textarea::new(&state).no_wrap();
-        assert!(!ta_no_wrap.wrap);
+        let ta_no_wrap = TextareaBuilder::new(&state).no_wrap();
+        assert!(!ta_no_wrap.config.wrap);
     }
 }
