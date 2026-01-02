@@ -2551,18 +2551,31 @@ impl RenderTree {
     ///
     /// Reads from scroll physics if available (has direction-aware bounds),
     /// falls back to legacy scroll_offsets.
+    ///
+    /// Note: Returns rounded values to prevent subpixel jitter during scrolling.
+    /// Fractional scroll offsets cause content to shift between pixel boundaries,
+    /// resulting in wobbling text and lines.
     pub fn get_scroll_offset(&self, node_id: LayoutNodeId) -> (f32, f32) {
         // Check scroll physics first (has direction-aware scroll from element)
-        if let Some(physics) = self.scroll_physics.get(&node_id) {
+        let (x, y) = if let Some(physics) = self.scroll_physics.get(&node_id) {
             if let Ok(p) = physics.try_lock() {
-                return (p.offset_x, p.offset_y);
+                (p.offset_x, p.offset_y)
+            } else {
+                self.scroll_offsets
+                    .get(&node_id)
+                    .copied()
+                    .unwrap_or((0.0, 0.0))
             }
-        }
-        // Fallback to legacy scroll_offsets
-        self.scroll_offsets
-            .get(&node_id)
-            .copied()
-            .unwrap_or((0.0, 0.0))
+        } else {
+            // Fallback to legacy scroll_offsets
+            self.scroll_offsets
+                .get(&node_id)
+                .copied()
+                .unwrap_or((0.0, 0.0))
+        };
+
+        // Round to whole pixels to prevent subpixel jitter
+        (x.round(), y.round())
     }
 
     /// Get the motion translation for a node (if it has motion bindings)
