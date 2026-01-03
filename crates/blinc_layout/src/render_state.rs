@@ -789,9 +789,10 @@ impl RenderState {
     /// Check if any nodes have active motion animations
     pub fn has_active_motions(&self) -> bool {
         self.node_states.values().any(|s| s.has_active_motion())
-            || self.stable_motions.values().any(|m| {
-                !matches!(m.state, MotionState::Visible | MotionState::Removed)
-            })
+            || self
+                .stable_motions
+                .values()
+                .any(|m| !matches!(m.state, MotionState::Visible | MotionState::Removed))
     }
 
     // =========================================================================
@@ -822,7 +823,12 @@ impl RenderState {
         // Check if motion already exists
         if let Some(existing) = self.stable_motions.get_mut(key) {
             // If closing and not already exiting, start exit animation
-            if is_closing && !matches!(existing.state, MotionState::Exiting { .. } | MotionState::Removed) {
+            if is_closing
+                && !matches!(
+                    existing.state,
+                    MotionState::Exiting { .. } | MotionState::Removed
+                )
+            {
                 // Start exit animation
                 if config.exit_to.is_some() && config.exit_duration_ms > 0 {
                     tracing::debug!(

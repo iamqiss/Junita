@@ -417,7 +417,11 @@ fn build_dialog_content(
         }
 
         if let Some(ref desc_text) = description {
-            header = header.child(text(desc_text).size(theme.typography().text_sm).color(text_secondary));
+            header = header.child(
+                text(desc_text)
+                    .size(theme.typography().text_sm)
+                    .color(text_secondary),
+            );
         }
 
         inner_content = inner_content.child(header);

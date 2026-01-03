@@ -1115,9 +1115,9 @@ impl OverlayManagerInner {
         // Build the layer with optional backdrop
         if let Some(ref backdrop_config) = overlay.config.backdrop {
             // Apply opacity to backdrop color
-            let backdrop_color = backdrop_config.color.with_alpha(
-                backdrop_config.color.a * backdrop_opacity,
-            );
+            let backdrop_color = backdrop_config
+                .color
+                .with_alpha(backdrop_config.color.a * backdrop_opacity);
 
             // Use stack: first child (backdrop) renders behind, second child (content) on top
             div().w(vp_width).h(vp_height).child(

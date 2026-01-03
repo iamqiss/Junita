@@ -314,10 +314,7 @@ impl Button {
             };
 
             // Build content with icon + label or just label
-            let mut content = div()
-                .flex_row()
-                .items_center()
-                .gap(6.0);
+            let mut content = div().flex_row().items_center().gap(6.0);
 
             let label_text = text(&label_clone).size(font_size).color(fg).no_cursor();
 
@@ -357,27 +354,62 @@ impl Button {
 
     /// Set the button variant (rebuilds with new styling)
     pub fn variant(self, variant: ButtonVariant) -> Self {
-        Self::with_options(self.label, variant, self.btn_size, self.disabled, self.icon, self.icon_position)
+        Self::with_options(
+            self.label,
+            variant,
+            self.btn_size,
+            self.disabled,
+            self.icon,
+            self.icon_position,
+        )
     }
 
     /// Set the button size (rebuilds with new sizing)
     pub fn size(self, size: ButtonSize) -> Self {
-        Self::with_options(self.label, self.variant, size, self.disabled, self.icon, self.icon_position)
+        Self::with_options(
+            self.label,
+            self.variant,
+            size,
+            self.disabled,
+            self.icon,
+            self.icon_position,
+        )
     }
 
     /// Make the button disabled
     pub fn disabled(self, disabled: bool) -> Self {
-        Self::with_options(self.label, self.variant, self.btn_size, disabled, self.icon, self.icon_position)
+        Self::with_options(
+            self.label,
+            self.variant,
+            self.btn_size,
+            disabled,
+            self.icon,
+            self.icon_position,
+        )
     }
 
     /// Set an icon for the button
     pub fn icon(self, icon: impl Into<String>) -> Self {
-        Self::with_options(self.label, self.variant, self.btn_size, self.disabled, Some(icon.into()), self.icon_position)
+        Self::with_options(
+            self.label,
+            self.variant,
+            self.btn_size,
+            self.disabled,
+            Some(icon.into()),
+            self.icon_position,
+        )
     }
 
     /// Set the icon position (Start or End)
     pub fn icon_position(self, position: IconPosition) -> Self {
-        Self::with_options(self.label, self.variant, self.btn_size, self.disabled, self.icon, position)
+        Self::with_options(
+            self.label,
+            self.variant,
+            self.btn_size,
+            self.disabled,
+            self.icon,
+            position,
+        )
     }
 
     /// Make the button full width

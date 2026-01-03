@@ -370,6 +370,7 @@ impl TestHarness {
             max_glyphs: config.max_glyphs,
             sample_count: config.sample_count,
             texture_format: Some(wgpu::TextureFormat::Rgba8Unorm),
+            unified_text_rendering: true,
         };
 
         let renderer = pollster::block_on(GpuRenderer::new(renderer_config))

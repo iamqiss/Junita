@@ -535,11 +535,7 @@ fn context_menu_section() -> impl ElementBuilder {
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .child(
-                            text("Click me!")
-                                .size(14.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("Click me!").size(14.0).color(text_secondary))
                         .child(
                             text("(opens context menu)")
                                 .size(12.0)
@@ -568,11 +564,7 @@ fn context_menu_section() -> impl ElementBuilder {
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .child(
-                            text("With Shortcuts")
-                                .size(14.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("With Shortcuts").size(14.0).color(text_secondary))
                         .on_click(move |ctx| {
                             cn::context_menu()
                                 .at(ctx.mouse_x, ctx.mouse_y)
@@ -606,11 +598,7 @@ fn context_menu_section() -> impl ElementBuilder {
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .child(
-                            text("With Icons")
-                                .size(14.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("With Icons").size(14.0).color(text_secondary))
                         .on_click(move |ctx| {
                             cn::context_menu()
                                 .at(ctx.mouse_x, ctx.mouse_y)
@@ -636,11 +624,7 @@ fn context_menu_section() -> impl ElementBuilder {
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .child(
-                            text("With Disabled Items")
-                                .size(14.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("With Disabled Items").size(14.0).color(text_secondary))
                         .on_click(move |ctx| {
                             cn::context_menu()
                                 .at(ctx.mouse_x, ctx.mouse_y)
