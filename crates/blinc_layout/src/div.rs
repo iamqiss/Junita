@@ -27,6 +27,7 @@ use crate::element::{
     ElementBounds, GlassMaterial, Material, MetallicMaterial, RenderLayer, RenderProps,
     WoodMaterial,
 };
+use crate::element_style::ElementStyle;
 use crate::tree::{LayoutNodeId, LayoutTree};
 
 // ============================================================================
@@ -555,6 +556,72 @@ impl Div {
     #[inline]
     pub fn set_h(&mut self, px: f32) {
         self.style.size.height = taffy::Dimension::Length(px);
+    }
+
+    // =========================================================================
+    // ElementStyle Application
+    // =========================================================================
+
+    /// Apply an ElementStyle to this div
+    ///
+    /// Only properties that are set (Some) in the style will be applied.
+    /// This allows for style composition and sharing reusable styles.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_layout::prelude::*;
+    ///
+    /// // Define a reusable card style
+    /// let card_style = ElementStyle::new()
+    ///     .bg_surface()
+    ///     .rounded_lg()
+    ///     .shadow_md();
+    ///
+    /// // Apply to multiple elements
+    /// div().style(&card_style).child(text("Card 1"))
+    /// div().style(&card_style).child(text("Card 2"))
+    /// ```
+    pub fn style(mut self, style: &ElementStyle) -> Self {
+        self.set_style(style);
+        self
+    }
+
+    /// Apply an ElementStyle without consuming self
+    ///
+    /// This is useful in state callbacks where you want to update
+    /// styling without using the swap pattern.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// .on_state(|state, div| {
+    ///     div.set_style(&hover_style);
+    /// })
+    /// ```
+    #[inline]
+    pub fn set_style(&mut self, style: &ElementStyle) {
+        if let Some(ref bg) = style.background {
+            self.background = Some(bg.clone());
+        }
+        if let Some(radius) = style.corner_radius {
+            self.border_radius = radius;
+        }
+        if let Some(ref shadow) = style.shadow {
+            self.shadow = Some(shadow.clone());
+        }
+        if let Some(ref transform) = style.transform {
+            self.transform = Some(transform.clone());
+        }
+        if let Some(ref material) = style.material {
+            self.material = Some(material.clone());
+        }
+        if let Some(layer) = style.render_layer {
+            self.render_layer = layer;
+        }
+        if let Some(opacity) = style.opacity {
+            self.opacity = opacity;
+        }
     }
 
     /// Merge properties from another Div into this one

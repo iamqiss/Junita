@@ -1302,6 +1302,16 @@ impl WindowedApp {
         // Shared element registry for query API
         let element_registry: SharedElementRegistry =
             Arc::new(blinc_layout::selector::ElementRegistry::new());
+
+        // Set up query callback in BlincContextState so components can query elements globally
+        {
+            let registry_for_query = Arc::clone(&element_registry);
+            let query_callback: blinc_core::QueryCallback = Arc::new(move |id: &str| {
+                registry_for_query.get(id).map(|node_id| node_id.to_raw())
+            });
+            BlincContextState::get().set_query_callback(query_callback);
+        }
+
         // Shared storage for on_ready callbacks
         let ready_callbacks: SharedReadyCallbacks = Arc::new(Mutex::new(Vec::new()));
 

@@ -1,6 +1,6 @@
 //! Layout tree management
 
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, Key, SlotMap};
 use std::collections::HashMap;
 use taffy::prelude::*;
 
@@ -8,6 +8,23 @@ use crate::element::ElementBounds;
 
 new_key_type! {
     pub struct LayoutNodeId;
+}
+
+impl LayoutNodeId {
+    /// Convert to a raw u64 representation
+    ///
+    /// This is useful for storing node IDs in type-erased contexts.
+    pub fn to_raw(self) -> u64 {
+        self.data().as_ffi()
+    }
+
+    /// Create from a raw u64 representation
+    ///
+    /// # Safety
+    /// The raw value must have been created by `to_raw()` from a valid LayoutNodeId.
+    pub fn from_raw(raw: u64) -> Self {
+        Self::from(slotmap::KeyData::from_ffi(raw))
+    }
 }
 
 /// Maps between Blinc node IDs and Taffy node IDs
