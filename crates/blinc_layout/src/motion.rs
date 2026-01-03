@@ -312,6 +312,32 @@ pub struct Motion {
     opacity: Option<SharedAnimatedValue>,
 }
 
+/// Convert a MotionKeyframe to KeyframeProperties for animation system integration
+fn motion_keyframe_to_properties(kf: &MotionKeyframe) -> blinc_animation::KeyframeProperties {
+    let mut props = blinc_animation::KeyframeProperties::default();
+
+    if let Some(opacity) = kf.opacity {
+        props = props.with_opacity(opacity);
+    }
+    if let Some(scale_x) = kf.scale_x {
+        props.scale_x = Some(scale_x);
+    }
+    if let Some(scale_y) = kf.scale_y {
+        props.scale_y = Some(scale_y);
+    }
+    if let Some(tx) = kf.translate_x {
+        props.translate_x = Some(tx);
+    }
+    if let Some(ty) = kf.translate_y {
+        props.translate_y = Some(ty);
+    }
+    if let Some(rotate) = kf.rotate {
+        props.rotate = Some(rotate);
+    }
+
+    props
+}
+
 /// Create a motion container
 pub fn motion() -> Motion {
     Motion {
@@ -372,6 +398,48 @@ impl Motion {
     pub fn stagger(mut self, config: StaggerConfig) -> Self {
         self.stagger_config = Some(config);
         self
+    }
+
+    /// Set both enter and exit animations from a MotionAnimation config
+    ///
+    /// This is useful when you have a pre-built `MotionAnimation` from CSS
+    /// keyframes or other sources.
+    pub fn animation(self, config: MotionAnimation) -> Self {
+        use blinc_animation::{Easing, KeyframeProperties};
+
+        let mut result = self;
+
+        if let Some(ref enter_from) = config.enter_from {
+            // Build enter animation: start from enter_from, animate to defaults (visible)
+            let from_props = motion_keyframe_to_properties(enter_from);
+            let to_props = KeyframeProperties::default()
+                .with_opacity(1.0)
+                .with_scale(1.0)
+                .with_translate(0.0, 0.0);
+
+            let enter = MultiKeyframeAnimation::new(config.enter_duration_ms)
+                .keyframe(0.0, from_props, Easing::Linear)
+                .keyframe(1.0, to_props, Easing::EaseOut);
+
+            result = result.enter_animation(enter);
+        }
+
+        if let Some(ref exit_to) = config.exit_to {
+            // Build exit animation: start from defaults (visible), animate to exit_to
+            let from_props = KeyframeProperties::default()
+                .with_opacity(1.0)
+                .with_scale(1.0)
+                .with_translate(0.0, 0.0);
+            let to_props = motion_keyframe_to_properties(exit_to);
+
+            let exit = MultiKeyframeAnimation::new(config.exit_duration_ms)
+                .keyframe(0.0, from_props, Easing::Linear)
+                .keyframe(1.0, to_props, Easing::EaseIn);
+
+            result = result.exit_animation(exit);
+        }
+
+        result
     }
 
     // ========================================================================
@@ -435,6 +503,96 @@ impl Motion {
     /// Pop in (scale with overshoot)
     pub fn pop_in(self, duration_ms: u32) -> Self {
         self.enter_animation(AnimationPreset::pop_in(duration_ms))
+    }
+
+    // ========================================================================
+    // Stylesheet Integration
+    // ========================================================================
+
+    /// Apply animation from a CSS stylesheet's `@keyframes` definition
+    ///
+    /// This is an alternative to `to_motion_animation()` that works with the
+    /// Motion builder API. It looks up the named keyframes and applies them
+    /// as enter/exit animations.
+    ///
+    /// # Arguments
+    ///
+    /// * `stylesheet` - The parsed CSS stylesheet containing @keyframes
+    /// * `animation_name` - The name of the @keyframes to use
+    /// * `enter_duration_ms` - Duration for enter animation
+    /// * `exit_duration_ms` - Duration for exit animation
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let css = r#"
+    ///     @keyframes modal-enter {
+    ///         from { opacity: 0; transform: scale(0.95); }
+    ///         to { opacity: 1; transform: scale(1); }
+    ///     }
+    /// "#;
+    /// let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+    ///
+    /// motion()
+    ///     .from_stylesheet(&stylesheet, "modal-enter", 300, 200)
+    ///     .child(modal_content)
+    /// ```
+    pub fn from_stylesheet(
+        self,
+        stylesheet: &crate::css_parser::Stylesheet,
+        animation_name: &str,
+        enter_duration_ms: u32,
+        exit_duration_ms: u32,
+    ) -> Self {
+        if let Some(keyframes) = stylesheet.get_keyframes(animation_name) {
+            let motion_anim = keyframes.to_motion_animation(enter_duration_ms, exit_duration_ms);
+            self.animation(motion_anim)
+        } else {
+            tracing::warn!(
+                animation_name = animation_name,
+                "Keyframes not found in stylesheet"
+            );
+            self
+        }
+    }
+
+    /// Apply animation from @keyframes with custom easing
+    ///
+    /// Similar to `from_stylesheet` but uses the `MultiKeyframeAnimation`
+    /// system for more complex multi-step animations with custom easing.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let css = r#"
+    ///     @keyframes pulse {
+    ///         0%, 100% { opacity: 1; transform: scale(1); }
+    ///         50% { opacity: 0.8; transform: scale(1.05); }
+    ///     }
+    /// "#;
+    /// let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+    ///
+    /// motion()
+    ///     .keyframes_from_stylesheet(&stylesheet, "pulse", 1000, Easing::EaseInOut)
+    ///     .child(button_content)
+    /// ```
+    pub fn keyframes_from_stylesheet(
+        self,
+        stylesheet: &crate::css_parser::Stylesheet,
+        animation_name: &str,
+        duration_ms: u32,
+        easing: blinc_animation::Easing,
+    ) -> Self {
+        if let Some(keyframes) = stylesheet.get_keyframes(animation_name) {
+            let animation = keyframes.to_multi_keyframe_animation(duration_ms, easing);
+            self.enter_animation(animation)
+        } else {
+            tracing::warn!(
+                animation_name = animation_name,
+                "Keyframes not found in stylesheet"
+            );
+            self
+        }
     }
 
     // ========================================================================

@@ -220,6 +220,62 @@ fn main() {
         println!("    :{} => opacity={:?}, transform={:?}", state, style.opacity, style.transform);
     }
 
+    // Example 8: Keyframe Animations
+    println!("\n8. Keyframe Animations (@keyframes):");
+    println!("{}", "-".repeat(50));
+    let css_with_keyframes = r#"
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+#modal {
+    background: theme(surface);
+    border-radius: theme(radius-lg);
+}
+"#;
+
+    let result = Stylesheet::parse_with_errors(css_with_keyframes);
+    print_result(&result, css_with_keyframes);
+
+    println!("\nKeyframe animations defined:");
+    for name in result.stylesheet.keyframe_names() {
+        let keyframes = result.stylesheet.get_keyframes(name).unwrap();
+        println!("  @keyframes {} ({} stops):", name, keyframes.keyframes.len());
+        for kf in &keyframes.keyframes {
+            println!("    {}% => opacity={:?}, transform={:?}",
+                (kf.position * 100.0) as i32,
+                kf.style.opacity,
+                kf.style.transform.is_some()
+            );
+        }
+    }
+
+    println!("\nConverting keyframes to MotionAnimation:");
+    if let Some(fade_in) = result.stylesheet.get_keyframes("fade-in") {
+        let motion = fade_in.to_motion_animation(300, 200);
+        println!("  fade-in:");
+        println!("    enter_duration_ms: {}", motion.enter_duration_ms);
+        println!("    exit_duration_ms: {}", motion.exit_duration_ms);
+        if let Some(ref enter) = motion.enter_from {
+            println!("    enter_from: opacity={:?}, translate_y={:?}", enter.opacity, enter.translate_y);
+        }
+        if let Some(ref exit) = motion.exit_to {
+            println!("    exit_to: opacity={:?}, translate_y={:?}", exit.opacity, exit.translate_y);
+        }
+    }
+
     println!("\n=== Demo Complete ===\n");
 }
 

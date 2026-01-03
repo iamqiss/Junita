@@ -1018,6 +1018,23 @@ impl RenderTree {
         let mut props = element.render_props();
         props.node_id = Some(node_id);
 
+        // Check for CSS animation from stylesheet if element has an ID
+        // Only apply if no motion animation is already set (motion container takes precedence)
+        if props.motion.is_none() {
+            if let Some(ref stylesheet) = self.stylesheet {
+                if let Some(id) = element.element_id() {
+                    if let Some(motion) = stylesheet.resolve_animation(id) {
+                        props.motion = Some(motion);
+                        tracing::trace!(
+                            "Applied CSS animation from stylesheet for element #{} ({:?})",
+                            id,
+                            node_id
+                        );
+                    }
+                }
+            }
+        }
+
         // Determine element type using the trait methods
         let element_type = Self::determine_element_type(element);
 
@@ -1098,6 +1115,23 @@ impl RenderTree {
 
         let mut props = element.render_props();
         props.node_id = Some(node_id);
+
+        // Check for CSS animation from stylesheet if element has an ID
+        // Only apply if no motion animation is already set (motion container takes precedence)
+        if props.motion.is_none() {
+            if let Some(ref stylesheet) = self.stylesheet {
+                if let Some(id) = element.element_id() {
+                    if let Some(motion) = stylesheet.resolve_animation(id) {
+                        props.motion = Some(motion);
+                        tracing::trace!(
+                            "Applied CSS animation from stylesheet for element #{} ({:?})",
+                            id,
+                            node_id
+                        );
+                    }
+                }
+            }
+        }
 
         // Use the element_type_id to determine type
         let element_type = match element.element_type_id() {
@@ -1284,7 +1318,25 @@ impl RenderTree {
     ) {
         let mut props = element.render_props();
         props.node_id = Some(node_id);
-        props.motion = motion_config;
+
+        // Motion config from parent takes precedence
+        if motion_config.is_some() {
+            props.motion = motion_config;
+        } else if props.motion.is_none() {
+            // Fall back to CSS animation from stylesheet if element has an ID
+            if let Some(ref stylesheet) = self.stylesheet {
+                if let Some(id) = element.element_id() {
+                    if let Some(motion) = stylesheet.resolve_animation(id) {
+                        props.motion = Some(motion);
+                        tracing::trace!(
+                            "Applied CSS animation from stylesheet for element #{} ({:?})",
+                            id,
+                            node_id
+                        );
+                    }
+                }
+            }
+        }
 
         // Use the element_type_id to determine type
         let element_type = match element.element_type_id() {

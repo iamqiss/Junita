@@ -513,6 +513,304 @@ impl CssSelector {
     }
 }
 
+/// A CSS keyframe animation definition
+///
+/// Represents a parsed `@keyframes` rule with multiple stops.
+#[derive(Clone, Debug)]
+pub struct CssKeyframes {
+    /// Animation name
+    pub name: String,
+    /// Keyframe stops (position 0.0-1.0 -> style properties)
+    pub keyframes: Vec<CssKeyframe>,
+}
+
+/// A single keyframe stop in an animation
+#[derive(Clone, Debug)]
+pub struct CssKeyframe {
+    /// Position in the animation (0.0 = start, 1.0 = end)
+    pub position: f32,
+    /// Style properties at this keyframe
+    pub style: ElementStyle,
+}
+
+impl CssKeyframes {
+    /// Create a new keyframes definition
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            keyframes: Vec::new(),
+        }
+    }
+
+    /// Add a keyframe at a specific position
+    pub fn add_keyframe(&mut self, position: f32, style: ElementStyle) {
+        self.keyframes.push(CssKeyframe { position, style });
+        // Keep keyframes sorted by position
+        self.keyframes.sort_by(|a, b| a.position.partial_cmp(&b.position).unwrap());
+    }
+
+    /// Get the keyframe at or before a given position
+    pub fn keyframe_at(&self, position: f32) -> Option<&CssKeyframe> {
+        self.keyframes.iter().rev().find(|kf| kf.position <= position)
+    }
+
+    /// Convert to Blinc MotionAnimation for enter animations
+    ///
+    /// Uses the first keyframe (0% or from) as enter_from and animates to the final state.
+    pub fn to_enter_animation(&self, duration_ms: u32) -> crate::element::MotionAnimation {
+        let enter_from = self.keyframes.first().map(|kf| Self::style_to_motion_keyframe(&kf.style));
+
+        crate::element::MotionAnimation {
+            enter_from,
+            enter_duration_ms: duration_ms,
+            enter_delay_ms: 0,
+            exit_to: None,
+            exit_duration_ms: 0,
+        }
+    }
+
+    /// Convert to Blinc MotionAnimation for exit animations
+    ///
+    /// Uses the last keyframe (100% or to) as exit_to.
+    pub fn to_exit_animation(&self, duration_ms: u32) -> crate::element::MotionAnimation {
+        let exit_to = self.keyframes.last().map(|kf| Self::style_to_motion_keyframe(&kf.style));
+
+        crate::element::MotionAnimation {
+            enter_from: None,
+            enter_duration_ms: 0,
+            enter_delay_ms: 0,
+            exit_to,
+            exit_duration_ms: duration_ms,
+        }
+    }
+
+    /// Convert to a full enter/exit MotionAnimation
+    ///
+    /// First keyframe becomes enter_from, last keyframe becomes exit_to.
+    pub fn to_motion_animation(&self, enter_duration_ms: u32, exit_duration_ms: u32) -> crate::element::MotionAnimation {
+        let enter_from = self.keyframes.first().map(|kf| Self::style_to_motion_keyframe(&kf.style));
+        let exit_to = self.keyframes.last().map(|kf| Self::style_to_motion_keyframe(&kf.style));
+
+        crate::element::MotionAnimation {
+            enter_from,
+            enter_duration_ms,
+            enter_delay_ms: 0,
+            exit_to,
+            exit_duration_ms,
+        }
+    }
+
+    /// Convert to a MultiKeyframeAnimation for more complex, multi-step animations
+    ///
+    /// This is the preferred method for animations with multiple keyframes (more than
+    /// just from/to). It creates a proper multi-keyframe animation that can be played,
+    /// paused, and controlled.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration_ms` - Total animation duration in milliseconds
+    /// * `easing` - Default easing function for transitions between keyframes
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let css = r#"
+    ///     @keyframes pulse {
+    ///         0%, 100% { opacity: 1; transform: scale(1); }
+    ///         50% { opacity: 0.8; transform: scale(1.05); }
+    ///     }
+    /// "#;
+    /// let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+    /// if let Some(keyframes) = stylesheet.get_keyframes("pulse") {
+    ///     let mut animation = keyframes.to_multi_keyframe_animation(1000, Easing::EaseInOut);
+    ///     animation.set_iterations(-1); // Infinite loop
+    ///     animation.play();
+    /// }
+    /// ```
+    pub fn to_multi_keyframe_animation(
+        &self,
+        duration_ms: u32,
+        easing: blinc_animation::Easing,
+    ) -> blinc_animation::MultiKeyframeAnimation {
+        use blinc_animation::MultiKeyframeAnimation;
+
+        let mut animation = MultiKeyframeAnimation::new(duration_ms);
+
+        for kf in &self.keyframes {
+            let props = Self::style_to_keyframe_properties(&kf.style);
+            animation = animation.keyframe(kf.position, props, easing);
+        }
+
+        animation
+    }
+
+    /// Convert ElementStyle to KeyframeProperties for MultiKeyframeAnimation
+    fn style_to_keyframe_properties(style: &ElementStyle) -> blinc_animation::KeyframeProperties {
+        use blinc_animation::KeyframeProperties;
+        use blinc_core::Transform;
+
+        let mut props = KeyframeProperties::default();
+
+        if let Some(opacity) = style.opacity {
+            props.opacity = Some(opacity);
+        }
+
+        // Try to extract transform components from Affine2D
+        if let Some(ref transform) = style.transform {
+            if let Transform::Affine2D(affine) = transform {
+                let [a, b, c, d, tx, ty] = affine.elements;
+
+                // Extract translation
+                if tx != 0.0 || ty != 0.0 {
+                    props.translate_x = Some(tx);
+                    props.translate_y = Some(ty);
+                }
+
+                // Try to extract scale (valid when no rotation/skew: b=0, c=0)
+                if b.abs() < 0.0001 && c.abs() < 0.0001 {
+                    if (a - 1.0).abs() > 0.0001 {
+                        props.scale_x = Some(a);
+                    }
+                    if (d - 1.0).abs() > 0.0001 {
+                        props.scale_y = Some(d);
+                    }
+                } else {
+                    // Has rotation - extract rotation angle
+                    let rotation = b.atan2(a);
+                    if rotation.abs() > 0.0001 {
+                        props.rotate = Some(rotation.to_degrees());
+                    }
+                }
+            }
+        }
+
+        props
+    }
+
+    /// Convert ElementStyle to MotionKeyframe
+    ///
+    /// Extracts animatable properties from an ElementStyle for use in motion animations.
+    /// Note: Transform decomposition is limited - for complex CSS transforms, only
+    /// simple scale/translate/rotate can be reliably extracted.
+    fn style_to_motion_keyframe(style: &ElementStyle) -> crate::element::MotionKeyframe {
+        use blinc_core::Transform;
+
+        let mut kf = crate::element::MotionKeyframe::new();
+
+        if let Some(opacity) = style.opacity {
+            kf.opacity = Some(opacity);
+        }
+
+        // Try to extract transform components from Affine2D
+        // Note: Complex combined transforms may not decompose cleanly
+        if let Some(ref transform) = style.transform {
+            if let Transform::Affine2D(affine) = transform {
+                let [a, b, c, d, tx, ty] = affine.elements;
+
+                // Always extract translation for keyframe animations
+                // (including zero values which are meaningful end states)
+                kf.translate_x = Some(tx);
+                kf.translate_y = Some(ty);
+
+                // Try to extract scale (valid when no rotation/skew: b=0, c=0)
+                if b.abs() < 0.0001 && c.abs() < 0.0001 {
+                    // Always include scale values for keyframe animations
+                    // (including 1.0 which is a meaningful end state)
+                    kf.scale_x = Some(a);
+                    kf.scale_y = Some(d);
+                } else {
+                    // Has rotation - try to extract rotation angle
+                    // For pure rotation: a=cos(θ), b=sin(θ), c=-sin(θ), d=cos(θ)
+                    let rotation = b.atan2(a);
+                    if rotation.abs() > 0.0001 {
+                        kf.rotate = Some(rotation.to_degrees());
+                    }
+                }
+            }
+            // Mat4 transforms are more complex, skip for now
+        }
+
+        kf
+    }
+}
+
+/// CSS animation configuration parsed from `animation:` property
+#[derive(Clone, Debug)]
+pub struct CssAnimation {
+    /// Name of the @keyframes to use
+    pub name: String,
+    /// Duration in milliseconds
+    pub duration_ms: u32,
+    /// Timing function
+    pub timing: AnimationTiming,
+    /// Delay before starting in milliseconds
+    pub delay_ms: u32,
+    /// Number of iterations (0 = infinite)
+    pub iteration_count: u32,
+    /// Direction of animation
+    pub direction: AnimationDirection,
+    /// Fill mode
+    pub fill_mode: AnimationFillMode,
+}
+
+impl Default for CssAnimation {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            duration_ms: 0,
+            timing: AnimationTiming::Ease,
+            delay_ms: 0,
+            iteration_count: 1,
+            direction: AnimationDirection::Normal,
+            fill_mode: AnimationFillMode::None,
+        }
+    }
+}
+
+/// Animation timing function
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AnimationTiming {
+    Linear,
+    #[default]
+    Ease,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+impl AnimationTiming {
+    fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "linear" => Some(AnimationTiming::Linear),
+            "ease" => Some(AnimationTiming::Ease),
+            "ease-in" => Some(AnimationTiming::EaseIn),
+            "ease-out" => Some(AnimationTiming::EaseOut),
+            "ease-in-out" => Some(AnimationTiming::EaseInOut),
+            _ => None,
+        }
+    }
+}
+
+/// Animation direction
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AnimationDirection {
+    #[default]
+    Normal,
+    Reverse,
+    Alternate,
+    AlternateReverse,
+}
+
+/// Animation fill mode
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AnimationFillMode {
+    #[default]
+    None,
+    Forwards,
+    Backwards,
+    Both,
+}
+
 /// A parsed stylesheet containing styles keyed by element ID
 #[derive(Clone, Default, Debug)]
 pub struct Stylesheet {
@@ -520,6 +818,8 @@ pub struct Stylesheet {
     styles: HashMap<String, ElementStyle>,
     /// CSS custom properties (variables) defined in :root
     variables: HashMap<String, String>,
+    /// Keyframe animations defined with @keyframes
+    keyframes: HashMap<String, CssKeyframes>,
 }
 
 impl Stylesheet {
@@ -575,6 +875,9 @@ impl Stylesheet {
                 stylesheet.variables = parsed.variables;
                 for (id, style) in parsed.rules {
                     stylesheet.styles.insert(id, style);
+                }
+                for keyframes in parsed.keyframes {
+                    stylesheet.keyframes.insert(keyframes.name.clone(), keyframes);
                 }
 
                 CssParseResult { stylesheet, errors }
@@ -778,6 +1081,128 @@ impl Stylesheet {
             self.variables.get(name).cloned()
         }
     }
+
+    // =========================================================================
+    // Keyframe Animations
+    // =========================================================================
+
+    /// Get a keyframe animation by name
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let css = r#"
+    ///     @keyframes fade-in {
+    ///         from { opacity: 0; }
+    ///         to { opacity: 1; }
+    ///     }
+    /// "#;
+    /// let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+    /// if let Some(keyframes) = stylesheet.get_keyframes("fade-in") {
+    ///     let animation = keyframes.to_enter_animation(300);
+    /// }
+    /// ```
+    pub fn get_keyframes(&self, name: &str) -> Option<&CssKeyframes> {
+        self.keyframes.get(name)
+    }
+
+    /// Check if keyframes exist with the given name
+    pub fn contains_keyframes(&self, name: &str) -> bool {
+        self.keyframes.contains_key(name)
+    }
+
+    /// Get all keyframe animation names
+    pub fn keyframe_names(&self) -> impl Iterator<Item = &str> {
+        self.keyframes.keys().map(|s| s.as_str())
+    }
+
+    /// Get the number of keyframe animations defined
+    pub fn keyframe_count(&self) -> usize {
+        self.keyframes.len()
+    }
+
+    /// Add a keyframe animation to the stylesheet
+    pub fn add_keyframes(&mut self, keyframes: CssKeyframes) {
+        self.keyframes.insert(keyframes.name.clone(), keyframes);
+    }
+
+    // =========================================================================
+    // Resolved Animations
+    // =========================================================================
+
+    /// Resolve a full motion animation for an element by its ID
+    ///
+    /// This combines:
+    /// 1. The element's `animation:` property (from its style)
+    /// 2. The referenced `@keyframes` definition
+    ///
+    /// Returns `Some(MotionAnimation)` if the element has an animation configured
+    /// and the keyframes exist.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let css = r#"
+    ///     @keyframes fade-in {
+    ///         from { opacity: 0; transform: translateY(20px); }
+    ///         to { opacity: 1; transform: translateY(0); }
+    ///     }
+    ///     #card {
+    ///         animation: fade-in 300ms ease-out;
+    ///     }
+    /// "#;
+    /// let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+    ///
+    /// if let Some(motion) = stylesheet.resolve_animation("card") {
+    ///     // Apply motion animation to the element
+    /// }
+    /// ```
+    pub fn resolve_animation(&self, id: &str) -> Option<crate::element::MotionAnimation> {
+        // Get the element's style
+        let style = self.get(id)?;
+
+        // Check if it has an animation property
+        let anim_config = style.animation.as_ref()?;
+
+        // Look up the keyframes by name
+        let keyframes = self.get_keyframes(&anim_config.name)?;
+
+        // Convert to MotionAnimation
+        // For enter animation, use the configured duration
+        // For exit animation, use the same duration (can be customized later)
+        let mut motion = keyframes.to_motion_animation(anim_config.duration_ms, anim_config.duration_ms);
+
+        // Apply delay from config
+        motion.enter_delay_ms = anim_config.delay_ms;
+
+        Some(motion)
+    }
+
+    /// Resolve animation for an element considering its current state
+    ///
+    /// This checks both the base style and state-specific styles for animations.
+    pub fn resolve_animation_with_state(
+        &self,
+        id: &str,
+        state: ElementState,
+    ) -> Option<crate::element::MotionAnimation> {
+        // First try state-specific animation
+        if let Some(style) = self.get_with_state(id, state) {
+            if let Some(anim_config) = &style.animation {
+                if let Some(keyframes) = self.get_keyframes(&anim_config.name) {
+                    let mut motion = keyframes.to_motion_animation(
+                        anim_config.duration_ms,
+                        anim_config.duration_ms,
+                    );
+                    motion.enter_delay_ms = anim_config.delay_ms;
+                    return Some(motion);
+                }
+            }
+        }
+
+        // Fall back to base animation
+        self.resolve_animation(id)
+    }
 }
 
 // ============================================================================
@@ -918,6 +1343,126 @@ fn root_block(input: &str) -> ParseResult<Vec<(String, String)>> {
     Ok((input, declarations))
 }
 
+/// Parse a @keyframes block
+///
+/// Supports:
+/// - `from` and `to` keywords (0% and 100%)
+/// - Percentage values like `50%`
+/// - Multiple stops: `0%, 100%` (same style for multiple positions)
+///
+/// # Example
+///
+/// ```ignore
+/// @keyframes slide-in {
+///     from { opacity: 0; transform: translateY(20px); }
+///     to { opacity: 1; transform: translateY(0); }
+/// }
+/// ```
+fn keyframes_block<'a>(
+    css: &'a str,
+    errors: &mut Vec<ParseError>,
+    variables: &HashMap<String, String>,
+) -> ParseResult<'a, CssKeyframes> {
+    let (input, _) = ws(css)?;
+    let (input, _) = tag("@keyframes")(input)?;
+    let (input, _) = ws(input)?;
+    let (input, name) = identifier(input)?;
+    let (input, _) = ws(input)?;
+    let (input, _) = char('{')(input)?;
+    let (input, _) = ws(input)?;
+
+    let mut keyframes = CssKeyframes::new(name);
+    let mut remaining = input;
+
+    // Parse keyframe stops
+    loop {
+        let trimmed = remaining.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('}') {
+            break;
+        }
+
+        match keyframe_stop(css, errors, variables)(trimmed) {
+            Ok((rest, (positions, style))) => {
+                for position in positions {
+                    keyframes.add_keyframe(position, style.clone());
+                }
+                remaining = rest;
+            }
+            Err(_) => {
+                // Can't parse more keyframe stops
+                break;
+            }
+        }
+    }
+
+    let (input, _) = ws(remaining)?;
+    let (input, _) = char('}')(input)?;
+    Ok((input, keyframes))
+}
+
+/// Parse a single keyframe stop (e.g., `from { ... }`, `50% { ... }`, or `0%, 100% { ... }`)
+fn keyframe_stop<'a, 'b>(
+    original_css: &'a str,
+    errors: &'b mut Vec<ParseError>,
+    variables: &'b HashMap<String, String>,
+) -> impl FnMut(&'a str) -> ParseResult<'a, (Vec<f32>, ElementStyle)> + 'b
+where
+    'a: 'b,
+{
+    move |input: &'a str| {
+        let (input, _) = ws(input)?;
+        let (input, positions) = keyframe_positions(input)?;
+        let (input, _) = ws(input)?;
+        let (input, properties) = rule_block(input)?;
+
+        let mut style = ElementStyle::new();
+        for (name, value) in properties {
+            let resolved_value = resolve_var_references(value, variables);
+            apply_property_with_errors(
+                &mut style,
+                name,
+                &resolved_value,
+                original_css,
+                input,
+                errors,
+            );
+        }
+
+        Ok((input, (positions, style)))
+    }
+}
+
+/// Parse keyframe position(s): `from`, `to`, `50%`, or `0%, 100%`
+fn keyframe_positions(input: &str) -> ParseResult<Vec<f32>> {
+    let (input, first) = keyframe_position(input)?;
+    let (input, rest) = many0(|i| {
+        let (i, _) = ws(i)?;
+        let (i, _) = char(',')(i)?;
+        let (i, _) = ws(i)?;
+        keyframe_position(i)
+    })(input)?;
+
+    let mut positions = vec![first];
+    positions.extend(rest);
+    Ok((input, positions))
+}
+
+/// Parse a single keyframe position: `from`, `to`, or percentage like `50%`
+fn keyframe_position(input: &str) -> ParseResult<f32> {
+    alt((
+        // `from` = 0%
+        value(0.0, tag_no_case("from")),
+        // `to` = 100%
+        value(1.0, tag_no_case("to")),
+        // Percentage like `50%`
+        |i| {
+            let (i, num) = float(i)?;
+            let (i, _) = char('%')(i)?;
+            Ok((i, num / 100.0))
+        },
+    ))(input)
+}
+
 /// Parsed content from a stylesheet - can be either a rule or variables
 enum CssBlock {
     Rule(String, ElementStyle),
@@ -972,10 +1517,11 @@ where
     }
 }
 
-/// Result of parsing a stylesheet - rules and variables
+/// Result of parsing a stylesheet - rules, variables, and keyframes
 struct ParsedStylesheet {
     rules: Vec<(String, ElementStyle)>,
     variables: HashMap<String, String>,
+    keyframes: Vec<CssKeyframes>,
 }
 
 /// Parse an entire stylesheet with error collection
@@ -989,6 +1535,7 @@ fn parse_stylesheet_with_errors<'a>(
     // Parse blocks one at a time to collect errors
     let mut rules = Vec::new();
     let mut parsed_variables = variables.clone();
+    let mut parsed_keyframes = Vec::new();
     let mut remaining = input;
 
     loop {
@@ -1009,6 +1556,20 @@ fn parse_stylesheet_with_errors<'a>(
                 }
                 Err(_) => {
                     // Not a valid :root block, try as a rule
+                }
+            }
+        }
+
+        // Try to parse @keyframes block
+        if trimmed.starts_with("@keyframes") {
+            match keyframes_block(trimmed, errors, &parsed_variables) {
+                Ok((rest, keyframes)) => {
+                    parsed_keyframes.push(keyframes);
+                    remaining = rest;
+                    continue;
+                }
+                Err(_) => {
+                    // Not a valid @keyframes block, try as a rule
                 }
             }
         }
@@ -1035,6 +1596,7 @@ fn parse_stylesheet_with_errors<'a>(
         ParsedStylesheet {
             rules,
             variables: parsed_variables,
+            keyframes: parsed_keyframes,
         },
     ))
 }
@@ -1176,6 +1738,60 @@ fn apply_property(style: &mut ElementStyle, name: &str, value: &str) {
                 style.render_layer = Some(layer);
             }
         }
+        "animation" => {
+            if let Some(animation) = parse_animation(value) {
+                style.animation = Some(animation);
+            }
+        }
+        "animation-name" => {
+            let mut anim = style.animation.take().unwrap_or_default();
+            anim.name = value.trim().to_string();
+            style.animation = Some(anim);
+        }
+        "animation-duration" => {
+            if let Some(ms) = parse_time_value(value) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.duration_ms = ms;
+                style.animation = Some(anim);
+            }
+        }
+        "animation-delay" => {
+            if let Some(ms) = parse_time_value(value) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.delay_ms = ms;
+                style.animation = Some(anim);
+            }
+        }
+        "animation-timing-function" => {
+            if let Some(timing) = AnimationTiming::from_str(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.timing = timing;
+                style.animation = Some(anim);
+            }
+        }
+        "animation-iteration-count" => {
+            let mut anim = style.animation.take().unwrap_or_default();
+            if value.trim().eq_ignore_ascii_case("infinite") {
+                anim.iteration_count = 0;
+            } else if let Ok(count) = value.trim().parse::<u32>() {
+                anim.iteration_count = count;
+            }
+            style.animation = Some(anim);
+        }
+        "animation-direction" => {
+            if let Some(direction) = parse_animation_direction(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.direction = direction;
+                style.animation = Some(anim);
+            }
+        }
+        "animation-fill-mode" => {
+            if let Some(fill_mode) = parse_animation_fill_mode(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.fill_mode = fill_mode;
+                style.animation = Some(anim);
+            }
+        }
         _ => {
             // Unknown property - log at debug level for forward compatibility
             debug!(property = name, value = value, "Unknown CSS property (ignored)");
@@ -1233,6 +1849,75 @@ fn apply_property_with_errors(
         "render-layer" | "z-index" => {
             if let Ok((_, layer)) = parse_render_layer::<nom::error::Error<&str>>(value) {
                 style.render_layer = Some(layer);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation" => {
+            if let Some(animation) = parse_animation(value) {
+                style.animation = Some(animation);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-name" => {
+            let mut anim = style.animation.take().unwrap_or_default();
+            anim.name = value.trim().to_string();
+            style.animation = Some(anim);
+        }
+        "animation-duration" => {
+            if let Some(ms) = parse_time_value(value) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.duration_ms = ms;
+                style.animation = Some(anim);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-delay" => {
+            if let Some(ms) = parse_time_value(value) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.delay_ms = ms;
+                style.animation = Some(anim);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-timing-function" => {
+            if let Some(timing) = AnimationTiming::from_str(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.timing = timing;
+                style.animation = Some(anim);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-iteration-count" => {
+            let mut anim = style.animation.take().unwrap_or_default();
+            if value.trim().eq_ignore_ascii_case("infinite") {
+                anim.iteration_count = 0;
+                style.animation = Some(anim);
+            } else if let Ok(count) = value.trim().parse::<u32>() {
+                anim.iteration_count = count;
+                style.animation = Some(anim);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-direction" => {
+            if let Some(direction) = parse_animation_direction(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.direction = direction;
+                style.animation = Some(anim);
+            } else {
+                errors.push(ParseError::invalid_value(name, value, line, column));
+            }
+        }
+        "animation-fill-mode" => {
+            if let Some(fill_mode) = parse_animation_fill_mode(value.trim()) {
+                let mut anim = style.animation.take().unwrap_or_default();
+                anim.fill_mode = fill_mode;
+                style.animation = Some(anim);
             } else {
                 errors.push(ParseError::invalid_value(name, value, line, column));
             }
@@ -1467,9 +2152,33 @@ fn parse_rotate_transform<'a, E: NomParseError<&'a str>>(input: &'a str) -> IRes
     Ok((input, Transform::rotate(degrees * std::f32::consts::PI / 180.0)))
 }
 
-/// Parse translate(x, y)
+/// Parse translate(x, y), translateX(x), or translateY(y)
 fn parse_translate_transform<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Transform, E> {
     let (input, _) = ws(input)?;
+
+    // Try translateX(x)
+    if let Ok((rest, _)) = tag_no_case::<_, _, E>("translateX")(input) {
+        let (rest, _) = ws(rest)?;
+        let (rest, _) = char('(')(rest)?;
+        let (rest, _) = ws(rest)?;
+        let (rest, x) = parse_length(rest)?;
+        let (rest, _) = ws(rest)?;
+        let (rest, _) = char(')')(rest)?;
+        return Ok((rest, Transform::translate(x, 0.0)));
+    }
+
+    // Try translateY(y)
+    if let Ok((rest, _)) = tag_no_case::<_, _, E>("translateY")(input) {
+        let (rest, _) = ws(rest)?;
+        let (rest, _) = char('(')(rest)?;
+        let (rest, _) = ws(rest)?;
+        let (rest, y) = parse_length(rest)?;
+        let (rest, _) = ws(rest)?;
+        let (rest, _) = char(')')(rest)?;
+        return Ok((rest, Transform::translate(0.0, y)));
+    }
+
+    // Try translate(x, y)
     let (input, _) = tag_no_case("translate")(input)?;
     let (input, _) = ws(input)?;
     let (input, _) = char('(')(input)?;
@@ -1513,6 +2222,122 @@ fn parse_render_layer<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<
         value(RenderLayer::Glass, tag_no_case("glass")),
         value(RenderLayer::Background, tag_no_case("background")),
     ))(input)
+}
+
+// ============================================================================
+// Animation Parsing
+// ============================================================================
+
+/// Parse CSS animation shorthand: animation: name duration timing-function delay iteration-count direction fill-mode
+///
+/// Examples:
+/// - `animation: fade-in 300ms`
+/// - `animation: fade-in 300ms ease-out`
+/// - `animation: fade-in 300ms ease-out 100ms`
+/// - `animation: fade-in 300ms ease-out 0ms infinite`
+/// - `animation: slide-in 0.5s ease-in-out 0s 1 normal forwards`
+fn parse_animation(value: &str) -> Option<CssAnimation> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut anim = CssAnimation::default();
+    let mut duration_set = false;
+    let mut delay_set = false;
+
+    for part in parts {
+        // Try parsing as timing function
+        if let Some(timing) = AnimationTiming::from_str(part) {
+            anim.timing = timing;
+            continue;
+        }
+
+        // Try parsing as direction
+        if let Some(direction) = parse_animation_direction(part) {
+            anim.direction = direction;
+            continue;
+        }
+
+        // Try parsing as fill mode
+        if let Some(fill_mode) = parse_animation_fill_mode(part) {
+            anim.fill_mode = fill_mode;
+            continue;
+        }
+
+        // Try parsing as iteration count
+        if part.eq_ignore_ascii_case("infinite") {
+            anim.iteration_count = 0; // 0 means infinite
+            continue;
+        }
+        if let Ok(count) = part.parse::<u32>() {
+            anim.iteration_count = count;
+            continue;
+        }
+
+        // Try parsing as duration (first time value is duration, second is delay)
+        if let Some(ms) = parse_time_value(part) {
+            if !duration_set {
+                anim.duration_ms = ms;
+                duration_set = true;
+            } else if !delay_set {
+                anim.delay_ms = ms;
+                delay_set = true;
+            }
+            continue;
+        }
+
+        // Otherwise, treat as animation name
+        if anim.name.is_empty() {
+            anim.name = part.to_string();
+        }
+    }
+
+    if anim.name.is_empty() {
+        return None;
+    }
+
+    Some(anim)
+}
+
+/// Parse animation direction keyword
+fn parse_animation_direction(input: &str) -> Option<AnimationDirection> {
+    match input.to_lowercase().as_str() {
+        "normal" => Some(AnimationDirection::Normal),
+        "reverse" => Some(AnimationDirection::Reverse),
+        "alternate" => Some(AnimationDirection::Alternate),
+        "alternate-reverse" => Some(AnimationDirection::AlternateReverse),
+        _ => None,
+    }
+}
+
+/// Parse animation fill mode keyword
+fn parse_animation_fill_mode(input: &str) -> Option<AnimationFillMode> {
+    match input.to_lowercase().as_str() {
+        "none" => Some(AnimationFillMode::None),
+        "forwards" => Some(AnimationFillMode::Forwards),
+        "backwards" => Some(AnimationFillMode::Backwards),
+        "both" => Some(AnimationFillMode::Both),
+        _ => None,
+    }
+}
+
+/// Parse a time value (e.g., "300ms", "0.5s", "1s")
+fn parse_time_value(input: &str) -> Option<u32> {
+    let input = input.trim();
+
+    // Try milliseconds
+    if let Some(ms_str) = input.strip_suffix("ms") {
+        return ms_str.trim().parse::<f32>().ok().map(|ms| ms as u32);
+    }
+
+    // Try seconds
+    if let Some(s_str) = input.strip_suffix('s') {
+        return s_str.trim().parse::<f32>().ok().map(|s| (s * 1000.0) as u32);
+    }
+
+    // Try plain number (assume milliseconds)
+    input.parse::<f32>().ok().map(|ms| ms as u32)
 }
 
 // ============================================================================
@@ -1747,6 +2572,30 @@ mod tests {
     #[test]
     fn test_parse_transform_rotate() {
         let css = "#test { transform: rotate(45deg); }";
+        let stylesheet = Stylesheet::parse(css).unwrap();
+        let style = stylesheet.get("test").unwrap();
+        assert!(style.transform.is_some());
+    }
+
+    #[test]
+    fn test_parse_transform_translate() {
+        let css = "#test { transform: translate(10px, 20px); }";
+        let stylesheet = Stylesheet::parse(css).unwrap();
+        let style = stylesheet.get("test").unwrap();
+        assert!(style.transform.is_some());
+    }
+
+    #[test]
+    fn test_parse_transform_translate_x() {
+        let css = "#test { transform: translateX(10px); }";
+        let stylesheet = Stylesheet::parse(css).unwrap();
+        let style = stylesheet.get("test").unwrap();
+        assert!(style.transform.is_some());
+    }
+
+    #[test]
+    fn test_parse_transform_translate_y() {
+        let css = "#test { transform: translateY(20px); }";
         let stylesheet = Stylesheet::parse(css).unwrap();
         let style = stylesheet.get("test").unwrap();
         assert!(style.transform.is_some());
@@ -2587,5 +3436,406 @@ mod tests {
 
         let selector_hover = CssSelector::with_state("button", ElementState::Hover);
         assert_eq!(selector_hover.key(), "button:hover");
+    }
+
+    // =========================================================================
+    // Keyframe Animation Tests
+    // =========================================================================
+
+    #[test]
+    fn test_keyframes_basic() {
+        let css = r#"
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert!(!result.has_errors());
+        assert!(result.stylesheet.contains_keyframes("fade-in"));
+
+        let keyframes = result.stylesheet.get_keyframes("fade-in").unwrap();
+        assert_eq!(keyframes.name, "fade-in");
+        assert_eq!(keyframes.keyframes.len(), 2);
+
+        // Check first keyframe (from = 0%)
+        assert_eq!(keyframes.keyframes[0].position, 0.0);
+        assert_eq!(keyframes.keyframes[0].style.opacity, Some(0.0));
+
+        // Check last keyframe (to = 100%)
+        assert_eq!(keyframes.keyframes[1].position, 1.0);
+        assert_eq!(keyframes.keyframes[1].style.opacity, Some(1.0));
+    }
+
+    #[test]
+    fn test_keyframes_percentage() {
+        let css = r#"
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.5; }
+                100% { opacity: 1; }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert!(!result.has_errors());
+        let keyframes = result.stylesheet.get_keyframes("pulse").unwrap();
+        assert_eq!(keyframes.keyframes.len(), 3);
+
+        assert_eq!(keyframes.keyframes[0].position, 0.0);
+        assert_eq!(keyframes.keyframes[1].position, 0.5);
+        assert_eq!(keyframes.keyframes[2].position, 1.0);
+    }
+
+    #[test]
+    fn test_keyframes_with_transform() {
+        let css = r#"
+            @keyframes slide-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert!(!result.has_errors());
+        let keyframes = result.stylesheet.get_keyframes("slide-in").unwrap();
+
+        // First keyframe should have opacity 0 and transform
+        assert_eq!(keyframes.keyframes[0].style.opacity, Some(0.0));
+        assert!(keyframes.keyframes[0].style.transform.is_some());
+
+        // Last keyframe should have opacity 1
+        assert_eq!(keyframes.keyframes[1].style.opacity, Some(1.0));
+        assert!(keyframes.keyframes[1].style.transform.is_some());
+    }
+
+    #[test]
+    fn test_keyframes_multiple_positions() {
+        let css = r#"
+            @keyframes blink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0; }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert!(!result.has_errors());
+        let keyframes = result.stylesheet.get_keyframes("blink").unwrap();
+
+        // Should have 3 keyframes: 0%, 50%, 100%
+        assert_eq!(keyframes.keyframes.len(), 3);
+
+        // 0% and 100% should have opacity 1
+        assert_eq!(keyframes.keyframes[0].position, 0.0);
+        assert_eq!(keyframes.keyframes[0].style.opacity, Some(1.0));
+
+        assert_eq!(keyframes.keyframes[1].position, 0.5);
+        assert_eq!(keyframes.keyframes[1].style.opacity, Some(0.0));
+
+        assert_eq!(keyframes.keyframes[2].position, 1.0);
+        assert_eq!(keyframes.keyframes[2].style.opacity, Some(1.0));
+    }
+
+    #[test]
+    fn test_keyframes_count() {
+        let css = r#"
+            @keyframes anim1 {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes anim2 {
+                from { opacity: 1; }
+                to { opacity: 0; }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert_eq!(result.stylesheet.keyframe_count(), 2);
+        assert!(result.stylesheet.contains_keyframes("anim1"));
+        assert!(result.stylesheet.contains_keyframes("anim2"));
+    }
+
+    #[test]
+    fn test_keyframes_names() {
+        let css = r#"
+            @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        let names: Vec<_> = result.stylesheet.keyframe_names().collect();
+        assert!(names.contains(&"fade-in"));
+        assert!(names.contains(&"fade-out"));
+    }
+
+    #[test]
+    fn test_keyframes_to_motion_animation() {
+        let css = r#"
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        let keyframes = result.stylesheet.get_keyframes("fade-in").unwrap();
+
+        let motion = keyframes.to_motion_animation(300, 200);
+
+        assert_eq!(motion.enter_duration_ms, 300);
+        assert_eq!(motion.exit_duration_ms, 200);
+        assert!(motion.enter_from.is_some());
+        assert!(motion.exit_to.is_some());
+
+        // enter_from should have opacity 0
+        let enter = motion.enter_from.unwrap();
+        assert_eq!(enter.opacity, Some(0.0));
+
+        // exit_to should have opacity 1
+        let exit = motion.exit_to.unwrap();
+        assert_eq!(exit.opacity, Some(1.0));
+    }
+
+    #[test]
+    fn test_keyframes_to_multi_keyframe_animation() {
+        use blinc_animation::Easing;
+
+        let css = r#"
+            @keyframes pulse {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.8; transform: scale(1.05); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        let keyframes = result.stylesheet.get_keyframes("pulse").unwrap();
+
+        let animation = keyframes.to_multi_keyframe_animation(1000, Easing::EaseInOut);
+
+        // Should have 3 keyframes
+        assert_eq!(animation.keyframes().len(), 3);
+
+        // Check keyframe positions
+        assert_eq!(animation.keyframes()[0].time, 0.0);
+        assert_eq!(animation.keyframes()[1].time, 0.5);
+        assert_eq!(animation.keyframes()[2].time, 1.0);
+
+        // Check opacity values
+        assert_eq!(animation.keyframes()[0].properties.opacity, Some(1.0));
+        assert_eq!(animation.keyframes()[1].properties.opacity, Some(0.8));
+        assert_eq!(animation.keyframes()[2].properties.opacity, Some(1.0));
+    }
+
+    #[test]
+    fn test_keyframes_with_variables() {
+        let css = r#"
+            :root {
+                --start-opacity: 0;
+                --end-opacity: 1;
+            }
+            @keyframes fade-in {
+                from { opacity: var(--start-opacity); }
+                to { opacity: var(--end-opacity); }
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        assert!(!result.has_errors());
+        let keyframes = result.stylesheet.get_keyframes("fade-in").unwrap();
+
+        // Variables should be resolved
+        assert_eq!(keyframes.keyframes[0].style.opacity, Some(0.0));
+        assert_eq!(keyframes.keyframes[1].style.opacity, Some(1.0));
+    }
+
+    #[test]
+    fn test_keyframes_mixed_with_rules() {
+        let css = r#"
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            #card {
+                background: #FF0000;
+            }
+
+            #card:hover {
+                opacity: 0.9;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        // Keyframes should be parsed
+        assert!(result.stylesheet.contains_keyframes("fade-in"));
+
+        // Rules should also be parsed
+        assert!(result.stylesheet.contains("card"));
+        assert!(result.stylesheet.contains_with_state("card", ElementState::Hover));
+    }
+
+    // =========================================================================
+    // Animation Property Tests
+    // =========================================================================
+
+    #[test]
+    fn test_animation_shorthand_basic() {
+        let css = r#"
+            #card {
+                animation: fade-in 300ms;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        assert!(!result.has_errors());
+
+        let style = result.stylesheet.get("card").unwrap();
+        let anim = style.animation.as_ref().unwrap();
+        assert_eq!(anim.name, "fade-in");
+        assert_eq!(anim.duration_ms, 300);
+    }
+
+    #[test]
+    fn test_animation_shorthand_full() {
+        let css = r#"
+            #modal {
+                animation: slide-in 0.5s ease-out 100ms infinite alternate forwards;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        assert!(!result.has_errors());
+
+        let style = result.stylesheet.get("modal").unwrap();
+        let anim = style.animation.as_ref().unwrap();
+        assert_eq!(anim.name, "slide-in");
+        assert_eq!(anim.duration_ms, 500);
+        assert_eq!(anim.timing, AnimationTiming::EaseOut);
+        assert_eq!(anim.delay_ms, 100);
+        assert_eq!(anim.iteration_count, 0); // 0 = infinite
+        assert_eq!(anim.direction, AnimationDirection::Alternate);
+        assert_eq!(anim.fill_mode, AnimationFillMode::Forwards);
+    }
+
+    #[test]
+    fn test_animation_individual_properties() {
+        let css = r#"
+            #button {
+                animation-name: pulse;
+                animation-duration: 2s;
+                animation-timing-function: ease-in-out;
+                animation-delay: 0.5s;
+                animation-iteration-count: 3;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        assert!(!result.has_errors());
+
+        let style = result.stylesheet.get("button").unwrap();
+        let anim = style.animation.as_ref().unwrap();
+        assert_eq!(anim.name, "pulse");
+        assert_eq!(anim.duration_ms, 2000);
+        assert_eq!(anim.timing, AnimationTiming::EaseInOut);
+        assert_eq!(anim.delay_ms, 500);
+        assert_eq!(anim.iteration_count, 3);
+        assert_eq!(anim.direction, AnimationDirection::Reverse);
+        assert_eq!(anim.fill_mode, AnimationFillMode::Both);
+    }
+
+    #[test]
+    fn test_animation_with_keyframes() {
+        let css = r#"
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            #card {
+                animation: fade-in 300ms ease-out forwards;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        assert!(!result.has_errors());
+
+        // Both keyframes and animation property should be parsed
+        assert!(result.stylesheet.contains_keyframes("fade-in"));
+
+        let style = result.stylesheet.get("card").unwrap();
+        let anim = style.animation.as_ref().unwrap();
+        assert_eq!(anim.name, "fade-in");
+        assert_eq!(anim.duration_ms, 300);
+        assert_eq!(anim.timing, AnimationTiming::EaseOut);
+        assert_eq!(anim.fill_mode, AnimationFillMode::Forwards);
+    }
+
+    #[test]
+    fn test_resolve_animation() {
+        let css = r#"
+            @keyframes slide-in {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            #modal {
+                animation: slide-in 500ms ease-out 100ms;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+        assert!(!result.has_errors());
+
+        // resolve_animation should combine keyframes and animation config
+        let motion = result.stylesheet.resolve_animation("modal").unwrap();
+
+        // Check duration comes from animation property
+        assert_eq!(motion.enter_duration_ms, 500);
+        assert_eq!(motion.exit_duration_ms, 500);
+        assert_eq!(motion.enter_delay_ms, 100);
+
+        // Check enter_from comes from first keyframe
+        let enter_from = motion.enter_from.as_ref().unwrap();
+        assert_eq!(enter_from.opacity, Some(0.0));
+        assert_eq!(enter_from.translate_y, Some(20.0));
+
+        // Check exit_to comes from last keyframe
+        let exit_to = motion.exit_to.as_ref().unwrap();
+        assert_eq!(exit_to.opacity, Some(1.0));
+        assert_eq!(exit_to.translate_y, Some(0.0));
+    }
+
+    #[test]
+    fn test_resolve_animation_missing_keyframes() {
+        let css = r#"
+            #card {
+                animation: nonexistent 300ms;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        // Should return None when keyframes don't exist
+        assert!(result.stylesheet.resolve_animation("card").is_none());
+    }
+
+    #[test]
+    fn test_resolve_animation_no_animation_property() {
+        let css = r#"
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            #card {
+                background: blue;
+            }
+        "#;
+        let result = Stylesheet::parse_with_errors(css);
+
+        // Should return None when element has no animation property
+        assert!(result.stylesheet.resolve_animation("card").is_none());
     }
 }

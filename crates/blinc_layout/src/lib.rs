@@ -359,7 +359,8 @@ pub mod prelude {
 
     // CSS parser for loading stylesheets
     pub use crate::css_parser::{
-        CssParseResult, CssSelector, ElementState as CssElementState,
+        AnimationDirection, AnimationFillMode, AnimationTiming, CssAnimation, CssKeyframe,
+        CssKeyframes, CssParseResult, CssSelector, ElementState as CssElementState,
         ParseError as CssParseError, Severity as CssSeverity, Stylesheet,
     };
 }

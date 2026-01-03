@@ -30,6 +30,7 @@
 use blinc_core::{Brush, Color, CornerRadius, Shadow, Transform};
 use blinc_theme::ThemeState;
 
+use crate::css_parser::CssAnimation;
 use crate::element::{GlassMaterial, Material, MetallicMaterial, RenderLayer, WoodMaterial};
 
 /// Visual style properties for an element
@@ -53,6 +54,8 @@ pub struct ElementStyle {
     pub render_layer: Option<RenderLayer>,
     /// Opacity (0.0 = transparent, 1.0 = opaque)
     pub opacity: Option<f32>,
+    /// CSS animation configuration (animation: name duration timing delay iteration-count direction fill-mode)
+    pub animation: Option<CssAnimation>,
 }
 
 impl ElementStyle {
@@ -338,6 +341,7 @@ impl ElementStyle {
             material: other.material.clone().or_else(|| self.material.clone()),
             render_layer: other.render_layer.or(self.render_layer),
             opacity: other.opacity.or(self.opacity),
+            animation: other.animation.clone().or_else(|| self.animation.clone()),
         }
     }
 
@@ -350,6 +354,33 @@ impl ElementStyle {
             && self.material.is_none()
             && self.render_layer.is_none()
             && self.opacity.is_none()
+            && self.animation.is_none()
+    }
+
+    // =========================================================================
+    // Animation
+    // =========================================================================
+
+    /// Set CSS animation
+    pub fn animation(mut self, animation: CssAnimation) -> Self {
+        self.animation = Some(animation);
+        self
+    }
+
+    /// Set animation by name (requires stylesheet lookup later)
+    pub fn animation_name(mut self, name: impl Into<String>) -> Self {
+        let mut anim = self.animation.take().unwrap_or_default();
+        anim.name = name.into();
+        self.animation = Some(anim);
+        self
+    }
+
+    /// Set animation duration in milliseconds
+    pub fn animation_duration(mut self, duration_ms: u32) -> Self {
+        let mut anim = self.animation.take().unwrap_or_default();
+        anim.duration_ms = duration_ms;
+        self.animation = Some(anim);
+        self
     }
 }
 
