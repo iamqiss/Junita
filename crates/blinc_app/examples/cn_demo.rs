@@ -11,7 +11,7 @@ use blinc_cn::prelude::*;
 use blinc_core::Color;
 use blinc_layout::selector::ScrollRef;
 use blinc_layout::widgets::text_input::text_input_data;
-use blinc_theme::{ColorToken, ThemeState};
+use blinc_theme::{ColorScheme, ColorToken, ThemeState};
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -42,7 +42,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
         .h(ctx.height)
         .bg(bg)
         .flex_col()
-        .child(header())
+        .child(header(ctx))
         .child(
             scroll()
                 .w_full()
@@ -71,13 +71,19 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
         )
 }
 
-/// Header with title
-fn header() -> impl ElementBuilder {
+/// Header with title and theme toggle
+fn header(ctx: &WindowedContext) -> impl ElementBuilder {
     let theme = ThemeState::get();
     let surface = theme.color(ColorToken::Surface);
     let text_primary = theme.color(ColorToken::TextPrimary);
     let text_secondary = theme.color(ColorToken::TextSecondary);
     let border = theme.color(ColorToken::Border);
+
+    // Theme toggle switch state
+    let is_dark = ctx.use_state_keyed("theme_is_dark", || {
+        ThemeState::get().scheme() == ColorScheme::Dark
+    });
+    let scheduler = ctx.animation_handle();
 
     div()
         .w_full()
@@ -87,6 +93,7 @@ fn header() -> impl ElementBuilder {
         .px(theme.spacing().space_6)
         .flex_row()
         .items_center()
+        .justify_between()
         .child(
             div()
                 .flex_col()
@@ -102,6 +109,13 @@ fn header() -> impl ElementBuilder {
                         .size(theme.typography().text_sm)
                         .color(text_secondary),
                 ),
+        )
+        .child(
+            cn::switch(&is_dark, scheduler)
+                .label("Dark Mode")
+                .on_change(|_| {
+                    ThemeState::get().toggle_scheme();
+                }),
         )
 }
 
