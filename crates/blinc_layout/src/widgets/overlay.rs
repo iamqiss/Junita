@@ -695,6 +695,16 @@ impl OverlayManagerInner {
         }
     }
 
+    /// Set the cached content size for an overlay (for hit testing)
+    ///
+    /// This is typically called from an `on_ready` callback after the overlay
+    /// content has been laid out, providing accurate size for backdrop click detection.
+    pub fn set_content_size(&mut self, handle: OverlayHandle, width: f32, height: f32) {
+        if let Some(overlay) = self.overlays.get_mut(&handle) {
+            overlay.cached_size = Some((width, height));
+        }
+    }
+
     /// Close the topmost overlay
     pub fn close_top(&mut self) {
         // Find highest z-priority open overlay
@@ -1179,10 +1189,16 @@ pub trait OverlayManagerExt {
     fn has_blocking_overlay(&self) -> bool;
     /// Check if any dismissable overlay is visible (dropdown, context menu, etc.)
     fn has_dismissable_overlay(&self) -> bool;
+    /// Check if any overlay is visible
+    fn has_visible_overlays(&self) -> bool;
     /// Check if a specific overlay handle is still visible
     fn is_visible(&self, handle: OverlayHandle) -> bool;
     /// Update overlay states - call every frame for animations and auto-dismiss
     fn update(&self, current_time_ms: u64);
+    /// Take the dirty flag (returns true if dirty, clears flag)
+    fn take_dirty(&self) -> bool;
+    /// Set the cached content size for an overlay (for hit testing)
+    fn set_content_size(&self, handle: OverlayHandle, width: f32, height: f32);
 }
 
 impl OverlayManagerExt for OverlayManager {
@@ -1256,6 +1272,10 @@ impl OverlayManagerExt for OverlayManager {
         self.lock().unwrap().has_dismissable_overlay()
     }
 
+    fn has_visible_overlays(&self) -> bool {
+        self.lock().unwrap().has_visible_overlays()
+    }
+
     fn is_visible(&self, handle: OverlayHandle) -> bool {
         self.lock()
             .unwrap()
@@ -1267,6 +1287,14 @@ impl OverlayManagerExt for OverlayManager {
 
     fn update(&self, current_time_ms: u64) {
         self.lock().unwrap().update(current_time_ms);
+    }
+
+    fn take_dirty(&self) -> bool {
+        self.lock().unwrap().take_dirty()
+    }
+
+    fn set_content_size(&self, handle: OverlayHandle, width: f32, height: f32) {
+        self.lock().unwrap().set_content_size(handle, width, height);
     }
 }
 

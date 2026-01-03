@@ -183,9 +183,15 @@ impl Svg {
         self
     }
 
-    /// Set flex-shrink
+    /// Set flex-shrink to 1 (element will shrink if needed)
     pub fn flex_shrink(mut self) -> Self {
         self.style.flex_shrink = 1.0;
+        self
+    }
+
+    /// Set flex-shrink to 0 (element won't shrink)
+    pub fn flex_shrink_0(mut self) -> Self {
+        self.style.flex_shrink = 0.0;
         self
     }
 

@@ -93,6 +93,8 @@ pub struct WindowedContext {
     pub rebuild_count: u32,
     /// Event router for input event handling
     pub event_router: EventRouter,
+    /// Event router for overlay content (modals, dropdowns, etc.)
+    pub overlay_event_router: EventRouter,
     /// Animation scheduler for spring/keyframe animations
     pub animations: SharedAnimationScheduler,
     /// Shared dirty flag for element refs - when set, triggers UI rebuild
@@ -103,6 +105,8 @@ pub struct WindowedContext {
     hooks: SharedHookState,
     /// Overlay manager for modals, dialogs, toasts, etc.
     overlay_manager: OverlayManager,
+    /// Cached overlay tree for event routing (rebuilt when overlays change)
+    overlay_tree: Option<blinc_layout::RenderTree>,
     /// Element registry for query API (shared with RenderTree)
     element_registry: SharedElementRegistry,
     /// Callbacks to run after UI is ready (motion bindings registered)
@@ -140,11 +144,13 @@ impl WindowedContext {
             focused: window.is_focused(),
             rebuild_count: 0,
             event_router,
+            overlay_event_router: EventRouter::new(),
             animations,
             ref_dirty_flag,
             reactive,
             hooks,
             overlay_manager: overlay_mgr,
+            overlay_tree: None,
             element_registry,
             ready_callbacks,
         }
@@ -1506,7 +1512,7 @@ impl WindowedApp {
                         }
 
                         // First phase: collect events using immutable borrow
-                        let (pending_events, keyboard_events, scroll_ended, gesture_ended, scroll_info) = if let (Some(ref mut windowed_ctx), Some(ref tree)) =
+                        let (pending_events, keyboard_events, pending_overlay_events, scroll_ended, gesture_ended, scroll_info) = if let (Some(ref mut windowed_ctx), Some(ref tree)) =
                             (&mut ctx, &render_tree)
                         {
                             let router = &mut windowed_ctx.event_router;
@@ -1515,6 +1521,8 @@ impl WindowedApp {
                             let mut pending_events: Vec<PendingEvent> = Vec::new();
                             // Separate collection for keyboard events (TEXT_INPUT)
                             let mut keyboard_events: Vec<PendingEvent> = Vec::new();
+                            // Separate collection for overlay events
+                            let mut pending_overlay_events: Vec<PendingEvent> = Vec::new();
                             // Track if scroll ended (momentum finished)
                             let mut scroll_ended = false;
                             // Track if gesture ended (finger lifted - may still have momentum)
@@ -1537,6 +1545,21 @@ impl WindowedApp {
                                 }
                             });
 
+                            // Set up callback to collect overlay events
+                            windowed_ctx.overlay_event_router.set_event_callback({
+                                let events = &mut pending_overlay_events as *mut Vec<PendingEvent>;
+                                move |node, event_type| {
+                                    // SAFETY: This callback is only used within this scope
+                                    unsafe {
+                                        (*events).push(PendingEvent {
+                                            node_id: node,
+                                            event_type,
+                                            ..Default::default()
+                                        });
+                                    }
+                                }
+                            });
+
                             // Convert physical coordinates to logical for hit testing
                             let scale = windowed_ctx.scale_factor as f32;
 
@@ -1546,6 +1569,25 @@ impl WindowedApp {
                                         // Convert physical to logical coordinates
                                         let lx = x / scale;
                                         let ly = y / scale;
+
+                                        // Route to overlay tree first if visible
+                                        if windowed_ctx.overlay_manager.has_visible_overlays() {
+                                            // Build/update overlay tree for event routing
+                                            if windowed_ctx.overlay_tree.is_none() || windowed_ctx.overlay_manager.take_dirty() {
+                                                windowed_ctx.overlay_tree = windowed_ctx.overlay_manager.build_overlay_tree();
+                                            }
+                                            if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                                windowed_ctx.overlay_event_router.on_mouse_move(overlay_tree, lx, ly);
+                                                // Update cursor from overlay if hovering over overlay content
+                                                let overlay_cursor = overlay_tree
+                                                    .get_cursor_at(&windowed_ctx.overlay_event_router, lx, ly)
+                                                    .unwrap_or(CursorStyle::Default);
+                                                if overlay_cursor != CursorStyle::Default {
+                                                    window.set_cursor(convert_cursor_style(overlay_cursor));
+                                                }
+                                            }
+                                        }
+
                                         router.on_mouse_move(tree, lx, ly);
 
                                         // Get drag delta from router (for DRAG events)
@@ -1563,11 +1605,19 @@ impl WindowedApp {
                                             }
                                         }
 
-                                        // Update cursor based on hovered element
-                                        let cursor = tree
-                                            .get_cursor_at(router, lx, ly)
-                                            .unwrap_or(CursorStyle::Default);
-                                        window.set_cursor(convert_cursor_style(cursor));
+                                        // Update overlay events with mouse position
+                                        for event in pending_overlay_events.iter_mut() {
+                                            event.mouse_x = lx;
+                                            event.mouse_y = ly;
+                                        }
+
+                                        // Update cursor based on hovered element (only if overlay didn't set one)
+                                        if !windowed_ctx.overlay_manager.has_visible_overlays() {
+                                            let cursor = tree
+                                                .get_cursor_at(router, lx, ly)
+                                                .unwrap_or(CursorStyle::Default);
+                                            window.set_cursor(convert_cursor_style(cursor));
+                                        }
                                     }
                                     MouseEvent::ButtonPressed { button, x, y } => {
                                         let lx = x / scale;
@@ -1578,9 +1628,13 @@ impl WindowedApp {
                                         // These block all clicks to the main UI - only modal content receives events
                                         if windowed_ctx.overlay_manager.has_blocking_overlay() {
                                             // Check if click is on backdrop (outside content) - dismisses if so
-                                            windowed_ctx.overlay_manager.handle_click_at(lx, ly);
-                                            // Block the click from reaching main UI
-                                            // TODO: Route click events to overlay tree for modal content interaction
+                                            let dismissed = windowed_ctx.overlay_manager.handle_click_at(lx, ly);
+                                            // Route click to overlay content if not on backdrop
+                                            if !dismissed {
+                                                if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                                    windowed_ctx.overlay_event_router.on_mouse_down(overlay_tree, lx, ly, btn);
+                                                }
+                                            }
                                         } else {
                                             // Check for dismissable overlays (dropdowns, context menus)
                                             // If click is on backdrop (outside overlay content), dismiss and block the click
@@ -1591,27 +1645,36 @@ impl WindowedApp {
                                                 false
                                             };
 
-                                            // Only process click if no overlay was dismissed
+                                            // If overlay was dismissed, we don't process the click further
+                                            // If not dismissed, route click to overlay content first (for dropdown items)
                                             if !overlay_dismissed {
-                                                // Blur any focused text inputs BEFORE processing mouse down
-                                                // This mimics HTML behavior where clicking anywhere blurs inputs,
-                                                // and clicking on an input then re-focuses it via its own handler
-                                                blinc_layout::widgets::blur_all_text_inputs();
+                                                // Route click to overlay content if visible
+                                                if windowed_ctx.overlay_manager.has_visible_overlays() {
+                                                    if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                                        windowed_ctx.overlay_event_router.on_mouse_down(overlay_tree, lx, ly, btn);
+                                                    }
+                                                } else {
+                                                    // No overlay visible - route to main tree
+                                                    // Blur any focused text inputs BEFORE processing mouse down
+                                                    // This mimics HTML behavior where clicking anywhere blurs inputs,
+                                                    // and clicking on an input then re-focuses it via its own handler
+                                                    blinc_layout::widgets::blur_all_text_inputs();
 
-                                                let _events = router.on_mouse_down(tree, lx, ly, btn);
+                                                    let _events = router.on_mouse_down(tree, lx, ly, btn);
 
-                                                let (local_x, local_y) = router.last_hit_local();
-                                                let (bounds_x, bounds_y) = router.last_hit_bounds_pos();
-                                                let (bounds_width, bounds_height) = router.last_hit_bounds();
-                                                for event in pending_events.iter_mut() {
-                                                    event.mouse_x = lx;
-                                                    event.mouse_y = ly;
-                                                    event.local_x = local_x;
-                                                    event.local_y = local_y;
-                                                    event.bounds_x = bounds_x;
-                                                    event.bounds_y = bounds_y;
-                                                    event.bounds_width = bounds_width;
-                                                    event.bounds_height = bounds_height;
+                                                    let (local_x, local_y) = router.last_hit_local();
+                                                    let (bounds_x, bounds_y) = router.last_hit_bounds_pos();
+                                                    let (bounds_width, bounds_height) = router.last_hit_bounds();
+                                                    for event in pending_events.iter_mut() {
+                                                        event.mouse_x = lx;
+                                                        event.mouse_y = ly;
+                                                        event.local_x = local_x;
+                                                        event.local_y = local_y;
+                                                        event.bounds_x = bounds_x;
+                                                        event.bounds_y = bounds_y;
+                                                        event.bounds_width = bounds_width;
+                                                        event.bounds_height = bounds_height;
+                                                    }
                                                 }
                                             }
                                         }
@@ -1620,6 +1683,14 @@ impl WindowedApp {
                                         let lx = x / scale;
                                         let ly = y / scale;
                                         let btn = convert_mouse_button(button);
+
+                                        // Route mouse up to overlay tree if visible
+                                        if windowed_ctx.overlay_manager.has_visible_overlays() {
+                                            if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                                windowed_ctx.overlay_event_router.on_mouse_up(overlay_tree, lx, ly, btn);
+                                            }
+                                        }
+
                                         router.on_mouse_up(tree, lx, ly, btn);
                                         // Use the local coordinates from when the press started
                                         // (stored by on_mouse_down via last_hit_local)
@@ -1856,9 +1927,10 @@ impl WindowedApp {
                             }
 
                             router.clear_event_callback();
-                            (pending_events, keyboard_events, scroll_ended, gesture_ended, scroll_info)
+                            windowed_ctx.overlay_event_router.clear_event_callback();
+                            (pending_events, keyboard_events, pending_overlay_events, scroll_ended, gesture_ended, scroll_info)
                         } else {
-                            (Vec::new(), Vec::new(), false, false, None)
+                            (Vec::new(), Vec::new(), Vec::new(), false, false, None)
                         };
 
                         // Second phase: dispatch events with mutable borrow
@@ -1940,6 +2012,34 @@ impl WindowedApp {
                                     event.drag_delta_x,
                                     event.drag_delta_y,
                                 );
+                            }
+
+                            // Dispatch overlay events to the overlay tree
+                            if !pending_overlay_events.is_empty() {
+                                if let Some(ref mut windowed_ctx) = ctx {
+                                    if let Some(ref mut overlay_tree) = windowed_ctx.overlay_tree {
+                                        for event in pending_overlay_events {
+                                            // Skip scroll events
+                                            if event.event_type == blinc_core::events::event_types::SCROLL {
+                                                continue;
+                                            }
+                                            overlay_tree.dispatch_event_full(
+                                                event.node_id,
+                                                event.event_type,
+                                                event.mouse_x,
+                                                event.mouse_y,
+                                                event.local_x,
+                                                event.local_y,
+                                                event.bounds_x,
+                                                event.bounds_y,
+                                                event.bounds_width,
+                                                event.bounds_height,
+                                                event.drag_delta_x,
+                                                event.drag_delta_y,
+                                            );
+                                        }
+                                    }
+                                }
                             }
 
                             // Dispatch keyboard events
@@ -2054,13 +2154,14 @@ impl WindowedApp {
                             if blinc_layout::take_needs_redraw() {
                                 tracing::debug!("Redraw requested by: stateful state change");
 
-                                // Apply any pending prop updates directly to the render tree
+                                // Get all pending prop updates
+                                let prop_updates = blinc_layout::take_pending_prop_updates();
+                                let had_prop_updates = !prop_updates.is_empty();
+
+                                // Apply prop updates to the main render tree
                                 if let Some(ref mut tree) = render_tree {
-                                    // Apply prop updates (visual-only changes)
-                                    let prop_updates = blinc_layout::take_pending_prop_updates();
-                                    let had_prop_updates = !prop_updates.is_empty();
-                                    for (node_id, props) in prop_updates {
-                                        tree.update_render_props(node_id, |p| *p = props);
+                                    for (node_id, props) in &prop_updates {
+                                        tree.update_render_props(*node_id, |p| *p = props.clone());
                                     }
 
                                     // Process pending subtree rebuilds (structural changes)
@@ -2074,6 +2175,13 @@ impl WindowedApp {
                                         tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
                                     } else if had_prop_updates {
                                         tracing::trace!("Visual-only prop updates, skipping layout");
+                                    }
+                                }
+
+                                // Also apply prop updates to the overlay tree if it exists
+                                if let Some(ref mut overlay_tree) = windowed_ctx.overlay_tree {
+                                    for (node_id, props) in &prop_updates {
+                                        overlay_tree.update_render_props(*node_id, |p| *p = props.clone());
                                     }
                                 }
 
@@ -2260,17 +2368,24 @@ impl WindowedApp {
 
                             // Build and render overlay tree if there are visible overlays
                             // Use render_overlay_tree_with_motion which does NOT clear the screen
-                            if let Some(overlay_tree) = windowed_ctx.overlay_manager.build_overlay_tree() {
-                                let result = blinc_app.render_overlay_tree_with_motion(
-                                    &overlay_tree,
-                                    rs,
-                                    &view,
-                                    windowed_ctx.physical_width as u32,
-                                    windowed_ctx.physical_height as u32,
-                                );
-                                if let Err(e) = result {
-                                    tracing::error!("Overlay render error: {}", e);
+                            if windowed_ctx.overlay_manager.has_visible_overlays() {
+                                // Rebuild overlay tree (always rebuild for rendering to get latest content)
+                                windowed_ctx.overlay_tree = windowed_ctx.overlay_manager.build_overlay_tree();
+                                if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                    let result = blinc_app.render_overlay_tree_with_motion(
+                                        overlay_tree,
+                                        rs,
+                                        &view,
+                                        windowed_ctx.physical_width as u32,
+                                        windowed_ctx.physical_height as u32,
+                                    );
+                                    if let Err(e) = result {
+                                        tracing::error!("Overlay render error: {}", e);
+                                    }
                                 }
+                            } else {
+                                // Clear cached overlay tree when no overlays visible
+                                windowed_ctx.overlay_tree = None;
                             }
 
                             frame.present();

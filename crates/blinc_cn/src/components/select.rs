@@ -41,6 +41,7 @@ use blinc_layout::div::ElementTypeId;
 use blinc_layout::element::{CursorStyle, RenderProps};
 use blinc_layout::overlay_state::get_overlay_manager;
 use blinc_layout::prelude::*;
+use blinc_layout::stateful::{ButtonState, Stateful};
 use blinc_layout::tree::{LayoutNodeId, LayoutTree};
 use blinc_layout::widgets::overlay::{OverlayHandle, OverlayManagerExt};
 use blinc_theme::{ColorToken, RadiusToken, SpacingToken, ThemeState};
@@ -88,15 +89,31 @@ impl SelectSize {
     }
 }
 
+/// Content builder for select options
+pub type OptionContentFn = Arc<dyn Fn() -> Div + Send + Sync>;
+
 /// An option in the select dropdown
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SelectOption {
     /// The value (stored in state when selected)
     pub value: String,
-    /// The display label shown in UI
+    /// The display label shown in UI (used for trigger display)
     pub label: String,
+    /// Custom content builder for the dropdown item (if None, uses label)
+    pub content: Option<OptionContentFn>,
     /// Whether this option is disabled
     pub disabled: bool,
+}
+
+impl std::fmt::Debug for SelectOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SelectOption")
+            .field("value", &self.value)
+            .field("label", &self.label)
+            .field("content", &self.content.is_some())
+            .field("disabled", &self.disabled)
+            .finish()
+    }
 }
 
 impl SelectOption {
@@ -105,8 +122,21 @@ impl SelectOption {
         Self {
             value: value.into(),
             label: label.into(),
+            content: None,
             disabled: false,
         }
+    }
+
+    /// Set custom content for the dropdown item
+    ///
+    /// The content builder is called to render the dropdown item.
+    /// The label is still used for the trigger display when selected.
+    pub fn content<F>(mut self, f: F) -> Self
+    where
+        F: Fn() -> Div + Send + Sync + 'static,
+    {
+        self.content = Some(Arc::new(f));
+        self
     }
 
     /// Mark this option as disabled
@@ -183,19 +213,13 @@ impl Select {
             .on_state(move |_state: &(), container: &mut Div| {
                 let is_open = open_state_for_display.get();
 
-                // Get current display value
+                // Get current display value and selected option
                 let current_val = value_state_for_display.get();
-                let current_lbl = options_for_display
+                let selected_option = options_for_display
                     .iter()
-                    .find(|opt| opt.value == current_val)
-                    .map(|opt| opt.label.clone());
+                    .find(|opt| opt.value == current_val);
 
-                let disp_text = current_lbl.clone().unwrap_or_else(|| {
-                    placeholder_for_display
-                        .clone()
-                        .unwrap_or_else(|| "Select...".to_string())
-                });
-                let is_placeholder = current_lbl.is_none();
+                let is_placeholder = selected_option.is_none();
                 let text_clr = if is_placeholder {
                     text_tertiary
                 } else {
@@ -203,23 +227,49 @@ impl Select {
                 };
                 let bdr = if is_open { border_hover } else { border };
 
+                // Build the content to display in the trigger
+                // Use custom content if available, otherwise fall back to label text
+                let display_content: Div = if let Some(opt) = selected_option {
+                    if let Some(ref content_fn) = opt.content {
+                        // Use custom content builder for the selected option
+                        content_fn()
+                    } else {
+                        // Fall back to label text
+                        div().child(text(&opt.label).size(font_size).no_cursor().color(text_clr))
+                    }
+                } else {
+                    // Show placeholder
+                    let placeholder_text = placeholder_for_display
+                        .clone()
+                        .unwrap_or_else(|| "Select...".to_string());
+                    div().child(text(&placeholder_text).size(font_size).no_cursor().color(text_clr))
+                };
+
                 // Build trigger (visual only - click handler is on Stateful)
+                // Wrap content in a flex-1 overflow-hidden container to prevent growing
+                let content_wrapper = div()
+                    .flex_1()
+                    .overflow_clip()
+                    .child(display_content);
+
                 let trigger = div()
                     .flex_row()
+                    .w_full()
                     .items_center()
-                    .justify_between()
                     .h(height)
                     .p_px(padding)
                     .bg(bg)
                     .border(1.0, bdr)
                     .rounded(radius)
-                    .child(text(&disp_text).size(font_size).color(text_clr))
+                    .child(content_wrapper)
+                    .flex_shrink_0()
                     .child(
                         svg(chevron_svg)
                             .size(16.0, 16.0)
                             .tint(text_tertiary)
-                            .ml(1.0),
-                    );
+                            .ml(1.0)
+                            .flex_shrink_0(),
+                    ).cursor_pointer();
 
                 let main_container = div().relative().w_full().child(trigger);
 
@@ -237,15 +287,18 @@ impl Select {
                     open_state_for_click.set(false);
                     overlay_handle_for_click.set(None);
                 } else {
-                    // Calculate dropdown position from element bounds
-                    // Use mouse position minus local offset to get element's screen position
-                    // (bounds_x/y don't account for scroll offset correctly)
-                    // let trigger_screen_x = ctx.mouse_x - ctx.local_x;
-                    let trigger_screen_y = ctx.mouse_y - ctx.local_y;
+                    // Use EventContext bounds which are computed absolutely by the event router
+                    // These are set during hit testing and represent the actual screen position
+                    let (trigger_x, trigger_y, trigger_w, trigger_h) =
+                        (ctx.bounds_x, ctx.bounds_y, ctx.bounds_width, ctx.bounds_height);
+
                     // Position dropdown below the trigger, centered horizontally
-                    // let trigger_center_x = trigger_screen_x + ctx.bounds_width / 2.0;
-                    let dropdown_x = ctx.bounds_x - ctx.bounds_width / 2.0;
-                    let dropdown_y = ctx.bounds_y + ctx.bounds_height - 4.0;
+                    let dropdown_x = trigger_x + trigger_w / 2.0;
+                    let dropdown_y = trigger_y + trigger_h - 4.0;
+                    tracing::debug!(
+                        "Select dropdown position: x={:.1}, y={:.1} (trigger bounds: {:.1}, {:.1}, {:.1}, {:.1})",
+                        dropdown_x, dropdown_y, trigger_x, trigger_y, trigger_w, trigger_h
+                    );
 
                     // Clone values for the dropdown content closure
                     let opts = options.clone();
@@ -256,11 +309,7 @@ impl Select {
                     let current_selected = val_state.get();
                     let dw = dropdown_width;
 
-                    // Estimate dropdown height for hit testing
-                    // Each option: py(8.0) * 2 + font_size + padding
-                    let option_height = 16.0 + font_size + padding * 2.0;
-                    let estimated_height =
-                        (option_height * opts.len() as f32).min(200.0) + 2.0; // +2 for border
+
 
                     // Clone for on_close callback
                     let open_state_for_close = open_state_for_click.clone();
@@ -271,7 +320,7 @@ impl Select {
                     let handle = mgr
                         .dropdown()
                         .at(dropdown_x, dropdown_y)
-                        .size(dropdown_width, estimated_height)
+                        // .size(dropdown_width, estimated_height)
                         .dismiss_on_escape(true)
                         .content(move || {
                             build_dropdown_content(
@@ -305,12 +354,9 @@ impl Select {
             });
 
         // Build the outer container with optional label
-        let mut select_container = div().w_full().child(select_element);
-
-        // Apply width if specified
-        if let Some(w) = config.width {
-            select_container = select_container.w(w);
-        }
+        // Use explicit width to maintain consistent size (don't shrink to content)
+        let container_width = config.width.unwrap_or(dropdown_width);
+        let mut select_container = div().w(container_width).child(select_element);
 
         if disabled {
             select_container = select_container.opacity(0.5);
@@ -319,13 +365,8 @@ impl Select {
         // If there's a label, wrap in a container
         let inner = if let Some(ref label_text) = config.label {
             let spacing = theme.spacing_value(SpacingToken::Space2);
-            let mut outer = div().flex_col().gap_px(spacing);
-
-            if let Some(w) = config.width {
-                outer = outer.w(w);
-            } else {
-                outer = outer.w_fit();
-            }
+            // Use same width as container for consistency
+            let mut outer = div().flex_col().gap_px(spacing).w(container_width);
 
             let mut lbl = label(label_text).size(LabelSize::Medium);
             if disabled {
@@ -550,6 +591,9 @@ fn build_dropdown_content(
     text_tertiary: blinc_core::Color,
     surface_elevated: blinc_core::Color,
 ) -> Div {
+    // Clone handle state for on_ready callback
+    let handle_state_for_ready = overlay_handle_state.clone();
+
     let mut dropdown_div = div()
         .flex_col()
         .w(width)
@@ -558,11 +602,23 @@ fn build_dropdown_content(
         .rounded(radius)
         .shadow_md()
         .overflow_clip()
-        .max_h(200.0);
+        .h_fit()
+        .on_ready(move |bounds| {
+            // Report actual content size to overlay manager for accurate hit testing
+            if let Some(handle_id) = handle_state_for_ready.get() {
+                let mgr = get_overlay_manager();
+                mgr.set_content_size(
+                    OverlayHandle::from_raw(handle_id),
+                    bounds.width,
+                    bounds.height,
+                );
+            }
+        });
 
     for opt in options {
         let opt_value = opt.value.clone();
         let opt_label = opt.label.clone();
+        let opt_content = opt.content.clone();
         let is_selected = opt_value == current_selected;
         let is_opt_disabled = opt.disabled;
 
@@ -572,30 +628,50 @@ fn build_dropdown_content(
         let on_change_for_opt = on_change.clone();
         let opt_value_for_click = opt_value.clone();
 
-        // Background color - selected items are highlighted
-        let opt_bg = if is_selected { surface_elevated } else { bg };
-
         let option_text_color = if is_opt_disabled {
             text_tertiary
         } else {
             text_color
         };
 
-        // Build option item
+        // Background color - selected items get elevated bg, others get normal bg
+        let base_bg = if is_selected { surface_elevated } else { bg };
+
+        // Use persistent state for hover effect in overlay
+        // This ensures the state persists across overlay tree rebuilds
+        let hover_key = format!("_select_item_hover_{}", opt_value);
+        let hover_state = BlincContextState::get().use_state_keyed(&hover_key, || false);
+        let is_hovered = hover_state.get();
+        let hover_state_for_enter = hover_state.clone();
+        let hover_state_for_leave = hover_state.clone();
+
+        // Background changes on hover
+        let item_bg = if is_hovered && !is_opt_disabled {
+            surface_elevated
+        } else {
+            base_bg
+        };
+
+        // Build option item with div and manual hover handlers
         let option_item = div()
             .w_full()
+            .h_fit()
             .flex_row()
             .items_center()
-            .h_fit()
-            .py(8.0)
-            .p_px(padding)
-            .bg(opt_bg)
+            .py(padding / 4.0)
+            .px(padding / 2.0)
+            .bg(item_bg)
             .cursor(if is_opt_disabled {
                 CursorStyle::NotAllowed
             } else {
                 CursorStyle::Pointer
             })
-            .child(text(&opt_label).size(font_size).color(option_text_color))
+            .on_hover_enter(move |_ctx| {
+                hover_state_for_enter.set(true);
+            })
+            .on_hover_leave(move |_ctx| {
+                hover_state_for_leave.set(false);
+            })
             .on_click(move |_ctx| {
                 if !is_opt_disabled {
                     // Set the new value
@@ -614,7 +690,15 @@ fn build_dropdown_content(
                         cb(&opt_value_for_click);
                     }
                 }
-            });
+            })
+            .child(
+                // Use custom content if available, otherwise fall back to label text
+                if let Some(ref content_fn) = opt_content {
+                    content_fn()
+                } else {
+                    div().child(text(&opt_label).size(font_size).no_cursor().color(option_text_color))
+                },
+            );
 
         dropdown_div = dropdown_div.child(option_item);
     }
