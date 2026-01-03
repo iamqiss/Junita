@@ -454,11 +454,7 @@ impl RenderContext {
     ///
     /// This ensures text and shapes transform together during animations,
     /// preventing visual lag when parent containers have motion transforms.
-    fn render_unified(
-        &mut self,
-        target: &wgpu::TextureView,
-        primitives: &[GpuPrimitive],
-    ) {
+    fn render_unified(&mut self, target: &wgpu::TextureView, primitives: &[GpuPrimitive]) {
         if primitives.is_empty() {
             return;
         }
@@ -1031,10 +1027,8 @@ impl RenderContext {
                             let scaled_h = base_height * effective_motion_scale.1;
 
                             // Apply motion translation and convert back to absolute position
-                            let final_x =
-                                motion_center_x_scaled + scaled_rel_x + scaled_motion_tx;
-                            let final_y =
-                                motion_center_y_scaled + scaled_rel_y + scaled_motion_ty;
+                            let final_x = motion_center_x_scaled + scaled_rel_x + scaled_motion_tx;
+                            let final_y = motion_center_y_scaled + scaled_rel_y + scaled_motion_ty;
 
                             (final_x, final_y, scaled_w, scaled_h)
                         } else {
@@ -1044,8 +1038,7 @@ impl RenderContext {
                             (final_x, final_y, base_width, base_height)
                         };
 
-                    let scaled_font_size =
-                        text_data.font_size * effective_motion_scale.1 * scale;
+                    let scaled_font_size = text_data.font_size * effective_motion_scale.1 * scale;
                     let scaled_measured_width =
                         text_data.measured_width * effective_motion_scale.0 * scale;
 
@@ -1054,8 +1047,11 @@ impl RenderContext {
                         .map(|[cx, cy, cw, ch]| [cx * scale, cy * scale, cw * scale, ch * scale]);
 
                     // Log motion values if non-trivial (for debugging text/shape sync issues)
-                    if effective_motion_translate.0.abs() > 0.1 || effective_motion_translate.1.abs() > 0.1
-                        || (effective_motion_scale.0 - 1.0).abs() > 0.01 || (effective_motion_scale.1 - 1.0).abs() > 0.01 {
+                    if effective_motion_translate.0.abs() > 0.1
+                        || effective_motion_translate.1.abs() > 0.1
+                        || (effective_motion_scale.0 - 1.0).abs() > 0.01
+                        || (effective_motion_scale.1 - 1.0).abs() > 0.01
+                    {
                         tracing::info!(
                             "Text '{}': motion_translate=({:.1}, {:.1}), motion_scale=({:.2}, {:.2}), base=({:.1}, {:.1}), final=({:.1}, {:.1})",
                             text_data.content,
@@ -1172,10 +1168,8 @@ impl RenderContext {
                             let scaled_w = base_width * effective_motion_scale.0;
                             let scaled_h = base_height * effective_motion_scale.1;
 
-                            let final_x =
-                                motion_center_x_scaled + scaled_rel_x + scaled_motion_tx;
-                            let final_y =
-                                motion_center_y_scaled + scaled_rel_y + scaled_motion_ty;
+                            let final_x = motion_center_x_scaled + scaled_rel_x + scaled_motion_tx;
+                            let final_y = motion_center_y_scaled + scaled_rel_y + scaled_motion_ty;
 
                             (final_x, final_y, scaled_w, scaled_h)
                         } else {
@@ -1184,8 +1178,7 @@ impl RenderContext {
                             (final_x, final_y, base_width, base_height)
                         };
 
-                    let scaled_font_size =
-                        styled_data.font_size * effective_motion_scale.1 * scale;
+                    let scaled_font_size = styled_data.font_size * effective_motion_scale.1 * scale;
                     let scaled_clip = current_clip
                         .map(|[cx, cy, cw, ch]| [cx * scale, cy * scale, cw * scale, ch * scale]);
 
