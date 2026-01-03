@@ -395,6 +395,9 @@ mod tests {
 
     #[test]
     fn test_style_builder() {
+        // Initialize theme (required for shadow_md which uses theme)
+        ThemeState::init_default();
+
         let s = style().bg(Color::BLUE).rounded(8.0).shadow_md().scale(1.05);
 
         assert!(s.background.is_some());
@@ -405,6 +408,9 @@ mod tests {
 
     #[test]
     fn test_style_merge() {
+        // Initialize theme (required for shadow_sm which uses theme)
+        ThemeState::init_default();
+
         let base = style().bg(Color::BLUE).rounded(8.0).shadow_sm();
 
         let hover = style().bg(Color::GREEN).scale(1.02);

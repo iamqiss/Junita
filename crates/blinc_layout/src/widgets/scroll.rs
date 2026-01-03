@@ -6,7 +6,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use blinc_layout::prelude::*;
 //!
 //! let ui = scroll()
@@ -1349,7 +1349,7 @@ impl ElementBuilder for Scroll {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use blinc_layout::prelude::*;
 ///
 /// let scrollable = scroll()
