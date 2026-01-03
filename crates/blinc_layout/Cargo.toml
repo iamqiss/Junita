@@ -37,3 +37,6 @@ html-escape = "0.2"
 
 # URL opening (for links)
 open = "5"
+
+# CSS parser combinators
+nom = "7"

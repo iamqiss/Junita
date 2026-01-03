@@ -39,7 +39,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 /// Global context state instance
 static CONTEXT_STATE: OnceLock<BlincContextState> = OnceLock::new();
@@ -116,6 +116,10 @@ pub type SharedHookState = Arc<Mutex<HookState>>;
 /// Callback for notifying stateful elements of signal changes
 pub type StatefulCallback = Arc<dyn Fn(&[SignalId]) + Send + Sync>;
 
+/// Callback for querying elements by ID
+/// Returns the raw node ID (u64) if found, None otherwise
+pub type QueryCallback = Arc<dyn Fn(&str) -> Option<u64> + Send + Sync>;
+
 /// Global context state singleton
 ///
 /// Provides access to reactive state management and other context-level
@@ -131,6 +135,8 @@ pub struct BlincContextState {
     dirty_flag: DirtyFlag,
     /// Optional callback for notifying stateful elements of signal changes
     stateful_callback: Option<StatefulCallback>,
+    /// Optional callback for querying elements by ID
+    query_callback: RwLock<Option<QueryCallback>>,
 }
 
 impl BlincContextState {
@@ -145,6 +151,7 @@ impl BlincContextState {
             hooks,
             dirty_flag,
             stateful_callback: None,
+            query_callback: RwLock::new(None),
         };
 
         if CONTEXT_STATE.set(state).is_err() {
@@ -164,6 +171,7 @@ impl BlincContextState {
             hooks,
             dirty_flag,
             stateful_callback: Some(callback),
+            query_callback: RwLock::new(None),
         };
 
         if CONTEXT_STATE.set(state).is_err() {
@@ -306,6 +314,40 @@ impl BlincContextState {
     pub fn request_rebuild(&self) {
         self.dirty_flag.store(true, Ordering::SeqCst);
     }
+
+    // =========================================================================
+    // Element Query System
+    // =========================================================================
+
+    /// Set the query callback for element lookup
+    ///
+    /// This is called by `WindowedApp` to enable element querying by ID.
+    /// The callback receives an element ID and returns the raw node ID if found.
+    pub fn set_query_callback(&self, callback: QueryCallback) {
+        *self.query_callback.write().unwrap() = Some(callback);
+    }
+
+    /// Query an element by ID
+    ///
+    /// Returns the raw node ID (u64) if an element with the given ID exists.
+    /// This enables components to look up elements without needing a context reference.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_core::context_state::query;
+    ///
+    /// if let Some(node_id) = query("my-element") {
+    ///     // Element exists
+    /// }
+    /// ```
+    pub fn query(&self, id: &str) -> Option<u64> {
+        self.query_callback
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|cb| cb(id))
+    }
 }
 
 // =========================================================================
@@ -360,6 +402,28 @@ where
 /// Panics if `BlincContextState::init()` has not been called.
 pub fn request_rebuild() {
     BlincContextState::get().request_rebuild();
+}
+
+/// Query an element by ID
+///
+/// Returns the raw node ID (u64) if an element with the given ID exists.
+/// This is a convenience wrapper around `BlincContextState::get().query()`.
+///
+/// # Panics
+///
+/// Panics if `BlincContextState::init()` has not been called.
+///
+/// # Example
+///
+/// ```ignore
+/// use blinc_core::context_state::query;
+///
+/// if let Some(node_id) = query("my-element") {
+///     // Element with ID "my-element" exists
+/// }
+/// ```
+pub fn query(id: &str) -> Option<u64> {
+    BlincContextState::get().query(id)
 }
 
 #[cfg(test)]

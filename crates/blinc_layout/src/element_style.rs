@@ -37,7 +37,7 @@ use crate::element::{GlassMaterial, Material, MetallicMaterial, RenderLayer, Woo
 /// All properties are optional - when merging styles, only set properties
 /// will override. This enables state-specific styling where you only
 /// override the properties that change for that state.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct ElementStyle {
     /// Background brush (solid color, gradient, or glass)
     pub background: Option<Brush>,

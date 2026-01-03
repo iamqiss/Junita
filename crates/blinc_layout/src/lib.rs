@@ -66,6 +66,9 @@ pub mod selector;
 // Global overlay state singleton
 pub mod overlay_state;
 
+// CSS subset parser for ElementStyle
+pub mod css_parser;
+
 // Core types
 pub use element::{
     BorderSide, BorderSides, CursorStyle, DynRenderProps, ElementBounds, MotionAnimation,
@@ -353,4 +356,9 @@ pub mod prelude {
 
     // Overlay context singleton
     pub use crate::overlay_state::{get_overlay_manager, OverlayContext};
+
+    // CSS parser for loading stylesheets
+    pub use crate::css_parser::{
+        CssParseResult, ParseError as CssParseError, Severity as CssSeverity, Stylesheet,
+    };
 }

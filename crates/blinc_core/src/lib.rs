@@ -71,6 +71,6 @@ pub use value::{
 // Re-export context types at crate level for convenience
 pub use context::{BlincContext, BlincContextExt};
 pub use context_state::{
-    BlincContextState, HookState, SharedHookState, StateKey,
-    use_signal_keyed, use_state_keyed, request_rebuild,
+    BlincContextState, HookState, QueryCallback, SharedHookState, StateKey,
+    query, request_rebuild, use_signal_keyed, use_state_keyed,
 };
