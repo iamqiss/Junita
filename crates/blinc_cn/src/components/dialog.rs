@@ -31,7 +31,9 @@
 
 use std::sync::Arc;
 
+use blinc_animation::{AnimationPreset, MultiKeyframeAnimation};
 use blinc_core::Color;
+use blinc_layout::motion::motion;
 use blinc_layout::overlay_state::get_overlay_manager;
 use blinc_layout::prelude::*;
 use blinc_layout::widgets::overlay::{OverlayHandle, OverlayManagerExt};
@@ -80,6 +82,10 @@ pub struct DialogBuilder {
     on_cancel: Option<Arc<dyn Fn() + Send + Sync>>,
     confirm_destructive: bool,
     show_cancel: bool,
+    /// Custom enter animation (defaults to dialog_in)
+    enter_animation: Option<MultiKeyframeAnimation>,
+    /// Custom exit animation (defaults to dialog_out)
+    exit_animation: Option<MultiKeyframeAnimation>,
 }
 
 impl DialogBuilder {
@@ -97,6 +103,8 @@ impl DialogBuilder {
             on_cancel: None,
             confirm_destructive: false,
             show_cancel: true,
+            enter_animation: None,
+            exit_animation: None,
         }
     }
 
@@ -178,6 +186,40 @@ impl DialogBuilder {
         self
     }
 
+    /// Set a custom enter animation
+    ///
+    /// Overrides the default `AnimationPreset::grow_in(200)` animation.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use blinc_animation::AnimationPreset;
+    ///
+    /// cn::dialog()
+    ///     .title("Custom Animation")
+    ///     .enter_animation(AnimationPreset::bounce_in(300))
+    ///     .show();
+    ///
+    /// // For more dramatic scale animation:
+    /// cn::dialog()
+    ///     .title("Scale Animation")
+    ///     .enter_animation(AnimationPreset::dialog_in(200))
+    ///     .exit_animation(AnimationPreset::dialog_out(150))
+    ///     .show();
+    /// ```
+    pub fn enter_animation(mut self, animation: MultiKeyframeAnimation) -> Self {
+        self.enter_animation = Some(animation);
+        self
+    }
+
+    /// Set a custom exit animation
+    ///
+    /// Overrides the default `AnimationPreset::grow_out(150)` animation.
+    pub fn exit_animation(mut self, animation: MultiKeyframeAnimation) -> Self {
+        self.exit_animation = Some(animation);
+        self
+    }
+
     /// Show the dialog
     ///
     /// This creates a modal overlay with the dialog content.
@@ -203,6 +245,13 @@ impl DialogBuilder {
         let on_cancel = self.on_cancel;
         let confirm_destructive = self.confirm_destructive;
         let show_cancel = self.show_cancel;
+        // Use grow_in/grow_out by default - gentler scale (99% → 100%) to reduce text distortion
+        let enter_animation = self
+            .enter_animation
+            .unwrap_or_else(|| AnimationPreset::grow_in(200));
+        let exit_animation = self
+            .exit_animation
+            .unwrap_or_else(|| AnimationPreset::grow_out(150));
 
         let mgr = get_overlay_manager();
 
@@ -227,6 +276,8 @@ impl DialogBuilder {
                     &on_cancel,
                     confirm_destructive,
                     show_cancel,
+                    &enter_animation,
+                    &exit_animation,
                 )
             })
             .show()
@@ -327,7 +378,7 @@ pub fn alert_dialog() -> AlertDialogBuilder {
     AlertDialogBuilder::new()
 }
 
-/// Build the dialog content
+/// Build the dialog content wrapped in motion for animations
 #[allow(clippy::too_many_arguments)]
 fn build_dialog_content(
     title: &Option<String>,
@@ -347,18 +398,15 @@ fn build_dialog_content(
     on_cancel: &Option<Arc<dyn Fn() + Send + Sync>>,
     confirm_destructive: bool,
     show_cancel: bool,
+    enter_animation: &MultiKeyframeAnimation,
+    exit_animation: &MultiKeyframeAnimation,
 ) -> Div {
     // Use theme spacing tokens via helper methods (.p_6(), .gap_2(), .m_4(), etc.)
     let theme = ThemeState::get();
-    let mut dialog = div()
-        .min_w(300.0)
-        .max_w(max_width)
-        .bg(bg)
-        .border(1.0, border)
-        .rounded(radius)
-        .shadow_xl()
-        .flex_col()
-        .p_6(); // 24px padding from theme
+
+    // Build inner content that will have its own fade animation
+    // This helps mask any visual distortion from the outer scale animation
+    let mut inner_content = div().w_full().flex_col();
 
     // Header section
     if title.is_some() || description.is_some() {
@@ -372,12 +420,12 @@ fn build_dialog_content(
             header = header.child(text(desc_text).size(theme.typography().text_sm).color(text_secondary));
         }
 
-        dialog = dialog.child(header);
+        inner_content = inner_content.child(header);
     }
 
     // Custom content
     if let Some(ref content_fn) = content {
-        dialog = dialog.child(
+        inner_content = inner_content.child(
             div()
                 .w_full()
                 .mt(theme.spacing().space_2)
@@ -427,14 +475,40 @@ fn build_dialog_content(
         footer_div
     };
 
-    dialog = dialog.child(
+    // Add footer to inner content
+    inner_content = inner_content.child(
         div()
             .w_full()
             .mt(theme.spacing().space_2)
             .child(footer_content),
     ); // 16px margin from theme
 
-    dialog
+    // Wrap inner content in a motion container with fade-in
+    // This helps mask visual distortion from the outer scale animation
+    let animated_inner = motion()
+        .enter_animation(AnimationPreset::fade_in(150))
+        .exit_animation(AnimationPreset::fade_out(100))
+        .child(inner_content);
+
+    // Build the dialog container (card styling)
+    let dialog = div()
+        .min_w(300.0)
+        .max_w(max_width)
+        .bg(bg)
+        .border(1.0, border)
+        .rounded(radius)
+        .shadow_xl()
+        .flex_col()
+        .p_6() // 24px padding from theme
+        .child(animated_inner);
+
+    // Wrap dialog in outer motion container for scale+fade animations
+    div().child(
+        motion()
+            .enter_animation(enter_animation.clone())
+            .exit_animation(exit_animation.clone())
+            .child(dialog),
+    )
 }
 
 // Keep the old types for backwards compatibility but mark as deprecated

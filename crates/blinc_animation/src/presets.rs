@@ -464,6 +464,229 @@ impl AnimationPreset {
                 Easing::EaseInOut,
             )
     }
+
+    // ========================================================================
+    // Dialog/Modal animations (subtle scale + fade)
+    // ========================================================================
+
+    /// Dialog enter animation - subtle scale up from 95% with fade
+    ///
+    /// More appropriate for modals/dialogs than `scale_in` which starts from 0%.
+    pub fn dialog_in(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(0.95)
+                    .with_opacity(0.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::EaseOutCubic,
+            )
+    }
+
+    /// Dialog exit animation - subtle scale down to 95% with fade
+    pub fn dialog_out(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(0.95)
+                    .with_opacity(0.0),
+                Easing::EaseInCubic,
+            )
+    }
+
+    /// Gentle grow enter animation - very subtle scale (99% to 100%) with fade
+    ///
+    /// Minimal scale change to reduce visual distortion while still providing
+    /// a sense of the element "growing" into place. Good for content with text
+    /// where scale artifacts are more noticeable.
+    pub fn grow_in(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(0.99)
+                    .with_opacity(0.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::EaseOutCubic,
+            )
+    }
+
+    /// Gentle grow exit animation - very subtle scale with fade
+    pub fn grow_out(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(0.99)
+                    .with_opacity(0.0),
+                Easing::EaseInCubic,
+            )
+    }
+
+    /// Expand enter animation - grows from slightly smaller with a subtle "pop"
+    ///
+    /// Similar to grow_in but with a slight overshoot for a more dynamic feel.
+    /// Scale goes from 98% → 100.5% → 100%.
+    pub fn expand_in(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(0.98)
+                    .with_opacity(0.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                0.7,
+                KeyframeProperties::default()
+                    .with_scale(1.005)
+                    .with_opacity(1.0),
+                Easing::EaseOut,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::EaseInOut,
+            )
+    }
+
+    /// Expand exit animation - shrinks slightly with fade
+    pub fn expand_out(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(0.98)
+                    .with_opacity(0.0),
+                Easing::EaseInCubic,
+            )
+    }
+
+    // ========================================================================
+    // Dropdown/Menu animations (slide + fade, faster than dialogs)
+    // ========================================================================
+
+    /// Dropdown/menu enter animation - slide down with fade
+    ///
+    /// Appropriate for dropdowns, context menus, and other popup menus.
+    /// Uses a slight downward slide for a natural "dropping" feel.
+    pub fn dropdown_in(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(0.98)
+                    .with_opacity(0.0)
+                    .with_translate(0.0, -4.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0)
+                    .with_translate(0.0, 0.0),
+                Easing::EaseOutCubic,
+            )
+    }
+
+    /// Dropdown/menu exit animation - slide up with fade
+    pub fn dropdown_out(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0)
+                    .with_translate(0.0, 0.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(0.98)
+                    .with_opacity(0.0)
+                    .with_translate(0.0, -4.0),
+                Easing::EaseInCubic,
+            )
+    }
+
+    /// Context menu enter animation - subtle scale from origin with fade
+    ///
+    /// Similar to dropdown but uses scale from a corner origin feel.
+    pub fn context_menu_in(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(0.95)
+                    .with_opacity(0.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::EaseOutCubic,
+            )
+    }
+
+    /// Context menu exit animation - subtle scale with fade
+    pub fn context_menu_out(duration_ms: u32) -> MultiKeyframeAnimation {
+        MultiKeyframeAnimation::new(duration_ms)
+            .keyframe(
+                0.0,
+                KeyframeProperties::default()
+                    .with_scale(1.0)
+                    .with_opacity(1.0),
+                Easing::Linear,
+            )
+            .keyframe(
+                1.0,
+                KeyframeProperties::default()
+                    .with_scale(0.95)
+                    .with_opacity(0.0),
+                Easing::EaseInCubic,
+            )
+    }
 }
 
 #[cfg(test)]

@@ -230,6 +230,14 @@ pub struct RenderState {
     /// Per-node animated properties
     node_states: HashMap<LayoutNodeId, NodeRenderState>,
 
+    /// Stable-keyed motion animations (for overlays that rebuild each frame)
+    /// Key is a stable string ID (e.g., overlay handle ID), value is the motion state
+    stable_motions: HashMap<String, ActiveMotion>,
+
+    /// Set of stable motion keys that were accessed this frame
+    /// Used for mark-and-sweep cleanup of unused motions
+    stable_motions_used: std::collections::HashSet<String>,
+
     /// Global overlays (cursors, selections, focus rings)
     overlays: Vec<Overlay>,
 
@@ -261,6 +269,8 @@ impl RenderState {
     pub fn new(animations: Arc<Mutex<AnimationScheduler>>) -> Self {
         Self {
             node_states: HashMap::new(),
+            stable_motions: HashMap::new(),
+            stable_motions_used: std::collections::HashSet::new(),
             overlays: Vec::new(),
             animations,
             cursor_visible: true,
@@ -302,44 +312,49 @@ impl RenderState {
         let mut motion_active = false;
 
         // Update node states from their animation springs and motion animations
-        let scheduler = self.animations.lock().unwrap();
-        for (_node_id, state) in &mut self.node_states {
-            // Update opacity from spring
-            if let Some(spring_id) = state.opacity_spring {
-                if let Some(value) = scheduler.get_spring_value(spring_id) {
-                    state.opacity = value.clamp(0.0, 1.0);
+        {
+            let scheduler = self.animations.lock().unwrap();
+            for (_node_id, state) in &mut self.node_states {
+                // Update opacity from spring
+                if let Some(spring_id) = state.opacity_spring {
+                    if let Some(value) = scheduler.get_spring_value(spring_id) {
+                        state.opacity = value.clamp(0.0, 1.0);
+                    }
+                }
+
+                // Update background color from springs
+                if let Some(springs) = state.bg_color_springs {
+                    let r = scheduler.get_spring_value(springs[0]).unwrap_or(0.0);
+                    let g = scheduler.get_spring_value(springs[1]).unwrap_or(0.0);
+                    let b = scheduler.get_spring_value(springs[2]).unwrap_or(0.0);
+                    let a = scheduler.get_spring_value(springs[3]).unwrap_or(1.0);
+                    state.background_color = Some(Color::rgba(r, g, b, a));
+                }
+
+                // Update transform from springs
+                // Note: For now, we only support translation. Scale/rotation would need
+                // matrix composition which Transform doesn't expose directly.
+                if let Some(springs) = state.transform_springs {
+                    let tx = scheduler.get_spring_value(springs[0]).unwrap_or(0.0);
+                    let ty = scheduler.get_spring_value(springs[1]).unwrap_or(0.0);
+                    let scale = scheduler.get_spring_value(springs[2]).unwrap_or(1.0);
+                    let _rotate = scheduler.get_spring_value(springs[3]).unwrap_or(0.0);
+                    // TODO: Support scale/rotation when Transform supports composition
+                    state.transform = Some(Transform::translate(tx, ty));
+                    state.scale = scale;
+                }
+
+                // Update motion animation
+                if let Some(ref mut motion) = state.motion {
+                    if Self::tick_motion(motion, dt_ms) {
+                        motion_active = true;
+                    }
                 }
             }
+        } // Drop scheduler lock
 
-            // Update background color from springs
-            if let Some(springs) = state.bg_color_springs {
-                let r = scheduler.get_spring_value(springs[0]).unwrap_or(0.0);
-                let g = scheduler.get_spring_value(springs[1]).unwrap_or(0.0);
-                let b = scheduler.get_spring_value(springs[2]).unwrap_or(0.0);
-                let a = scheduler.get_spring_value(springs[3]).unwrap_or(1.0);
-                state.background_color = Some(Color::rgba(r, g, b, a));
-            }
-
-            // Update transform from springs
-            // Note: For now, we only support translation. Scale/rotation would need
-            // matrix composition which Transform doesn't expose directly.
-            if let Some(springs) = state.transform_springs {
-                let tx = scheduler.get_spring_value(springs[0]).unwrap_or(0.0);
-                let ty = scheduler.get_spring_value(springs[1]).unwrap_or(0.0);
-                let scale = scheduler.get_spring_value(springs[2]).unwrap_or(1.0);
-                let _rotate = scheduler.get_spring_value(springs[3]).unwrap_or(0.0);
-                // TODO: Support scale/rotation when Transform supports composition
-                state.transform = Some(Transform::translate(tx, ty));
-                state.scale = scale;
-            }
-
-            // Update motion animation
-            if let Some(ref mut motion) = state.motion {
-                if Self::tick_motion(motion, dt_ms) {
-                    motion_active = true;
-                }
-            }
-        }
+        // Tick stable-keyed motions (for overlays)
+        self.tick_stable_motions(dt_ms);
 
         // Update cursor overlays with blink state
         for overlay in &mut self.overlays {
@@ -348,7 +363,7 @@ impl RenderState {
             }
         }
 
-        animations_active || motion_active || self.has_overlays()
+        animations_active || motion_active || self.has_active_motions() || self.has_overlays()
     }
 
     /// Tick a motion animation, returns true if still active
@@ -774,6 +789,246 @@ impl RenderState {
     /// Check if any nodes have active motion animations
     pub fn has_active_motions(&self) -> bool {
         self.node_states.values().any(|s| s.has_active_motion())
+            || self.stable_motions.values().any(|m| {
+                !matches!(m.state, MotionState::Visible | MotionState::Removed)
+            })
+    }
+
+    // =========================================================================
+    // Stable-Keyed Motion Animations (for overlays)
+    // =========================================================================
+
+    /// Start or get a stable-keyed motion animation
+    ///
+    /// Unlike node-based motions, these persist across tree rebuilds using a
+    /// stable string key (e.g., overlay handle ID).
+    ///
+    /// If the motion already exists and is still animating (Waiting, Entering),
+    /// we leave it alone. If it's in Visible or Exiting state, we also leave it
+    /// alone. Only when in Removed state do we restart (overlay was closed and
+    /// reopened).
+    ///
+    /// If the overlay is closing (checked via `is_overlay_closing()`), this will
+    /// start the exit animation instead of leaving the motion alone.
+    pub fn start_stable_motion(&mut self, key: &str, config: MotionAnimation) {
+        use crate::overlay_state::is_overlay_closing;
+
+        // Mark this key as used this frame (for garbage collection)
+        self.stable_motions_used.insert(key.to_string());
+
+        // Check if we're in overlay closing mode
+        let is_closing = is_overlay_closing();
+
+        // Check if motion already exists
+        if let Some(existing) = self.stable_motions.get_mut(key) {
+            // If closing and not already exiting, start exit animation
+            if is_closing && !matches!(existing.state, MotionState::Exiting { .. } | MotionState::Removed) {
+                // Start exit animation
+                if config.exit_to.is_some() && config.exit_duration_ms > 0 {
+                    tracing::debug!(
+                        "start_stable_motion: Starting exit animation for key={}, duration={}ms",
+                        key,
+                        config.exit_duration_ms
+                    );
+                    existing.config = config;
+                    existing.state = MotionState::Exiting {
+                        progress: 0.0,
+                        duration_ms: existing.config.exit_duration_ms as f32,
+                    };
+                    existing.current = MotionKeyframe::default(); // Start from visible
+                } else {
+                    tracing::debug!(
+                        "start_stable_motion: Closing but no exit animation configured for key={}, exit_to={:?}, exit_duration={}",
+                        key,
+                        config.exit_to.is_some(),
+                        config.exit_duration_ms
+                    );
+                }
+                return;
+            }
+
+            // If already animating or visible, leave it alone
+            match existing.state {
+                MotionState::Waiting { .. }
+                | MotionState::Entering { .. }
+                | MotionState::Visible
+                | MotionState::Exiting { .. } => {
+                    // Don't restart - animation is either in progress or completed
+                    return;
+                }
+                // Only restart if the motion was previously removed (overlay closed then reopened)
+                MotionState::Removed => {
+                    // Reset to initial enter state
+                    existing.config = config.clone();
+                    existing.state = if config.enter_delay_ms > 0 {
+                        MotionState::Waiting {
+                            remaining_delay_ms: config.enter_delay_ms as f32,
+                        }
+                    } else if config.enter_from.is_some() && config.enter_duration_ms > 0 {
+                        MotionState::Entering {
+                            progress: 0.0,
+                            duration_ms: config.enter_duration_ms as f32,
+                        }
+                    } else {
+                        MotionState::Visible
+                    };
+                    existing.current = if matches!(existing.state, MotionState::Visible) {
+                        MotionKeyframe::default()
+                    } else {
+                        config.enter_from.clone().unwrap_or_default()
+                    };
+                    return;
+                }
+            }
+        }
+
+        // Create new motion
+        let initial_state = if config.enter_delay_ms > 0 {
+            MotionState::Waiting {
+                remaining_delay_ms: config.enter_delay_ms as f32,
+            }
+        } else if config.enter_from.is_some() && config.enter_duration_ms > 0 {
+            MotionState::Entering {
+                progress: 0.0,
+                duration_ms: config.enter_duration_ms as f32,
+            }
+        } else {
+            MotionState::Visible
+        };
+
+        // Initial values come from enter_from (the starting state)
+        let current = if matches!(initial_state, MotionState::Visible) {
+            MotionKeyframe::default() // Already fully visible
+        } else {
+            config.enter_from.clone().unwrap_or_default()
+        };
+
+        self.stable_motions.insert(
+            key.to_string(),
+            ActiveMotion {
+                config,
+                state: initial_state,
+                current,
+            },
+        );
+    }
+
+    /// Start exit animation for a stable-keyed motion
+    pub fn start_stable_motion_exit(&mut self, key: &str) {
+        if let Some(motion) = self.stable_motions.get_mut(key) {
+            if motion.config.exit_to.is_some() && motion.config.exit_duration_ms > 0 {
+                motion.state = MotionState::Exiting {
+                    progress: 0.0,
+                    duration_ms: motion.config.exit_duration_ms as f32,
+                };
+                motion.current = MotionKeyframe::default(); // Start from visible
+            } else {
+                motion.state = MotionState::Removed;
+            }
+        }
+    }
+
+    /// Get the current motion values for a stable-keyed animation
+    pub fn get_stable_motion_values(&self, key: &str) -> Option<&MotionKeyframe> {
+        self.stable_motions.get(key).map(|m| &m.current)
+    }
+
+    /// Check if a stable-keyed motion is complete and should be removed
+    pub fn is_stable_motion_removed(&self, key: &str) -> bool {
+        self.stable_motions
+            .get(key)
+            .map(|m| matches!(m.state, MotionState::Removed))
+            .unwrap_or(false)
+    }
+
+    /// Remove a stable-keyed motion (after exit animation completes)
+    pub fn remove_stable_motion(&mut self, key: &str) {
+        self.stable_motions.remove(key);
+    }
+
+    /// Tick stable-keyed motions (called from tick())
+    fn tick_stable_motions(&mut self, dt_ms: f32) {
+        for motion in self.stable_motions.values_mut() {
+            Self::tick_single_motion(motion, dt_ms);
+        }
+    }
+
+    /// Helper to tick a single motion animation
+    fn tick_single_motion(motion: &mut ActiveMotion, dt_ms: f32) {
+        match &mut motion.state {
+            MotionState::Waiting { remaining_delay_ms } => {
+                *remaining_delay_ms -= dt_ms;
+                if *remaining_delay_ms <= 0.0 {
+                    if motion.config.enter_from.is_some() && motion.config.enter_duration_ms > 0 {
+                        motion.state = MotionState::Entering {
+                            progress: 0.0,
+                            duration_ms: motion.config.enter_duration_ms as f32,
+                        };
+                    } else {
+                        motion.state = MotionState::Visible;
+                    }
+                }
+            }
+            MotionState::Entering {
+                progress,
+                duration_ms,
+            } => {
+                *progress += dt_ms / *duration_ms;
+                if *progress >= 1.0 {
+                    motion.state = MotionState::Visible;
+                    motion.current = MotionKeyframe::default();
+                } else {
+                    // Interpolate from enter_from to default (fully visible)
+                    if let Some(ref from) = motion.config.enter_from {
+                        motion.current = from.lerp(&MotionKeyframe::default(), *progress);
+                    }
+                }
+            }
+            MotionState::Exiting {
+                progress,
+                duration_ms,
+            } => {
+                *progress += dt_ms / *duration_ms;
+                if *progress >= 1.0 {
+                    motion.state = MotionState::Removed;
+                    if let Some(ref to) = motion.config.exit_to {
+                        motion.current = to.clone();
+                    }
+                } else {
+                    // Interpolate from default (fully visible) to exit_to
+                    if let Some(ref to) = motion.config.exit_to {
+                        motion.current = MotionKeyframe::default().lerp(to, *progress);
+                    }
+                }
+            }
+            MotionState::Visible | MotionState::Removed => {
+                // Nothing to do
+            }
+        }
+    }
+
+    /// Begin a new frame for stable motion tracking
+    ///
+    /// Call this before rendering overlay trees to reset the "used" tracking.
+    /// Stable motions that aren't accessed during the frame will be marked as
+    /// removed when `end_stable_motion_frame()` is called.
+    pub fn begin_stable_motion_frame(&mut self) {
+        self.stable_motions_used.clear();
+    }
+
+    /// End the frame for stable motion tracking
+    ///
+    /// Marks any stable motions that weren't accessed this frame as `Removed`.
+    /// This allows them to restart their animations if accessed again later
+    /// (e.g., when an overlay is reopened).
+    pub fn end_stable_motion_frame(&mut self) {
+        for (key, motion) in self.stable_motions.iter_mut() {
+            if !self.stable_motions_used.contains(key) {
+                // This motion wasn't used this frame - mark it as removed
+                // so it can restart when the overlay reopens
+                motion.state = MotionState::Removed;
+            }
+        }
     }
 
     // =========================================================================

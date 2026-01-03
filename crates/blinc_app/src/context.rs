@@ -766,8 +766,10 @@ impl RenderContext {
                 root,
                 (0.0, 0.0),
                 false,
-                None, // No initial clip
-                1.0,  // Initial motion opacity
+                None,       // No initial clip
+                1.0,        // Initial motion opacity
+                (0.0, 0.0), // Initial motion translate offset
+                (1.0, 1.0), // Initial motion scale
                 render_state,
                 scale,
                 &mut z_layer,
@@ -783,6 +785,7 @@ impl RenderContext {
         (texts, svgs, images)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn collect_elements_recursive(
         &self,
         tree: &RenderTree,
@@ -791,6 +794,8 @@ impl RenderContext {
         inside_glass: bool,
         current_clip: Option<[f32; 4]>,
         inherited_motion_opacity: f32,
+        inherited_motion_translate: (f32, f32),
+        inherited_motion_scale: (f32, f32),
         render_state: Option<&blinc_layout::RenderState>,
         scale: f32,
         z_layer: &mut u32,
@@ -807,14 +812,41 @@ impl RenderContext {
         let abs_x = bounds.x;
         let abs_y = bounds.y;
 
-        // Calculate motion opacity for this node (from RenderState)
-        let node_motion_opacity = render_state
-            .and_then(|rs| rs.get_motion_values(node))
-            .and_then(|m| m.opacity)
-            .unwrap_or(1.0);
+        // Get motion values for this node
+        let motion_values = render_state.and_then(|rs| {
+            // Try stable motion first, then node-based
+            if let Some(render_node) = tree.get_render_node(node) {
+                if let Some(ref stable_key) = render_node.props.motion_stable_id {
+                    return rs.get_stable_motion_values(stable_key);
+                }
+            }
+            rs.get_motion_values(node)
+        });
 
-        // Combine with inherited opacity
+        // Calculate motion opacity for this node
+        let node_motion_opacity = motion_values.and_then(|m| m.opacity).unwrap_or(1.0);
+
+        // Get motion translate for this node
+        let node_motion_translate = motion_values
+            .map(|m| m.resolved_translate())
+            .unwrap_or((0.0, 0.0));
+
+        // Get motion scale for this node (affects child positioning)
+        let node_motion_scale = motion_values
+            .map(|m| m.resolved_scale())
+            .unwrap_or((1.0, 1.0));
+
+        // Combine with inherited values
         let effective_motion_opacity = inherited_motion_opacity * node_motion_opacity;
+        let effective_motion_translate = (
+            inherited_motion_translate.0 + node_motion_translate.0,
+            inherited_motion_translate.1 + node_motion_translate.1,
+        );
+        // Scale compounds multiplicatively
+        let effective_motion_scale = (
+            inherited_motion_scale.0 * node_motion_scale.0,
+            inherited_motion_scale.1 * node_motion_scale.1,
+        );
 
         // Skip if completely transparent
         if effective_motion_opacity <= 0.001 {
@@ -878,13 +910,32 @@ impl RenderContext {
 
             match &render_node.element_type {
                 ElementType::Text(text_data) => {
+                    // Apply motion transform to position
+                    // Scale is applied centered around the element's own center (not world origin)
+                    // Translation simply offsets the element
+                    let center_x = abs_x + bounds.width / 2.0;
+                    let center_y = abs_y + bounds.height / 2.0;
+
+                    // Apply translation only (scale affects size, not position when scaling around center)
+                    let translated_center_x = center_x + effective_motion_translate.0;
+                    let translated_center_y = center_y + effective_motion_translate.1;
+
+                    // Convert back to top-left position with scaled dimensions
+                    // The element stays centered at its position but its size scales
+                    let motion_x =
+                        translated_center_x - (bounds.width * effective_motion_scale.0) / 2.0;
+                    let motion_y =
+                        translated_center_y - (bounds.height * effective_motion_scale.1) / 2.0;
+
                     // Apply DPI scale factor to positions and sizes
-                    let scaled_x = abs_x * scale;
-                    let scaled_y = abs_y * scale;
-                    let scaled_width = bounds.width * scale;
-                    let scaled_height = bounds.height * scale;
-                    let scaled_font_size = text_data.font_size * scale;
-                    let scaled_measured_width = text_data.measured_width * scale;
+                    let scaled_x = motion_x * scale;
+                    let scaled_y = motion_y * scale;
+                    let scaled_width = bounds.width * effective_motion_scale.0 * scale;
+                    let scaled_height = bounds.height * effective_motion_scale.1 * scale;
+                    let scaled_font_size =
+                        text_data.font_size * effective_motion_scale.1 * scale;
+                    let scaled_measured_width =
+                        text_data.measured_width * effective_motion_scale.0 * scale;
 
                     // Scale clip bounds if present
                     let scaled_clip = current_clip
@@ -923,7 +974,7 @@ impl RenderContext {
                         font_family: text_data.font_family.clone(),
                         word_spacing: text_data.word_spacing,
                         z_index: *z_layer,
-                        ascender: text_data.ascender * scale,
+                        ascender: text_data.ascender * effective_motion_scale.1 * scale,
                         strikethrough: text_data.strikethrough,
                         underline: text_data.underline,
                     });
@@ -1114,7 +1165,7 @@ impl RenderContext {
 
         // Include scroll offset and motion offset when calculating child positions
         let scroll_offset = tree.get_scroll_offset(node);
-        let motion_offset = tree
+        let static_motion_offset = tree
             .get_motion_transform(node)
             .map(|t| match t {
                 blinc_core::Transform::Affine2D(a) => (a.elements[4], a.elements[5]),
@@ -1123,8 +1174,8 @@ impl RenderContext {
             .unwrap_or((0.0, 0.0));
 
         let new_offset = (
-            abs_x + scroll_offset.0 + motion_offset.0,
-            abs_y + scroll_offset.1 + motion_offset.1,
+            abs_x + scroll_offset.0 + static_motion_offset.0,
+            abs_y + scroll_offset.1 + static_motion_offset.1,
         );
         for child_id in tree.layout().children(node) {
             self.collect_elements_recursive(
@@ -1134,6 +1185,8 @@ impl RenderContext {
                 children_inside_glass,
                 child_clip,
                 effective_motion_opacity,
+                effective_motion_translate,
+                effective_motion_scale,
                 render_state,
                 scale,
                 z_layer,

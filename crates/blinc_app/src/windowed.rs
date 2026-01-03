@@ -107,6 +107,8 @@ pub struct WindowedContext {
     overlay_manager: OverlayManager,
     /// Cached overlay tree for event routing (rebuilt when overlays change)
     overlay_tree: Option<blinc_layout::RenderTree>,
+    /// Whether overlays were visible last frame (for stable motion cleanup)
+    had_visible_overlays: bool,
     /// Element registry for query API (shared with RenderTree)
     element_registry: SharedElementRegistry,
     /// Callbacks to run after UI is ready (motion bindings registered)
@@ -151,6 +153,7 @@ impl WindowedContext {
             hooks,
             overlay_manager: overlay_mgr,
             overlay_tree: None,
+            had_visible_overlays: false,
             element_registry,
             ready_callbacks,
         }
@@ -2392,10 +2395,18 @@ impl WindowedApp {
 
                             // Build and render overlay tree if there are visible overlays
                             // Use render_overlay_tree_with_motion which does NOT clear the screen
-                            if windowed_ctx.overlay_manager.has_visible_overlays() {
+                            let has_visible_overlays = windowed_ctx.overlay_manager.has_visible_overlays();
+
+                            if has_visible_overlays {
+                                // Begin tracking stable motion usage for this frame
+                                rs.begin_stable_motion_frame();
+
                                 // Rebuild overlay tree (always rebuild for rendering to get latest content)
                                 windowed_ctx.overlay_tree = windowed_ctx.overlay_manager.build_overlay_tree();
                                 if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
+                                    // Initialize motion animations for overlay content
+                                    overlay_tree.initialize_motion_animations(rs);
+
                                     let result = blinc_app.render_overlay_tree_with_motion(
                                         overlay_tree,
                                         rs,
@@ -2407,10 +2418,22 @@ impl WindowedApp {
                                         tracing::error!("Overlay render error: {}", e);
                                     }
                                 }
-                            } else {
-                                // Clear cached overlay tree when no overlays visible
+
+                                // Mark unused stable motions as Removed so they can restart
+                                // when their overlay reopens
+                                rs.end_stable_motion_frame();
+                            } else if windowed_ctx.had_visible_overlays {
+                                // Overlays just became invisible - mark all stable motions as unused
+                                // so they restart their animations when overlays reopen
+                                rs.begin_stable_motion_frame();
+                                rs.end_stable_motion_frame();
+
+                                // Clear cached overlay tree
                                 windowed_ctx.overlay_tree = None;
                             }
+
+                            // Track visibility for next frame
+                            windowed_ctx.had_visible_overlays = has_visible_overlays;
 
                             frame.present();
 

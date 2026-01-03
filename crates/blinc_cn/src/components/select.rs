@@ -35,10 +35,12 @@
 use std::cell::OnceCell;
 use std::sync::Arc;
 
+use blinc_animation::AnimationPreset;
 use blinc_core::context_state::BlincContextState;
 use blinc_core::State;
 use blinc_layout::div::ElementTypeId;
 use blinc_layout::element::{CursorStyle, RenderProps};
+use blinc_layout::motion::motion;
 use blinc_layout::overlay_state::get_overlay_manager;
 use blinc_layout::prelude::*;
 use blinc_layout::stateful::{ButtonState, Stateful};
@@ -708,7 +710,13 @@ fn build_dropdown_content(
         dropdown_div = dropdown_div.child(option_item);
     }
 
-    dropdown_div
+    // Wrap dropdown in motion container for enter/exit animations
+    div().child(
+        motion()
+            .enter_animation(AnimationPreset::dropdown_in(150))
+            .exit_animation(AnimationPreset::dropdown_out(100))
+            .child(dropdown_div),
+    )
 }
 
 #[cfg(test)]

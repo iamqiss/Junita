@@ -1289,6 +1289,12 @@ impl RenderTree {
 
         // Check if this is a Motion container
         let is_motion = element.element_type_id() == ElementTypeId::Motion;
+        // Get stable ID from Motion container (for overlay animations that survive tree rebuilds)
+        let motion_stable_id = if is_motion {
+            element.motion_stable_id().map(|s| s.to_string())
+        } else {
+            None
+        };
 
         // Match children by index (they were built in order)
         for (index, (child_builder, &child_node_id)) in
@@ -1297,10 +1303,15 @@ impl RenderTree {
             // If parent is Motion, propagate motion animation to child
             if is_motion {
                 if let Some(motion_config) = element.motion_animation_for_child(index) {
+                    // Append child index to stable key for unique stagger animations
+                    let child_stable_id = motion_stable_id
+                        .as_ref()
+                        .map(|key| format!("{}:child:{}", key, index));
                     self.collect_render_props_boxed_with_motion(
                         child_builder.as_ref(),
                         child_node_id,
                         Some(motion_config),
+                        child_stable_id,
                     );
                     continue;
                 }
@@ -1315,6 +1326,7 @@ impl RenderTree {
         element: &dyn ElementBuilder,
         node_id: LayoutNodeId,
         motion_config: Option<crate::element::MotionAnimation>,
+        motion_stable_id: Option<String>,
     ) {
         let mut props = element.render_props();
         props.node_id = Some(node_id);
@@ -1322,6 +1334,7 @@ impl RenderTree {
         // Motion config from parent takes precedence
         if motion_config.is_some() {
             props.motion = motion_config;
+            props.motion_stable_id = motion_stable_id;
         } else if props.motion.is_none() {
             // Fall back to CSS animation from stylesheet if element has an ID
             if let Some(ref stylesheet) = self.stylesheet {
@@ -2525,13 +2538,23 @@ impl RenderTree {
     ///
     /// Call this after building/rebuilding the tree to start enter animations
     /// for any nodes wrapped in motion() containers.
+    ///
+    /// For nodes with a `motion_stable_id`, the animation state is tracked by
+    /// stable key instead of node_id. This allows animations to persist across
+    /// tree rebuilds (essential for overlays which are rebuilt every frame).
     pub fn initialize_motion_animations(
         &self,
         render_state: &mut crate::render_state::RenderState,
     ) {
         for (&node_id, render_node) in &self.render_nodes {
             if let Some(ref motion_config) = render_node.props.motion {
-                render_state.start_enter_motion(node_id, motion_config.clone());
+                // Use stable key if available (for overlays), otherwise use node_id
+                if let Some(ref stable_key) = render_node.props.motion_stable_id {
+                    // Only start if not already tracking this stable key
+                    render_state.start_stable_motion(stable_key, motion_config.clone());
+                } else {
+                    render_state.start_enter_motion(node_id, motion_config.clone());
+                }
             }
         }
     }
@@ -3599,12 +3622,23 @@ impl RenderTree {
         };
 
         // Check if this node should be skipped (motion removed)
-        if render_state.is_motion_removed(node) {
+        // For stable-keyed motions, check by key; for node-based, check by node_id
+        let motion_removed = if let Some(ref stable_key) = render_node.props.motion_stable_id {
+            render_state.is_stable_motion_removed(stable_key)
+        } else {
+            render_state.is_motion_removed(node)
+        };
+        if motion_removed {
             return;
         }
 
         // Get motion values from RenderState (for entry/exit animations)
-        let motion_values = render_state.get_motion_values(node);
+        // For stable-keyed motions (overlays), look up by key; otherwise by node_id
+        let motion_values = if let Some(ref stable_key) = render_node.props.motion_stable_id {
+            render_state.get_stable_motion_values(stable_key)
+        } else {
+            render_state.get_motion_values(node)
+        };
 
         // Get motion bindings from RenderTree (for continuous AnimatedValue animations)
         let binding_transform = self.get_motion_transform(node);

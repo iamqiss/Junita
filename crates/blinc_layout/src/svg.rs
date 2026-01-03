@@ -271,6 +271,7 @@ impl ElementBuilder for Svg {
             opacity: 1.0,
             clips_content: false,
             motion: None,
+            motion_stable_id: None,
             is_stack_layer: false,
             cursor: None,
         }

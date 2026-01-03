@@ -488,6 +488,42 @@ impl MultiKeyframeAnimation {
     pub fn keyframes(&self) -> &[MultiKeyframe] {
         &self.keyframes
     }
+
+    /// Sample the animation at a specific progress (0.0 to 1.0)
+    ///
+    /// This is useful for externally-timed animations where you manage
+    /// the progress yourself rather than using tick().
+    pub fn sample_at(&self, progress: f32) -> KeyframeProperties {
+        if self.keyframes.is_empty() {
+            return KeyframeProperties::default();
+        }
+
+        let progress = progress.clamp(0.0, 1.0);
+
+        // Find surrounding keyframes
+        let mut prev_kf = &self.keyframes[0];
+        let mut next_kf = &self.keyframes[0];
+
+        for kf in &self.keyframes {
+            if kf.time <= progress {
+                prev_kf = kf;
+            }
+            if kf.time >= progress {
+                next_kf = kf;
+                break;
+            }
+        }
+
+        if (prev_kf.time - next_kf.time).abs() < f32::EPSILON {
+            return prev_kf.properties.clone();
+        }
+
+        // Interpolate between keyframes
+        let local_progress = (progress - prev_kf.time) / (next_kf.time - prev_kf.time);
+        let eased = next_kf.easing.apply(local_progress);
+
+        prev_kf.properties.lerp(&next_kf.properties, eased)
+    }
 }
 
 impl Default for MultiKeyframeAnimation {

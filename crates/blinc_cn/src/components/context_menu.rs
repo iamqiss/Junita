@@ -51,9 +51,11 @@
 
 use std::sync::Arc;
 
+use blinc_animation::AnimationPreset;
 use blinc_core::context_state::BlincContextState;
 use blinc_core::{Color, State};
 use blinc_layout::element::CursorStyle;
+use blinc_layout::motion::motion;
 use blinc_layout::overlay_state::get_overlay_manager;
 use blinc_layout::prelude::*;
 use blinc_layout::widgets::overlay::{OverlayHandle, OverlayManagerExt};
@@ -540,7 +542,13 @@ fn build_menu_content(
         }
     }
 
-    menu
+    // Wrap menu in motion container for enter/exit animations
+    div().child(
+        motion()
+            .enter_animation(AnimationPreset::context_menu_in(150))
+            .exit_animation(AnimationPreset::context_menu_out(100))
+            .child(menu),
+    )
 }
 
 /// Create a context menu builder

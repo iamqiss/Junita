@@ -25,12 +25,29 @@
 //! OverlayContext::init(overlay_manager);
 //! ```
 
+use std::cell::Cell;
 use std::sync::OnceLock;
 
 use crate::widgets::overlay::OverlayManager;
 
 /// Global overlay context instance
 static OVERLAY_CONTEXT: OnceLock<OverlayContext> = OnceLock::new();
+
+/// Thread-local flag indicating if we're currently rendering closing overlay content
+/// When true, motion() containers should start their exit animations instead of reinitializing
+thread_local! {
+    static OVERLAY_CLOSING: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Check if we're currently rendering overlay content that is closing
+pub fn is_overlay_closing() -> bool {
+    OVERLAY_CLOSING.with(|c| c.get())
+}
+
+/// Set the overlay closing flag (call before/after building closing overlay content)
+pub fn set_overlay_closing(closing: bool) {
+    OVERLAY_CLOSING.with(|c| c.set(closing));
+}
 
 /// Global overlay context singleton
 ///

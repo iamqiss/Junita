@@ -40,7 +40,6 @@ use blinc_core::Color;
 use indexmap::IndexMap;
 
 use crate::div::{div, Div};
-use crate::motion::motion;
 use crate::renderer::RenderTree;
 use crate::stack::stack;
 use crate::stateful::StateTransitions;
@@ -285,18 +284,24 @@ impl std::fmt::Debug for OverlayAnimation {
 
 impl OverlayAnimation {
     /// Default modal animation (scale + fade)
+    ///
+    /// Note: Exit duration must be >= motion exit animation duration (150ms default for dialogs)
+    /// to ensure motion animations complete before overlay is removed.
     pub fn modal() -> Self {
         Self {
             enter: AnimationPreset::scale_in(200),
-            exit: AnimationPreset::fade_out(150),
+            exit: AnimationPreset::fade_out(170), // Slightly longer than motion exit (150ms)
         }
     }
 
     /// Context menu animation (pop in)
+    ///
+    /// Note: Exit duration must be >= motion exit animation duration (100ms default)
+    /// to ensure motion animations complete before overlay is removed.
     pub fn context_menu() -> Self {
         Self {
             enter: AnimationPreset::pop_in(150),
-            exit: AnimationPreset::fade_out(100),
+            exit: AnimationPreset::fade_out(120), // Slightly longer than motion exit (100ms)
         }
     }
 
@@ -309,10 +314,13 @@ impl OverlayAnimation {
     }
 
     /// Dropdown animation (fade in quickly)
+    ///
+    /// Note: Exit duration must be >= motion exit animation duration (100ms default)
+    /// to ensure motion animations complete before overlay is removed.
     pub fn dropdown() -> Self {
         Self {
             enter: AnimationPreset::fade_in(100),
-            exit: AnimationPreset::fade_out(75),
+            exit: AnimationPreset::fade_out(120), // Slightly longer than motion exit (100ms)
         }
     }
 
@@ -482,8 +490,12 @@ pub struct ActiveOverlay {
     pub state: OverlayState,
     /// Content builder function
     content_builder: Box<dyn Fn() -> Div + Send + Sync>,
+    /// Time when overlay was created (for enter animation timing)
+    created_at_ms: Option<u64>,
     /// Time when overlay was opened (for auto-dismiss)
     opened_at_ms: Option<u64>,
+    /// Time when close animation started (for exit animation timing)
+    close_started_at_ms: Option<u64>,
     /// Cached content size after layout (for positioning)
     pub cached_size: Option<(f32, f32)>,
     /// Callback invoked when the overlay is closed (backdrop click, escape, etc.)
@@ -510,6 +522,39 @@ impl ActiveOverlay {
             false
         }
     }
+
+    /// Get the current animation progress (0.0 to 1.0)
+    ///
+    /// Returns (progress, is_entering) where:
+    /// - progress: 0.0 = start of animation, 1.0 = end
+    /// - is_entering: true for enter animation, false for exit
+    ///
+    /// Returns None if not animating (fully visible or closed)
+    pub fn animation_progress(&self, current_time_ms: u64) -> Option<(f32, bool)> {
+        match self.state {
+            OverlayState::Opening => {
+                let duration = self.config.animation.enter.duration_ms() as f32;
+                if duration <= 0.0 {
+                    return None;
+                }
+                let created_at = self.created_at_ms.unwrap_or(current_time_ms);
+                let elapsed = (current_time_ms.saturating_sub(created_at)) as f32;
+                let progress = (elapsed / duration).clamp(0.0, 1.0);
+                Some((progress, true))
+            }
+            OverlayState::Closing => {
+                let duration = self.config.animation.exit.duration_ms() as f32;
+                if duration <= 0.0 {
+                    return None;
+                }
+                let close_started = self.close_started_at_ms.unwrap_or(current_time_ms);
+                let elapsed = (current_time_ms.saturating_sub(close_started)) as f32;
+                let progress = (elapsed / duration).clamp(0.0, 1.0);
+                Some((progress, false))
+            }
+            _ => None,
+        }
+    }
 }
 
 // =============================================================================
@@ -534,6 +579,8 @@ pub struct OverlayManagerInner {
     max_toasts: usize,
     /// Gap between stacked toasts
     toast_gap: f32,
+    /// Current time in milliseconds (set by update())
+    current_time_ms: u64,
 }
 
 impl OverlayManagerInner {
@@ -548,6 +595,7 @@ impl OverlayManagerInner {
             toast_corner: Corner::TopRight,
             max_toasts: 5,
             toast_gap: 8.0,
+            current_time_ms: 0,
         }
     }
 
@@ -614,7 +662,9 @@ impl OverlayManagerInner {
             config,
             state: OverlayState::Opening,
             content_builder: Box::new(content),
+            created_at_ms: None, // Will be set on first update
             opened_at_ms: None,
+            close_started_at_ms: None,
             cached_size: None,
             on_close,
         };
@@ -633,20 +683,40 @@ impl OverlayManagerInner {
     /// Update overlay states - call this every frame
     ///
     /// This handles:
-    /// - Transitioning Opening -> Open after animation
+    /// - Transitioning Opening -> Open after enter animation completes
+    /// - Transitioning Closing -> Closed after exit animation completes
     /// - Auto-dismissing toasts after their duration expires
     /// - Removing closed overlays
     pub fn update(&mut self, current_time_ms: u64) {
+        // Store current time for use in build_overlay_layer
+        self.current_time_ms = current_time_ms;
+
         let mut to_close = Vec::new();
         let mut dirty = false;
 
         for (handle, overlay) in self.overlays.iter_mut() {
+            // Initialize created_at_ms on first update
+            if overlay.created_at_ms.is_none() {
+                overlay.created_at_ms = Some(current_time_ms);
+                dirty = true;
+            }
+
             match overlay.state {
                 OverlayState::Opening => {
-                    // Transition to Open immediately (skip animation for now)
-                    if overlay.transition(overlay_events::ANIMATION_COMPLETE) {
-                        overlay.opened_at_ms = Some(current_time_ms);
-                        dirty = true;
+                    // Check if enter animation has completed
+                    let enter_duration = overlay.config.animation.enter.duration_ms();
+                    if let Some(created_at) = overlay.created_at_ms {
+                        let elapsed = current_time_ms.saturating_sub(created_at);
+                        if elapsed >= enter_duration as u64 {
+                            // Animation complete, transition to Open
+                            if overlay.transition(overlay_events::ANIMATION_COMPLETE) {
+                                overlay.opened_at_ms = Some(current_time_ms);
+                                dirty = true;
+                            }
+                        } else {
+                            // Animation still in progress, keep redrawing
+                            dirty = true;
+                        }
                     }
                 }
                 OverlayState::Open => {
@@ -660,9 +730,36 @@ impl OverlayManagerInner {
                     }
                 }
                 OverlayState::Closing => {
-                    // Transition to Closed immediately (skip animation for now)
-                    if overlay.transition(overlay_events::ANIMATION_COMPLETE) {
+                    // Initialize close_started_at_ms if not set
+                    if overlay.close_started_at_ms.is_none() {
+                        overlay.close_started_at_ms = Some(current_time_ms);
+                        tracing::debug!(
+                            "Overlay {:?} started closing at {}ms, exit duration={}ms",
+                            handle,
+                            current_time_ms,
+                            overlay.config.animation.exit.duration_ms()
+                        );
                         dirty = true;
+                    }
+
+                    // Check if exit animation has completed
+                    let exit_duration = overlay.config.animation.exit.duration_ms();
+                    if let Some(close_started) = overlay.close_started_at_ms {
+                        let elapsed = current_time_ms.saturating_sub(close_started);
+                        if elapsed >= exit_duration as u64 {
+                            // Animation complete, transition to Closed
+                            tracing::debug!(
+                                "Overlay {:?} exit animation complete, elapsed={}ms",
+                                handle,
+                                elapsed
+                            );
+                            if overlay.transition(overlay_events::ANIMATION_COMPLETE) {
+                                dirty = true;
+                            }
+                        } else {
+                            // Animation still in progress, keep redrawing
+                            dirty = true;
+                        }
                     }
                 }
                 OverlayState::Closed => {
@@ -979,7 +1076,16 @@ impl OverlayManagerInner {
 
     /// Build a single overlay layer
     fn build_overlay_layer(&self, overlay: &ActiveOverlay, vp_width: f32, vp_height: f32) -> Div {
+        // Set the closing flag if this overlay is closing, so motion() containers
+        // know to start their exit animations instead of reinitializing
+        let is_closing = overlay.state == OverlayState::Closing;
+        crate::overlay_state::set_overlay_closing(is_closing);
+
+        // Content is built by the user - they should wrap it in motion() for animations
         let content = overlay.build_content();
+
+        // Reset the closing flag after building content
+        crate::overlay_state::set_overlay_closing(false);
 
         // Apply size constraints if specified
         let content = if let Some((w, h)) = overlay.config.size {
@@ -988,34 +1094,45 @@ impl OverlayManagerInner {
             content
         };
 
-        // Wrap content in motion container for enter/exit animations
-        let animated_content = div().child(
-            motion()
-                .enter_animation(overlay.config.animation.enter.clone())
-                .exit_animation(overlay.config.animation.exit.clone())
-                .child(content),
-        );
+        // Calculate backdrop opacity based on animation state
+        let backdrop_opacity = if let Some((progress, is_entering)) =
+            overlay.animation_progress(self.current_time_ms)
+        {
+            if is_entering {
+                progress // Fade in: 0 -> 1
+            } else {
+                1.0 - progress // Fade out: 1 -> 0
+            }
+        } else {
+            match overlay.state {
+                OverlayState::Open => 1.0,
+                OverlayState::Closed => 0.0,
+                OverlayState::Opening => 0.0,
+                OverlayState::Closing => 1.0,
+            }
+        };
 
         // Build the layer with optional backdrop
         if let Some(ref backdrop_config) = overlay.config.backdrop {
-            tracing::debug!(
-                "build_overlay_layer: using backdrop color {:?}, position {:?}",
-                backdrop_config.color,
-                overlay.config.position
+            // Apply opacity to backdrop color
+            let backdrop_color = backdrop_config.color.with_alpha(
+                backdrop_config.color.a * backdrop_opacity,
             );
+
             // Use stack: first child (backdrop) renders behind, second child (content) on top
             div().w(vp_width).h(vp_height).child(
                 stack()
                     .w_full()
                     .h_full()
-                    // Backdrop layer (behind) - fills entire viewport
-                    .child(div().w_full().h_full().bg(backdrop_config.color))
+                    // Backdrop layer (behind) - fills entire viewport with animated opacity
+                    .child(div().w_full().h_full().bg(backdrop_color))
                     // Content layer (on top) - positioned according to config
-                    .child(self.position_content(overlay, animated_content, vp_width, vp_height)),
+                    // Content animation is handled by user via motion() container
+                    .child(self.position_content(overlay, content, vp_width, vp_height)),
             )
         } else {
             // No backdrop - position content according to config
-            self.position_content(overlay, animated_content, vp_width, vp_height)
+            self.position_content(overlay, content, vp_width, vp_height)
         }
     }
 

@@ -279,6 +279,23 @@ impl MotionBindings {
 ///
 /// The container itself is transparent but can have layout properties
 /// to control how children are arranged (flex direction, gap, etc.).
+///
+/// # Stable Keys
+///
+/// Motion containers automatically generate a stable key based on their call site
+/// (file, line, column). This allows animations to persist across tree rebuilds,
+/// which is essential for overlays and other dynamically rebuilt content.
+///
+/// For additional uniqueness (e.g., in loops), use `.id()` to append a suffix:
+///
+/// ```ignore
+/// for i in 0..items.len() {
+///     motion()
+///         .id(i)  // Appends index to auto-generated key
+///         .fade_in(300)
+///         .child(item_content)
+/// }
+/// ```
 pub struct Motion {
     /// Children to animate (single or multiple)
     children: Vec<Box<dyn ElementBuilder>>,
@@ -290,6 +307,11 @@ pub struct Motion {
     stagger_config: Option<StaggerConfig>,
     /// Layout style for the container
     style: Style,
+
+    /// Stable key for motion tracking across tree rebuilds
+    /// Auto-generated from call site, with optional user-provided suffix
+    /// Format: "motion:{file}:{line}:{col}" or "motion:{file}:{line}:{col}:{suffix}"
+    stable_key: String,
 
     // =========================================================================
     // Continuous animation bindings (AnimatedValue driven)
@@ -339,7 +361,25 @@ fn motion_keyframe_to_properties(kf: &MotionKeyframe) -> blinc_animation::Keyfra
 }
 
 /// Create a motion container
+///
+/// The motion container automatically generates a stable key based on the call site
+/// (file, line, column). This allows animations to persist across tree rebuilds.
+///
+/// For additional uniqueness in loops, use `.id()`:
+///
+/// ```ignore
+/// for i in 0..items.len() {
+///     motion()
+///         .id(i)  // Appends index to auto-generated key
+///         .fade_in(300)
+///         .child(item_content)
+/// }
+/// ```
+#[track_caller]
 pub fn motion() -> Motion {
+    let loc = std::panic::Location::caller();
+    let stable_key = format!("motion:{}:{}:{}", loc.file(), loc.line(), loc.column());
+
     Motion {
         children: Vec::new(),
         enter: None,
@@ -350,6 +390,7 @@ pub fn motion() -> Motion {
             flex_direction: FlexDirection::Column,
             ..Style::default()
         },
+        stable_key,
         translate_x: None,
         translate_y: None,
         scale: None,
@@ -773,6 +814,40 @@ impl Motion {
         self.stagger_config.as_ref()
     }
 
+    // ========================================================================
+    // ID for uniqueness in loops/lists
+    // ========================================================================
+
+    /// Append an ID suffix for additional uniqueness
+    ///
+    /// Motion containers automatically generate a stable key based on their call site.
+    /// Use `.id()` when you need additional uniqueness, such as in loops or lists.
+    ///
+    /// The provided ID is concatenated to the internal stable key.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// for (i, item) in items.iter().enumerate() {
+    ///     motion()
+    ///         .id(i)  // Creates unique key for each iteration
+    ///         .fade_in(300)
+    ///         .child(item_content)
+    /// }
+    /// ```
+    pub fn id(mut self, id: impl std::fmt::Display) -> Self {
+        // Append the ID to the existing stable key
+        self.stable_key = format!("{}:{}", self.stable_key, id);
+        self
+    }
+
+    /// Get the stable key for this motion container
+    ///
+    /// Returns the auto-generated call-site key with any user-provided ID suffixes appended.
+    pub fn get_stable_key(&self) -> &str {
+        &self.stable_key
+    }
+
     /// Get the motion animation configuration for a child at given index
     ///
     /// Takes stagger into account to compute the correct delay for each child.
@@ -879,6 +954,12 @@ impl ElementBuilder for Motion {
 
     fn motion_bindings(&self) -> Option<MotionBindings> {
         self.get_motion_bindings()
+    }
+
+    fn motion_stable_id(&self) -> Option<&str> {
+        // Always return the stable key - it's auto-generated from call site
+        // with any user-provided ID suffixes appended
+        Some(&self.stable_key)
     }
 
     fn layout_style(&self) -> Option<&taffy::Style> {

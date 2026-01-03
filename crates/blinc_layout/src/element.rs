@@ -857,6 +857,9 @@ pub struct RenderProps {
     pub clips_content: bool,
     /// Motion animation configuration (enter/exit animations)
     pub motion: Option<MotionAnimation>,
+    /// Stable ID for motion animation tracking across tree rebuilds
+    /// Used by overlays where the tree is rebuilt every frame
+    pub motion_stable_id: Option<String>,
     /// Whether this is a Stack layer that increments z_layer for proper z-ordering
     /// When true, entering this node increments the DrawContext's z_layer
     pub is_stack_layer: bool,
@@ -880,6 +883,7 @@ impl Default for RenderProps {
             opacity: 1.0,
             clips_content: false,
             motion: None,
+            motion_stable_id: None,
             is_stack_layer: false,
             cursor: None,
         }

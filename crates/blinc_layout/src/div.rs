@@ -2679,6 +2679,15 @@ pub trait ElementBuilder {
         None
     }
 
+    /// Get stable ID for motion animation tracking
+    ///
+    /// When set, the motion animation state is tracked by this stable key
+    /// instead of node ID, allowing animations to persist across tree rebuilds.
+    /// This is essential for overlays which are rebuilt every frame.
+    fn motion_stable_id(&self) -> Option<&str> {
+        None
+    }
+
     /// Get the layout style for this element
     ///
     /// This is used for hashing layout-affecting properties like size,
@@ -2765,6 +2774,7 @@ impl ElementBuilder for Div {
             opacity: self.opacity,
             clips_content,
             motion: None,
+            motion_stable_id: None,
             is_stack_layer: false,
             cursor: self.cursor,
         }

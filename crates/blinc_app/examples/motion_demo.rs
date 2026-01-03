@@ -50,6 +50,7 @@ fn main() -> Result<()> {
         title: "Motion Container Demo".to_string(),
         width: 900,
         height: 700,
+        fullscreen: true,
         ..Default::default()
     };
 
