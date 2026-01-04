@@ -166,21 +166,57 @@ On-ready callbacks:
 
 ---
 
+## Querying in Event Handlers
+
+Inside event handlers, use `BlincContextState` to access element operations:
+
+```rust
+use blinc_core::BlincContextState;
+
+div()
+    .on_click(|_| {
+        // Access global context state for element operations
+        if let Some(ctx) = BlincContextState::try_get() {
+            ctx.scroll_element_into_view("my-element");
+            ctx.set_focus(Some("my-input"));
+        }
+    })
+```
+
+For more complex queries, use the element registry:
+
+```rust
+fn my_component(ctx: &WindowedContext) -> impl ElementBuilder {
+    // Clone registry for use in closures
+    let registry = ctx.element_registry().clone();
+
+    div()
+        .on_click(move |_| {
+            let handle = ElementHandle::new("target", registry.clone());
+            if let Some(bounds) = handle.bounds() {
+                println!("Element at: {:?}", bounds);
+            }
+        })
+}
+```
+
+---
+
 ## Use Cases
 
 ### Scroll to Element on Action
 
 ```rust
 fn scrollable_list(ctx: &WindowedContext) -> impl ElementBuilder {
-    let ctx_scroll = ctx.clone();
-
     div()
         .flex_col()
         .child(
             div()
-                .on_click(move |_| {
-                    // Scroll to bottom of list
-                    ctx_scroll.query("list-bottom").scroll_into_view();
+                .on_click(|_| {
+                    // Use global context for scroll
+                    if let Some(ctx) = BlincContextState::try_get() {
+                        ctx.scroll_element_into_view("list-bottom");
+                    }
                 })
                 .child(text("Jump to Bottom"))
         )
@@ -207,8 +243,6 @@ fn scrollable_list(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ```rust
 fn login_form(ctx: &WindowedContext) -> impl ElementBuilder {
-    let ctx_focus = ctx.clone();
-
     div()
         .flex_col()
         .gap(16.0)
@@ -221,17 +255,21 @@ fn login_form(ctx: &WindowedContext) -> impl ElementBuilder {
             text_input(ctx.use_state_keyed::<TextInputState>("password"))
                 .id("password-input")
                 .placeholder("Password")
-                .on_key_down(move |evt| {
+                .on_key_down(|evt| {
                     if evt.key_code == 9 && evt.shift {  // Shift+Tab
-                        ctx_focus.query("username-input").focus();
+                        if let Some(ctx) = BlincContextState::try_get() {
+                            ctx.set_focus(Some("username-input"));
+                        }
                     }
                 })
         )
         .child(
             div()
-                .on_click(move |_| {
+                .on_click(|_| {
                     // Focus username on form reset
-                    ctx_focus.query("username-input").focus();
+                    if let Some(ctx) = BlincContextState::try_get() {
+                        ctx.set_focus(Some("username-input"));
+                    }
                 })
                 .child(text("Reset"))
         )
@@ -243,11 +281,11 @@ fn login_form(ctx: &WindowedContext) -> impl ElementBuilder {
 ```rust
 fn responsive_card(ctx: &WindowedContext) -> impl ElementBuilder {
     let card_width = ctx.use_signal(0.0f32);
-    let ctx_measure = ctx.clone();
 
     // Register callback to measure after layout
     ctx.query("adaptive-card").on_ready(move |bounds| {
-        ctx_measure.set(card_width, bounds.width);
+        // on_ready callback has access to bounds directly
+        println!("Card width: {}", bounds.width);
     });
 
     let width = ctx.get(card_width).unwrap_or(0.0);
@@ -271,7 +309,7 @@ Use `mark_visual_dirty` for visual-only changes that don't affect layout:
 
 ```rust
 fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> impl ElementBuilder {
-    let ctx_highlight = ctx.clone();
+    let registry = ctx.element_registry().clone();
     let selected = selected_id.map(|s| s.to_string());
 
     div()
@@ -279,7 +317,7 @@ fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> i
         .children(["item-a", "item-b", "item-c"].iter().map(|id| {
             let is_selected = selected.as_deref() == Some(*id);
             let id_string = id.to_string();
-            let ctx_click = ctx_highlight.clone();
+            let reg = registry.clone();
 
             div()
                 .id(*id)
@@ -291,7 +329,8 @@ fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> i
                 })
                 .on_click(move |_| {
                     // Visual-only update - skips layout recomputation
-                    ctx_click.query(&id_string).mark_visual_dirty(
+                    let handle = ElementHandle::new(&id_string, reg.clone());
+                    handle.mark_visual_dirty(
                         RenderProps::default()
                             .with_background(Color::rgba(0.2, 0.5, 1.0, 0.3).into())
                     );
@@ -306,7 +345,6 @@ fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> i
 ```rust
 fn carousel(ctx: &WindowedContext, items: &[String]) -> impl ElementBuilder {
     let current_index = ctx.use_signal(0usize);
-    let ctx_nav = ctx.clone();
 
     div()
         .flex_col()
@@ -335,18 +373,17 @@ fn carousel(ctx: &WindowedContext, items: &[String]) -> impl ElementBuilder {
                 .justify_center()
                 .gap(8.0)
                 .children((0..items.len()).map(|i| {
-                    let ctx_dot = ctx_nav.clone();
                     div()
                         .circle(8.0)
                         .bg(Color::WHITE.with_alpha(0.5))
                         .on_click(move |_| {
-                            ctx_dot.set(current_index, i);
-                            ctx_dot.query(&format!("slide-{}", i)).scroll_into_view();
+                            if let Some(ctx) = BlincContextState::try_get() {
+                                ctx.scroll_element_into_view(&format!("slide-{}", i));
+                            }
                         })
                 }))
         )
 }
-```
 
 ---
 
@@ -374,11 +411,12 @@ fn bad_example(ctx: &WindowedContext) -> impl ElementBuilder {
 
 // Good: Query in event handler or on_ready
 fn good_example(ctx: &WindowedContext) -> impl ElementBuilder {
-    let ctx_click = ctx.clone();
+    let registry = ctx.element_registry().clone();
 
     div()
         .on_click(move |_| {
-            let bounds = ctx_click.query("my-element").bounds();
+            let handle = ElementHandle::new("my-element", registry.clone());
+            let bounds = handle.bounds();
             // Use bounds...
         })
 }
