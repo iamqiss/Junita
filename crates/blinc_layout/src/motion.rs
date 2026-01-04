@@ -313,6 +313,11 @@ pub struct Motion {
     /// Format: "motion:{file}:{line}:{col}" or "motion:{file}:{line}:{col}:{suffix}"
     stable_key: String,
 
+    /// Whether to use stable keying for this motion
+    /// When true (default), animation state persists across tree rebuilds using stable_key
+    /// When false, each new node gets a fresh animation (useful for tabs, lists)
+    use_stable_key: bool,
+
     // =========================================================================
     // Continuous animation bindings (AnimatedValue driven)
     // =========================================================================
@@ -388,9 +393,16 @@ pub fn motion() -> Motion {
         style: Style {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
+            // Default to filling parent container (acts as transparent wrapper)
+            size: taffy::Size {
+                width: taffy::Dimension::Percent(1.0),
+                height: taffy::Dimension::Auto,
+            },
+            flex_grow: 1.0,
             ..Style::default()
         },
         stable_key,
+        use_stable_key: true, // Default to stable keying for overlays
         translate_x: None,
         translate_y: None,
         scale: None,
@@ -799,6 +811,24 @@ impl Motion {
         self
     }
 
+    /// Set width to 100% of parent
+    pub fn w_full(mut self) -> Self {
+        self.style.size.width = taffy::Dimension::Percent(1.0);
+        self
+    }
+
+    /// Set height to 100% of parent
+    pub fn h_full(mut self) -> Self {
+        self.style.size.height = taffy::Dimension::Percent(1.0);
+        self
+    }
+
+    /// Allow this element to grow to fill available space
+    pub fn flex_grow(mut self) -> Self {
+        self.style.flex_grow = 1.0;
+        self
+    }
+
     /// Get the enter animation if set
     pub fn get_enter_animation(&self) -> Option<&ElementAnimation> {
         self.enter.as_ref()
@@ -846,6 +876,30 @@ impl Motion {
     /// Returns the auto-generated call-site key with any user-provided ID suffixes appended.
     pub fn get_stable_key(&self) -> &str {
         &self.stable_key
+    }
+
+    /// Make this motion transient (animation replays on each rebuild)
+    ///
+    /// By default, motion containers persist their animation state across tree
+    /// rebuilds using a stable key. This is essential for overlays that rebuild
+    /// frequently but should maintain animation continuity.
+    ///
+    /// For content that changes frequently (like tab panels, list items),
+    /// use `.transient()` so the enter animation replays each time the
+    /// content appears.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Tab content that animates on every tab switch
+    /// motion()
+    ///     .transient()
+    ///     .fade_in(150)
+    ///     .child(tab_content)
+    /// ```
+    pub fn transient(mut self) -> Self {
+        self.use_stable_key = false;
+        self
     }
 
     /// Get the motion animation configuration for a child at given index
@@ -957,9 +1011,13 @@ impl ElementBuilder for Motion {
     }
 
     fn motion_stable_id(&self) -> Option<&str> {
-        // Always return the stable key - it's auto-generated from call site
-        // with any user-provided ID suffixes appended
-        Some(&self.stable_key)
+        // Return stable key only if stable keying is enabled
+        // When disabled, each node gets fresh animations (node-based tracking)
+        if self.use_stable_key {
+            Some(&self.stable_key)
+        } else {
+            None
+        }
     }
 
     fn layout_style(&self) -> Option<&taffy::Style> {

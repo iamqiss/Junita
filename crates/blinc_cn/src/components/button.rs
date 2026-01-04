@@ -55,7 +55,7 @@ pub enum ButtonVariant {
 
 impl ButtonVariant {
     /// Get the background color for this variant and state
-    fn background(&self, theme: &ThemeState, state: ButtonState) -> Color {
+    pub (crate) fn background(&self, theme: &ThemeState, state: ButtonState) -> Color {
         match (self, state) {
             // Disabled state
             (_, ButtonState::Disabled) => {
@@ -211,7 +211,7 @@ pub enum IconPosition {
 ///
 /// This bridges BlincContextState (which stores arbitrary values via signals)
 /// with SharedState<S> (which Stateful needs for FSM state management).
-fn use_button_state(key: &str) -> SharedState<ButtonState> {
+pub (crate) fn use_button_state(key: &str) -> SharedState<ButtonState> {
     let ctx = BlincContextState::get();
 
     // We store the SharedState wrapped in an Arc inside the signal
@@ -301,7 +301,7 @@ impl Button {
         let label_text = text(&label).size(font_size).color(initial_fg).no_cursor();
 
         if let Some(ref icon_str) = icon {
-            let icon_text = text(icon_str).size(font_size).color(initial_fg);
+            let icon_text = svg(icon_str).size(font_size, font_size).color(initial_fg);
             match icon_position {
                 IconPosition::Start => {
                     content = content.child(icon_text).child(label_text);

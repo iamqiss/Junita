@@ -1094,6 +1094,11 @@ impl<S: StateTransitions> Stateful<S> {
         }
     }
 
+    pub fn id(self, id:&str) -> Self {
+        self.merge_into_inner(Div::new().id(id));
+        self
+    }
+
     // =========================================================================
     // Builder pattern methods that return Self (not Div)
     // =========================================================================

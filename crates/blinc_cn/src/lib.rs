@@ -52,6 +52,7 @@ pub mod cn {
     pub use crate::components::checkbox::checkbox;
     pub use crate::components::context_menu::context_menu;
     pub use crate::components::dialog::{alert_dialog, dialog};
+    pub use crate::components::dropdown_menu::{dropdown_menu, dropdown_menu_custom};
     pub use crate::components::input::input;
     pub use crate::components::label::label;
     pub use crate::components::progress::{progress, progress_animated};
@@ -62,7 +63,9 @@ pub mod cn {
     pub use crate::components::slider::slider;
     pub use crate::components::spinner::spinner;
     pub use crate::components::switch::switch;
+    pub use crate::components::tabs::{tab_item, tabs, TabsSize, TabsTransition};
     pub use crate::components::textarea::textarea;
+    pub use crate::components::toast::{toast, toast_custom, toast_error, toast_success, toast_warning};
 }
 
 /// Prelude for convenient imports
@@ -85,6 +88,9 @@ pub mod prelude {
     pub use crate::components::dialog::{
         alert_dialog, dialog, AlertDialogBuilder, DialogBuilder, DialogSize,
     };
+    pub use crate::components::dropdown_menu::{
+        dropdown_menu, dropdown_menu_custom, DropdownAlign, DropdownMenuBuilder, DropdownPosition,
+    };
     pub use crate::components::input::{input, Input, InputBgColors, InputBorderColors, InputSize};
     pub use crate::components::label::{label, Label, LabelBuilder, LabelSize};
     pub use crate::components::progress::{
@@ -99,7 +105,13 @@ pub mod prelude {
     pub use crate::components::slider::{slider, Slider, SliderBuilder, SliderSize};
     pub use crate::components::spinner::{spinner, Spinner, SpinnerSize};
     pub use crate::components::switch::{switch, Switch, SwitchSize};
+    pub use crate::components::tabs::{
+        tab_item, tabs, TabMenuItem, Tabs, TabsBuilder, TabsSize, TabsTransition,
+    };
     pub use crate::components::textarea::{textarea, Textarea, TextareaSize};
+    pub use crate::components::toast::{
+        toast, toast_custom, toast_error, toast_success, toast_warning, ToastBuilder, ToastVariant,
+    };
     pub use blinc_layout::stateful::ButtonState;
     // Re-export State for checkbox/switch/radio usage
     pub use blinc_core::State;

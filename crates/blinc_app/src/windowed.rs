@@ -2243,6 +2243,9 @@ impl WindowedApp {
                                         if had_subtree_rebuilds {
                                             tracing::debug!("Subtree rebuilds processed, recomputing layout");
                                             tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                            // Initialize motion animations for any new motion() containers
+                                            // added during the subtree rebuild (e.g., tab content changes)
+                                            tree.initialize_motion_animations(rs);
                                         } else if had_prop_updates {
                                             tracing::trace!("Visual-only prop updates, skipping layout");
                                         }

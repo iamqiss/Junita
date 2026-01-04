@@ -152,6 +152,45 @@ impl ContextMenuItem {
         self.submenu = Some(items);
         self
     }
+
+    // =========================================================================
+    // Accessors for use by other components (like DropdownMenu)
+    // =========================================================================
+
+    /// Get the label
+    pub fn get_label(&self) -> &str {
+        &self.label
+    }
+
+    /// Get the shortcut if any
+    pub fn get_shortcut(&self) -> Option<&str> {
+        self.shortcut.as_deref()
+    }
+
+    /// Get the icon SVG if any
+    pub fn get_icon(&self) -> Option<&str> {
+        self.icon.as_deref()
+    }
+
+    /// Check if this item is disabled
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    /// Check if this is a separator
+    pub fn is_separator(&self) -> bool {
+        self.is_separator
+    }
+
+    /// Check if this item has a submenu
+    pub fn has_submenu(&self) -> bool {
+        self.submenu.is_some()
+    }
+
+    /// Get the click handler (clones the Arc)
+    pub fn get_on_click(&self) -> Option<Arc<dyn Fn() + Send + Sync>> {
+        self.on_click.clone()
+    }
 }
 
 /// Builder for creating context menus
@@ -375,6 +414,24 @@ impl SubmenuBuilder {
     pub fn separator(mut self) -> Self {
         self.items.push(ContextMenuItem::separator());
         self
+    }
+
+    /// Get the items from this submenu builder
+    pub fn items(self) -> Vec<ContextMenuItem> {
+        self.items
+    }
+}
+
+impl SubmenuBuilder {
+    /// Create a new submenu builder (public for use by other components)
+    pub fn new_public() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for SubmenuBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

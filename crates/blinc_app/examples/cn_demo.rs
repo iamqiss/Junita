@@ -66,7 +66,10 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(radio_section(ctx))
                         .child(select_section(ctx))
                         .child(context_menu_section())
+                        .child(dropdown_menu_section())
                         .child(dialog_section(ctx))
+                        .child(tabs_section(ctx))
+                        .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(misc_section()),
                 ),
@@ -641,6 +644,60 @@ fn context_menu_section() -> impl ElementBuilder {
 }
 
 // ============================================================================
+// DROPDOWN MENU SECTION
+// ============================================================================
+
+fn dropdown_menu_section() -> impl ElementBuilder {
+    section_container()
+        .child(section_title("Dropdown Menu"))
+        .child(
+            div()
+                .flex_row()
+                .flex_wrap()
+                .gap(24.0)
+                // Basic dropdown
+                .child(
+                    cn::dropdown_menu("Options")
+                        .item("Edit", || tracing::info!("Edit clicked"))
+                        .item("Duplicate", || tracing::info!("Duplicate clicked"))
+                        .separator()
+                        .item("Archive", || tracing::info!("Archive clicked"))
+                        .item("Delete", || tracing::info!("Delete clicked")),
+                )
+                // Dropdown with shortcuts
+                .child(
+                    cn::dropdown_menu("File")
+                        .item_with_shortcut("New", "Ctrl+N", || tracing::info!("New"))
+                        .item_with_shortcut("Open", "Ctrl+O", || tracing::info!("Open"))
+                        .item_with_shortcut("Save", "Ctrl+S", || tracing::info!("Save"))
+                        .separator()
+                        .item_with_shortcut("Export", "Ctrl+E", || tracing::info!("Export")),
+                )
+                // Dropdown with custom trigger
+                .child(
+                    cn::dropdown_menu_custom(|is_open| {
+                        div().child(
+                            cn::button(if is_open { "Close Menu" } else { "Custom Trigger" })
+                                .variant(ButtonVariant::Secondary),
+                        )
+                    })
+                    .item("Profile", || tracing::info!("Profile"))
+                    .item("Settings", || tracing::info!("Settings"))
+                    .separator()
+                    .item("Logout", || tracing::info!("Logout")),
+                )
+                // Dropdown with disabled items
+                .child(
+                    cn::dropdown_menu("Actions")
+                        .item("Available Action", || tracing::info!("Action"))
+                        .item_disabled("Disabled Action")
+                        .separator()
+                        .item("Another Action", || tracing::info!("Another")),
+                ),
+        )
+}
+
+// ============================================================================
 // DIALOG SECTION
 // ============================================================================
 
@@ -882,6 +939,154 @@ fn progress_section(ctx: &WindowedContext, _scroll_ref: &ScrollRef) -> impl Elem
 // ============================================================================
 // MISC SECTION (Separator, Label)
 // ============================================================================
+
+// ============================================================================
+// TABS SECTION
+// ============================================================================
+
+fn tabs_section(ctx: &WindowedContext) -> impl ElementBuilder {
+    // Simple tabs state
+    let simple_tab = ctx.use_state_keyed("simple_tab", || "tab1".to_string());
+
+    section_container().child(section_title("Tabs")).child(
+        div()
+            .flex_col()
+            .gap(24.0)
+            // Simple tabs
+            .child(
+                div()
+                    .w(500.0)
+                    .h(300.0)
+                    .flex_col()
+                    .gap(8.0)
+                    .child(cn::label("Simple Tabs"))
+                    .child(
+                        cn::tabs(&simple_tab)
+                            .tab("tab1", "Account", || {
+                                div().px(10.0).bg_surface_elevated().w_full().h_full().items_center().child(
+                                    text("Manage your account settings and preferences.")
+                                        .size(14.0)
+                                        .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                )
+                            })
+                            .tab("tab2", "Password", || {
+                                div().px(10.0).bg_surface_elevated().w_full().h_full().items_center().child(
+                                    text("Change your password and security settings.")
+                                        .size(14.0)
+                                        .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                )
+                            })
+                            .tab("tab3", "Notifications", || {
+                                div().px(10.0).bg_surface_elevated().w_full().h_full().items_center().child(
+                                    text("Configure your notification preferences.")
+                                        .size(14.0)
+                                        .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                )
+                            }),
+                    ),
+            )
+            // Tabs with different sizes
+            .child(
+                div()
+                    .flex_row()
+                    .gap(24.0)
+                    .child(
+                        div()
+                            .flex_col()
+                            .gap(8.0)
+                            .child(cn::label("Small Tabs"))
+                            .child({
+                                let small_tab =
+                                    ctx.use_state_keyed("small_tab", || "a".to_string());
+                                cn::tabs(&small_tab)
+                                    .size(cn::TabsSize::Small)
+                                    .tab("a", "First", || div())
+                                    .tab("b", "Second", || div())
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex_col()
+                            .gap(8.0)
+                            .child(cn::label("Large Tabs"))
+                            .child({
+                                let large_tab =
+                                    ctx.use_state_keyed("large_tab", || "x".to_string());
+                                cn::tabs(&large_tab)
+                                    .size(cn::TabsSize::Large)
+                                    .tab("x", "Overview", || div())
+                                    .tab("y", "Details", || div())
+                            }),
+                    ),
+            ),
+    )
+}
+
+// ============================================================================
+// TOAST SECTION
+// ============================================================================
+
+fn toast_section(_ctx: &WindowedContext) -> impl ElementBuilder {
+    section_container().child(section_title("Toasts")).child(
+        div()
+            .flex_row()
+            .flex_wrap()
+            .gap(16.0)
+            // Default toast
+            .child(
+                cn::button("Show Toast")
+                    .variant(ButtonVariant::Outline)
+                    .on_click(|_| {
+                        cn::toast("Event Created")
+                            .description("Your event has been scheduled.")
+                            .show();
+                    }),
+            )
+            // Success toast
+            .child(
+                cn::button("Success Toast")
+                    .variant(ButtonVariant::Secondary)
+                    .on_click(|_| {
+                        cn::toast_success("Success!")
+                            .description("Your changes have been saved.")
+                            .show();
+                    }),
+            )
+            // Warning toast
+            .child(
+                cn::button("Warning Toast")
+                    .variant(ButtonVariant::Secondary)
+                    .on_click(|_| {
+                        cn::toast_warning("Warning")
+                            .description("Your session is about to expire.")
+                            .show();
+                    }),
+            )
+            // Error toast
+            .child(
+                cn::button("Error Toast")
+                    .variant(ButtonVariant::Destructive)
+                    .on_click(|_| {
+                        cn::toast_error("Error")
+                            .description("Something went wrong. Please try again.")
+                            .show();
+                    }),
+            )
+            // Toast with action
+            .child(
+                cn::button("Toast with Action")
+                    .variant(ButtonVariant::Outline)
+                    .on_click(|_| {
+                        cn::toast("File Deleted")
+                            .description("The file has been moved to trash.")
+                            .action("Undo", || {
+                                tracing::info!("Undo clicked!");
+                            })
+                            .show();
+                    }),
+            ),
+    )
+}
 
 fn misc_section() -> impl ElementBuilder {
     let theme = ThemeState::get();
