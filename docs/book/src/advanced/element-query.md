@@ -168,36 +168,36 @@ On-ready callbacks:
 
 ## Querying in Event Handlers
 
-Inside event handlers, use `BlincContextState` to access element operations:
+Inside event handlers, use the global `query()` function to get an `ElementHandle`:
+
+```rust
+use blinc_layout::prelude::*;
+
+div()
+    .on_click(|_| {
+        // query() returns Option<ElementHandle> - None if element doesn't exist
+        if let Some(handle) = query("my-element") {
+            handle.scroll_into_view();
+            handle.focus();
+        }
+    })
+```
+
+The `query()` function uses the global `BlincContextState` internally, so you don't need to capture any context or registry in your closures.
+
+For simple operations like scroll and focus without needing the full handle:
 
 ```rust
 use blinc_core::BlincContextState;
 
 div()
     .on_click(|_| {
-        // Access global context state for element operations
+        // Direct access for simple operations
         if let Some(ctx) = BlincContextState::try_get() {
             ctx.scroll_element_into_view("my-element");
             ctx.set_focus(Some("my-input"));
         }
     })
-```
-
-For more complex queries, use the element registry:
-
-```rust
-fn my_component(ctx: &WindowedContext) -> impl ElementBuilder {
-    // Clone registry for use in closures
-    let registry = ctx.element_registry().clone();
-
-    div()
-        .on_click(move |_| {
-            let handle = ElementHandle::new("target", registry.clone());
-            if let Some(bounds) = handle.bounds() {
-                println!("Element at: {:?}", bounds);
-            }
-        })
-}
 ```
 
 ---
@@ -213,9 +213,9 @@ fn scrollable_list(ctx: &WindowedContext) -> impl ElementBuilder {
         .child(
             div()
                 .on_click(|_| {
-                    // Use global context for scroll
-                    if let Some(ctx) = BlincContextState::try_get() {
-                        ctx.scroll_element_into_view("list-bottom");
+                    // Use query() to get handle and scroll
+                    if let Some(handle) = query("list-bottom") {
+                        handle.scroll_into_view();
                     }
                 })
                 .child(text("Jump to Bottom"))
@@ -257,8 +257,8 @@ fn login_form(ctx: &WindowedContext) -> impl ElementBuilder {
                 .placeholder("Password")
                 .on_key_down(|evt| {
                     if evt.key_code == 9 && evt.shift {  // Shift+Tab
-                        if let Some(ctx) = BlincContextState::try_get() {
-                            ctx.set_focus(Some("username-input"));
+                        if let Some(handle) = query("username-input") {
+                            handle.focus();
                         }
                     }
                 })
@@ -267,8 +267,8 @@ fn login_form(ctx: &WindowedContext) -> impl ElementBuilder {
             div()
                 .on_click(|_| {
                     // Focus username on form reset
-                    if let Some(ctx) = BlincContextState::try_get() {
-                        ctx.set_focus(Some("username-input"));
+                    if let Some(handle) = query("username-input") {
+                        handle.focus();
                     }
                 })
                 .child(text("Reset"))
@@ -309,7 +309,6 @@ Use `mark_visual_dirty` for visual-only changes that don't affect layout:
 
 ```rust
 fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> impl ElementBuilder {
-    let registry = ctx.element_registry().clone();
     let selected = selected_id.map(|s| s.to_string());
 
     div()
@@ -317,7 +316,6 @@ fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> i
         .children(["item-a", "item-b", "item-c"].iter().map(|id| {
             let is_selected = selected.as_deref() == Some(*id);
             let id_string = id.to_string();
-            let reg = registry.clone();
 
             div()
                 .id(*id)
@@ -329,11 +327,12 @@ fn highlight_on_selection(ctx: &WindowedContext, selected_id: Option<&str>) -> i
                 })
                 .on_click(move |_| {
                     // Visual-only update - skips layout recomputation
-                    let handle = ElementHandle::new(&id_string, reg.clone());
-                    handle.mark_visual_dirty(
-                        RenderProps::default()
-                            .with_background(Color::rgba(0.2, 0.5, 1.0, 0.3).into())
-                    );
+                    if let Some(handle) = query(&id_string) {
+                        handle.mark_visual_dirty(
+                            RenderProps::default()
+                                .with_background(Color::rgba(0.2, 0.5, 1.0, 0.3).into())
+                        );
+                    }
                 })
                 .child(text(*id))
         }))
@@ -377,8 +376,8 @@ fn carousel(ctx: &WindowedContext, items: &[String]) -> impl ElementBuilder {
                         .circle(8.0)
                         .bg(Color::WHITE.with_alpha(0.5))
                         .on_click(move |_| {
-                            if let Some(ctx) = BlincContextState::try_get() {
-                                ctx.scroll_element_into_view(&format!("slide-{}", i));
+                            if let Some(handle) = query(&format!("slide-{}", i)) {
+                                handle.scroll_into_view();
                             }
                         })
                 }))
@@ -411,13 +410,13 @@ fn bad_example(ctx: &WindowedContext) -> impl ElementBuilder {
 
 // Good: Query in event handler or on_ready
 fn good_example(ctx: &WindowedContext) -> impl ElementBuilder {
-    let registry = ctx.element_registry().clone();
-
     div()
-        .on_click(move |_| {
-            let handle = ElementHandle::new("my-element", registry.clone());
-            let bounds = handle.bounds();
-            // Use bounds...
+        .on_click(|_| {
+            // query() is designed for use in event handlers
+            if let Some(handle) = query("my-element") {
+                let bounds = handle.bounds();
+                // Use bounds...
+            }
         })
 }
 ```

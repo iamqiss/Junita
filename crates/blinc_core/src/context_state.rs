@@ -35,7 +35,7 @@
 //! ```
 
 use crate::reactive::{ReactiveGraph, Signal, SignalId, State};
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -169,6 +169,10 @@ pub type FocusCallback = Arc<dyn Fn(Option<&str>) + Send + Sync>;
 /// Callback for scrolling an element into view
 pub type ScrollCallback = Arc<dyn Fn(&str) + Send + Sync>;
 
+/// Type-erased element registry storage
+/// This allows blinc_core to store the registry without depending on blinc_layout
+pub type AnyElementRegistry = Arc<dyn Any + Send + Sync>;
+
 /// Global context state singleton
 ///
 /// Provides access to reactive state management and other context-level
@@ -200,6 +204,9 @@ pub struct BlincContextState {
     viewport_size: RwLock<(f32, f32)>,
     /// Currently focused element ID
     focused_element: RwLock<Option<String>>,
+    /// Type-erased element registry for query API
+    /// Stored as `AnyElementRegistry` to avoid circular dependency with blinc_layout
+    element_registry: RwLock<Option<AnyElementRegistry>>,
 }
 
 impl BlincContextState {
@@ -220,6 +227,7 @@ impl BlincContextState {
             scroll_callback: RwLock::new(None),
             viewport_size: RwLock::new((0.0, 0.0)),
             focused_element: RwLock::new(None),
+            element_registry: RwLock::new(None),
         };
 
         if CONTEXT_STATE.set(state).is_err() {
@@ -245,6 +253,7 @@ impl BlincContextState {
             scroll_callback: RwLock::new(None),
             viewport_size: RwLock::new((0.0, 0.0)),
             focused_element: RwLock::new(None),
+            element_registry: RwLock::new(None),
         };
 
         if CONTEXT_STATE.set(state).is_err() {
@@ -521,6 +530,38 @@ impl BlincContextState {
         if let Some(cb) = self.scroll_callback.read().unwrap().as_ref() {
             cb(id);
         }
+    }
+
+    // =========================================================================
+    // Element Registry (for query API)
+    // =========================================================================
+
+    /// Set the element registry
+    ///
+    /// Called by `WindowedApp` to store the registry for the query API.
+    /// The registry is stored as type-erased `AnyElementRegistry` to avoid
+    /// circular dependencies with blinc_layout.
+    pub fn set_element_registry(&self, registry: AnyElementRegistry) {
+        *self.element_registry.write().unwrap() = Some(registry);
+    }
+
+    /// Get the element registry as type-erased Any
+    ///
+    /// Returns the raw `Arc` which can be downcast to the concrete
+    /// `ElementRegistry` type in blinc_layout.
+    pub fn element_registry_any(&self) -> Option<AnyElementRegistry> {
+        self.element_registry.read().unwrap().clone()
+    }
+
+    /// Get the element registry, downcasting to the expected type
+    ///
+    /// This is a convenience method for use by blinc_layout's query function.
+    pub fn element_registry<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.element_registry
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|r| r.clone().downcast::<T>().ok())
     }
 }
 

@@ -350,8 +350,8 @@ pub mod prelude {
 
     // Selector API for programmatic element access
     pub use crate::selector::{
-        ElementEvent, ElementHandle, ElementRegistry, ScrollBehavior, ScrollBlock, ScrollInline,
-        ScrollOptions, ScrollRef,
+        query, ElementEvent, ElementHandle, ElementRegistry, ScrollBehavior, ScrollBlock,
+        ScrollInline, ScrollOptions, ScrollRef, SharedElementRegistry,
     };
 
     // Overlay context singleton

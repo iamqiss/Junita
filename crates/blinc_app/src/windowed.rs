@@ -1339,6 +1339,11 @@ impl WindowedApp {
             BlincContextState::get().set_bounds_callback(bounds_callback);
         }
 
+        // Store element registry in BlincContextState for global query() function
+        // Cast to Arc<dyn Any + Send + Sync> for type-erased storage
+        BlincContextState::get()
+            .set_element_registry(Arc::clone(&element_registry) as blinc_core::AnyElementRegistry);
+
         // Shared storage for on_ready callbacks
         let ready_callbacks: SharedReadyCallbacks = Arc::new(Mutex::new(Vec::new()));
 

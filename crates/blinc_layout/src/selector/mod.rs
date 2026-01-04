@@ -6,6 +6,7 @@
 //! - `ScrollRef` - Programmatic scroll control for scroll containers
 //! - `ElementHandle` - Query result with bounds, events, signals, state access
 //! - `ScrollOptions` - Configuration for scroll-into-view behavior
+//! - `query()` - Global function to query elements from event handlers
 //!
 //! # Example
 //!
@@ -23,14 +24,54 @@
 //!
 //! // Later: scroll to element
 //! scroll_ref.scroll_to("item-42");
+//!
+//! // From event handlers, use the global query function:
+//! div().on_click(|_| {
+//!     if let Some(handle) = query("my-target") {
+//!         handle.scroll_into_view();
+//!     }
+//! })
 //! ```
 
 mod handle;
 mod registry;
 mod scroll_ref;
 
+use std::sync::Arc;
+
+use blinc_core::BlincContextState;
+
 pub use handle::{ElementEvent, ElementHandle};
 pub use registry::ElementRegistry;
+
+/// Shared element registry for thread-safe access
+pub type SharedElementRegistry = Arc<ElementRegistry>;
+
+/// Query an element by ID from event handlers
+///
+/// This is the primary way to access elements programmatically from within
+/// event handler closures. It uses the global `BlincContextState` to access
+/// the element registry.
+///
+/// Returns `Some(ElementHandle)` if the element exists, `None` otherwise.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use blinc_layout::selector::query;
+///
+/// div().on_click(|_| {
+///     if let Some(handle) = query("my-element") {
+///         handle.scroll_into_view();
+///         handle.focus();
+///     }
+/// })
+/// ```
+pub fn query(id: &str) -> Option<ElementHandle<()>> {
+    let ctx = BlincContextState::try_get()?;
+    let registry: Arc<ElementRegistry> = ctx.element_registry()?;
+    Some(ElementHandle::new(id, registry))
+}
 pub use scroll_ref::{PendingScroll, ScrollRef, SharedScrollRefInner, TriggerCallback};
 
 /// Options for scroll-into-view behavior

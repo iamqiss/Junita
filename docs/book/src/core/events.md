@@ -175,13 +175,14 @@ fn toggle_button(ctx: &WindowedContext) -> impl ElementBuilder {
 ### Drag to Move
 
 ```rust
+use blinc_core::BlincContextState;
+
 fn draggable_box(ctx: &WindowedContext) -> impl ElementBuilder {
     let pos_x = ctx.use_signal(100.0f32);
     let pos_y = ctx.use_signal(100.0f32);
 
     let x = ctx.get(pos_x).unwrap_or(100.0);
     let y = ctx.get(pos_y).unwrap_or(100.0);
-    let ctx_clone = ctx.clone();
 
     div()
         .absolute()
@@ -192,8 +193,10 @@ fn draggable_box(ctx: &WindowedContext) -> impl ElementBuilder {
         .rounded(8.0)
         .bg(Color::rgba(0.4, 0.6, 1.0, 1.0))
         .on_drag(move |evt| {
-            ctx_clone.update(pos_x, |v| v + evt.drag_delta_x);
-            ctx_clone.update(pos_y, |v| v + evt.drag_delta_y);
+            // Signal<T> is Copy, so it can be captured directly
+            // Use BlincContextState to update signals from closures
+            BlincContextState::get().update(pos_x, |v| v + evt.drag_delta_x);
+            BlincContextState::get().update(pos_y, |v| v + evt.drag_delta_y);
         })
 }
 ```
@@ -202,12 +205,10 @@ fn draggable_box(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ```rust
 fn keyboard_handler(ctx: &WindowedContext) -> impl ElementBuilder {
-    let ctx_clone = ctx.clone();
-
     div()
         .w_full()
         .h_full()
-        .on_key_down(move |evt| {
+        .on_key_down(|evt| {
             // Ctrl+S or Cmd+S to save
             if (evt.ctrl || evt.meta) && evt.key_code == 83 {
                 println!("Save triggered!");
@@ -248,15 +249,13 @@ fn hover_card(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ## Capturing State in Closures
 
-Event handlers are `Fn` closures, so you need to clone any values you want to use inside:
+Event handlers are `Fn` closures. `Signal<T>` is `Copy`, so signals can be captured directly. Use `BlincContextState` to access signal operations from within closures:
 
 ```rust
+use blinc_core::BlincContextState;
+
 fn counter_buttons(ctx: &WindowedContext) -> impl ElementBuilder {
     let count = ctx.use_signal(0i32);
-
-    // Clone what you need for the closures
-    let ctx_inc = ctx.clone();
-    let ctx_dec = ctx.clone();
 
     div()
         .flex_row()
@@ -264,7 +263,8 @@ fn counter_buttons(ctx: &WindowedContext) -> impl ElementBuilder {
         .child(
             div()
                 .on_click(move |_| {
-                    ctx_dec.update(count, |v| v - 1);
+                    // Signal is Copy - captured directly in the closure
+                    BlincContextState::get().update(count, |v| v - 1);
                 })
                 .child(text("-"))
         )
@@ -272,11 +272,31 @@ fn counter_buttons(ctx: &WindowedContext) -> impl ElementBuilder {
         .child(
             div()
                 .on_click(move |_| {
-                    ctx_inc.update(count, |v| v + 1);
+                    BlincContextState::get().update(count, |v| v + 1);
                 })
                 .child(text("+"))
         )
 }
+```
+
+### Thread Safety
+
+`BlincContextState` is a thread-safe global singleton:
+
+- It uses `Arc<Mutex<...>>` for the reactive graph and hook state
+- All callbacks use `RwLock` for safe concurrent access
+- `BlincContextState::get()` returns `&'static BlincContextState`
+
+This makes it safe to use in event handler closures:
+
+```rust
+div()
+    .on_click(move |_| {
+        // Safe: BlincContextState is thread-safe
+        BlincContextState::get().update(my_signal, |v| v + 1);
+        BlincContextState::get().set_focus(Some("my-input"));
+        BlincContextState::get().request_rebuild();
+    })
 ```
 
 For shared mutable state, use `Arc<Mutex<T>>`:
