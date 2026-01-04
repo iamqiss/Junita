@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use blinc_core::BlincContextState;
 
-use crate::element::ElementBounds;
+use crate::element::{ElementBounds, RenderProps};
 use crate::tree::LayoutNodeId;
 
 use super::registry::{ElementRegistry, OnReadyCallback};
@@ -200,6 +200,28 @@ impl<T> ElementHandle<T> {
     pub fn mark_dirty_subtree(&self, new_children: crate::div::Div) {
         if let Some(node_id) = self.registry.get(&self.string_id) {
             crate::stateful::queue_subtree_rebuild(node_id, new_children);
+        }
+    }
+
+    /// Mark this element as visually dirty with new render props
+    ///
+    /// This queues a visual-only update that **skips layout recomputation**.
+    /// Use this for changes to background, opacity, shadows, transforms, etc.
+    ///
+    /// This is the most efficient update method when you only need to change
+    /// visual properties without affecting layout.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Change background color without triggering layout
+    /// ctx.query("my-button").mark_visual_dirty(
+    ///     RenderProps::default().with_background(Color::RED.into())
+    /// );
+    /// ```
+    pub fn mark_visual_dirty(&self, props: RenderProps) {
+        if let Some(node_id) = self.registry.get(&self.string_id) {
+            crate::stateful::queue_prop_update(node_id, props);
         }
     }
 

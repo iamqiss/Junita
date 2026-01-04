@@ -183,9 +183,14 @@ pub fn take_pending_prop_updates() -> Vec<(LayoutNodeId, RenderProps)> {
 
 /// Queue a render props update for a node
 ///
-/// Called by stateful elements when their state changes.
-fn queue_prop_update(node_id: LayoutNodeId, props: RenderProps) {
+/// Called by stateful elements when their state changes, or by
+/// `ElementHandle::mark_visual_dirty()` for explicit visual updates.
+///
+/// This queues a visual-only update that skips layout recomputation.
+/// Use this for changes to background, opacity, shadows, etc.
+pub fn queue_prop_update(node_id: LayoutNodeId, props: RenderProps) {
     PENDING_PROP_UPDATES.lock().unwrap().push((node_id, props));
+    request_redraw();
 }
 
 // =========================================================================
