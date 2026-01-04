@@ -298,7 +298,7 @@ impl Button {
 
         // Build content with icon + label or just label
         let mut content = blinc_layout::div::div().flex_row().items_center().gap(6.0);
-        let label_text = text(&label).size(font_size).color(initial_fg);
+        let label_text = text(&label).size(font_size).color(initial_fg).no_cursor();
 
         if let Some(ref icon_str) = icon {
             let icon_text = text(icon_str).size(font_size).color(initial_fg);
@@ -339,9 +339,20 @@ impl Button {
                     1.0
                 };
 
-                // Apply visual properties using setters (preserves layout)
-                container.set_bg(bg);
-                container.set_transform(blinc_core::Transform::scale(scale, scale));
+                // Build merge div with background and transform
+                let mut merge_div = div()
+                    .padding_x(Length::Px(px))
+                    .padding_y(Length::Px(py))
+                    .bg(bg)
+                    .transform(blinc_core::Transform::scale(scale, scale))
+                    .cursor_pointer();
+
+                // Include border for outline variant (must be reapplied each state change)
+                if let Some(border_color) = variant.border(&theme) {
+                    merge_div = merge_div.border(1.0, border_color);
+                }
+
+                container.merge(merge_div);
             })
             .child(content);
 
