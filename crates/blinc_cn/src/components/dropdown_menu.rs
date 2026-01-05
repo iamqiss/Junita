@@ -55,7 +55,7 @@ use blinc_layout::element::{CursorStyle, ElementBounds, RenderProps};
 use blinc_layout::motion::motion;
 use blinc_layout::overlay_state::get_overlay_manager;
 use blinc_layout::prelude::*;
-use blinc_layout::stateful::Stateful;
+use blinc_layout::stateful::{ButtonState, Stateful};
 use blinc_layout::tree::{LayoutNodeId, LayoutTree};
 use blinc_layout::widgets::hr::hr_with_bg;
 use blinc_layout::widgets::overlay::{OverlayHandle, OverlayManagerExt};
@@ -294,6 +294,8 @@ impl DropdownMenuBuilder {
 
         let btn_variant = ButtonVariant::Outline;
         let button_state = use_button_state(&self.key.derive("button"));
+        // Get the key string for use in closures (InstanceKey is not Sync)
+        let menu_key = self.key.get().to_string();
 
         // Build trigger element
         let open_state_for_trigger = open_state.clone();
@@ -350,7 +352,6 @@ impl DropdownMenuBuilder {
                 };
 
                 let trigger_div = div()
-                    .bg(bg)
                     .w_fit()
                     .cursor(CursorStyle::Pointer)
                     .child(trigger_content);
@@ -388,6 +389,7 @@ impl DropdownMenuBuilder {
                         min_width,
                         overlay_handle_for_trigger.clone(),
                         open_state_for_trigger_1.clone(),
+                        menu_key.clone(),
                     );
 
                     overlay_handle_for_trigger.set(Some(overlay_handle.id()));
@@ -459,6 +461,7 @@ fn show_dropdown_menu(
     min_width: f32,
     handle_state: State<Option<u64>>,
     open_state: State<bool>,
+    key: String,
 ) -> OverlayHandle {
     let theme = ThemeState::get();
     let bg = theme.color(ColorToken::Surface);
@@ -493,6 +496,7 @@ fn show_dropdown_menu(
                 min_width,
                 &handle_state_for_content,
                 &open_state_for_content,
+                &key,
                 bg,
                 border,
                 text_color,
@@ -516,6 +520,7 @@ fn build_dropdown_content(
     width: f32,
     overlay_handle_state: &State<Option<u64>>,
     open_state: &State<bool>,
+    key: &str,
     bg: Color,
     border: Color,
     text_color: Color,
@@ -526,10 +531,7 @@ fn build_dropdown_content(
     font_size: f32,
     padding: f32,
 ) -> Div {
-    let menu_id = overlay_handle_state
-        .get()
-        .map(|h| format!("dropdown-menu-{}", h))
-        .unwrap_or_else(|| "dropdown-menu-temp".to_string());
+    let menu_id = key;
 
     let mut menu = div()
         .id(menu_id)
@@ -541,7 +543,7 @@ fn build_dropdown_content(
         .shadow_lg()
         .overflow_clip()
         .h_fit()
-        .py(4.0);
+        .py(1.0);
 
     for (idx, item) in items.iter().enumerate() {
         if item.is_separator() {
@@ -557,18 +559,9 @@ fn build_dropdown_content(
             let handle_state_for_click = overlay_handle_state.clone();
             let open_state_for_click = open_state.clone();
 
-            // Hover state for this item
-            let hover_key = format!("_dropdown_item_hover_{}", idx);
-            let hover_state = BlincContextState::get().use_state_keyed(&hover_key, || false);
-            let is_hovered = hover_state.get();
-            let hover_state_enter = hover_state.clone();
-            let hover_state_leave = hover_state.clone();
-
-            let item_bg = if is_hovered && !item_disabled {
-                surface_elevated
-            } else {
-                bg
-            };
+            // Create a stable key for this item's button state
+            let item_key = format!("{}_item-{}", key, idx);
+            let button_state = use_button_state(&item_key);
 
             let item_text_color = if item_disabled {
                 text_tertiary
@@ -578,81 +571,89 @@ fn build_dropdown_content(
 
             let shortcut_color = text_secondary;
 
-            let mut row = div()
+            // Build the stateful row element
+            let row = Stateful::with_shared_state(button_state)
                 .w_full()
                 .h_fit()
-                .flex_row()
-                .items_center()
-                .justify_between()
                 .py(padding / 4.0)
                 .px(padding / 2.0)
-                .bg(item_bg)
+                .bg(bg)
                 .cursor(if item_disabled {
                     CursorStyle::NotAllowed
                 } else {
                     CursorStyle::Pointer
                 })
-                .on_hover_enter(move |_| {
-                    hover_state_enter.set(true);
-                    // Request redraw (not full content rebuild) so hover state change is reflected
-                    get_overlay_manager().request_redraw();
-                })
-                .on_hover_leave(move |_| {
-                    hover_state_leave.set(false);
-                    // Request redraw (not full content rebuild) so hover state change is reflected
-                    get_overlay_manager().request_redraw();
-                });
+                .on_state(move |state, container: &mut Div| {
+                    // Apply hover background based on button state
+                    let item_bg = if *state == ButtonState::Hovered && !item_disabled {
+                        surface_elevated
+                    } else {
+                        bg
+                    };
 
-            if !item_disabled {
-                row = row.on_click(move |_| {
-                    if let Some(ref cb) = item_on_click {
-                        cb();
+                    // Left side: icon + label
+                    let mut left_side = div()
+                        .w_fit()
+                        .h_fit()
+                        .flex_row()
+                        .items_center()
+                        .gap(padding / 4.0);
+
+                    if let Some(ref icon_svg) = item_icon {
+                        left_side = left_side.child(svg(icon_svg).size(16.0, 16.0).color(item_text_color));
                     }
-                    // Set open_state to false BEFORE closing overlay
-                    // This ensures the trigger's chevron updates correctly
-                    open_state_for_click.set(false);
-                    if let Some(handle_id) = handle_state_for_click.get() {
-                        let mgr = get_overlay_manager();
-                        mgr.close(OverlayHandle::from_raw(handle_id));
-                    }
-                });
-            }
 
-            // Left side: icon + label
-            let mut left_side = div()
-                .w_fit()
-                .h_fit()
-                .flex_row()
-                .items_center()
-                .gap(padding / 4.0);
-
-            if let Some(ref icon_svg) = item_icon {
-                left_side = left_side.child(svg(icon_svg).size(16.0, 16.0).color(item_text_color));
-            }
-
-            left_side = left_side.child(
-                text(&item_label)
-                    .size(font_size)
-                    .color(item_text_color)
-                    .no_cursor(),
-            );
-
-            row = row.child(left_side);
-
-            // Right side: shortcut or submenu arrow
-            if let Some(ref shortcut) = item_shortcut {
-                row = row.child(
-                    div().child(
-                        text(shortcut)
-                            .size(font_size - 2.0)
-                            .color(shortcut_color)
+                    left_side = left_side.child(
+                        text(&item_label)
+                            .size(font_size)
+                            .color(item_text_color)
                             .no_cursor(),
-                    ),
-                );
-            } else if has_submenu {
-                let chevron_right = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>"#;
-                row = row.child(svg(chevron_right).size(12.0, 12.0).color(text_tertiary));
-            }
+                    );
+
+                    // Right side: shortcut or submenu arrow
+                    let right_side: Option<Div> = if let Some(ref shortcut) = item_shortcut {
+                        Some(div().child(
+                            text(shortcut)
+                                .size(font_size - 2.0)
+                                .color(shortcut_color)
+                                .no_cursor(),
+                        ))
+                    } else if has_submenu {
+                        let chevron_right = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>"#;
+                        Some(div().child(svg(chevron_right).size(12.0, 12.0).color(text_tertiary)))
+                    } else {
+                        None
+                    };
+
+                    let mut row_content = div()
+                        .w_full()
+                        .h_fit()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .bg(item_bg)
+                        .child(left_side);
+
+                    if let Some(right) = right_side {
+                        row_content = row_content.child(right);
+                    }
+
+                    container.merge(row_content);
+                })
+                .on_click(move |_| {
+                    if !item_disabled {
+                        if let Some(ref cb) = item_on_click {
+                            cb();
+                        }
+                        // Set open_state to false BEFORE closing overlay
+                        // This ensures the trigger's chevron updates correctly
+                        open_state_for_click.set(false);
+                        if let Some(handle_id) = handle_state_for_click.get() {
+                            let mgr = get_overlay_manager();
+                            mgr.close(OverlayHandle::from_raw(handle_id));
+                        }
+                    }
+                });
 
             menu = menu.child(row);
         }

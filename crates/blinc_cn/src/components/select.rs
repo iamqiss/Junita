@@ -209,6 +209,8 @@ impl Select {
         let overlay_handle_for_click = overlay_handle_state.clone();
         let btn_variant = ButtonVariant::Outline;
         let select_btn_state = use_button_state(&format!("{}_btn", instance_key));
+        // Clone instance_key for use in closures (it's a &str that needs to outlive 'static)
+        let instance_key_owned = instance_key.to_string();
         // The click handler is on the Stateful itself (not the inner div) so it gets registered
         // Use w_full() to ensure the Stateful takes the same width as its parent container
         let select_element = Stateful::with_shared_state(select_btn_state)
@@ -313,6 +315,7 @@ impl Select {
                     let on_chg = on_change.clone();
                     let current_selected = val_state.get();
                     let dw = dropdown_width;
+                    let key_for_content = instance_key_owned.clone();
 
 
 
@@ -335,6 +338,7 @@ impl Select {
                                 &open_st,
                                 &handle_st,
                                 &on_chg,
+                                &key_for_content,
                                 dw,
                                 font_size,
                                 padding,
@@ -590,6 +594,7 @@ fn build_dropdown_content(
     open_state: &State<bool>,
     overlay_handle_state: &State<Option<u64>>,
     on_change: &Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    key: &str,
     width: f32,
     font_size: f32,
     padding: f32,
@@ -600,11 +605,8 @@ fn build_dropdown_content(
     text_tertiary: blinc_core::Color,
     surface_elevated: blinc_core::Color,
 ) -> Div {
-    // Generate a unique ID for the dropdown based on overlay handle
-    let dropdown_id = overlay_handle_state
-        .get()
-        .map(|h| format!("select-dropdown-{}", h))
-        .unwrap_or_else(|| "select-dropdown-temp".to_string());
+    // Generate a unique ID for the dropdown based on the key
+    let dropdown_id = key;
 
     let mut dropdown_div = div()
         .id(dropdown_id)
@@ -620,7 +622,7 @@ fn build_dropdown_content(
     // Note: on_ready callback removed - overlay manager now uses initial size estimation
     // If accurate sizing is needed, register via ctx.query("select-dropdown-{handle}").on_ready(...)
 
-    for opt in options {
+    for (idx, opt) in options.iter().enumerate() {
         let opt_value = opt.value.clone();
         let opt_label = opt.label.clone();
         let opt_content = opt.content.clone();
@@ -642,44 +644,51 @@ fn build_dropdown_content(
         // Background color - selected items get elevated bg, others get normal bg
         let base_bg = if is_selected { surface_elevated } else { bg };
 
-        // Use persistent state for hover effect in overlay
-        // This ensures the state persists across overlay tree rebuilds
-        let hover_key = format!("_select_item_hover_{}", opt_value);
-        let hover_state = BlincContextState::get().use_state_keyed(&hover_key, || false);
-        let is_hovered = hover_state.get();
-        let hover_state_for_enter = hover_state.clone();
-        let hover_state_for_leave = hover_state.clone();
+        // Create a stable key for this option's button state
+        let item_key = format!("{}_opt-{}", key, idx);
+        let button_state = use_button_state(&item_key);
 
-        // Background changes on hover
-        let item_bg = if is_hovered && !is_opt_disabled {
-            surface_elevated
-        } else {
-            base_bg
-        };
-
-        // Build option item with div and manual hover handlers
-        let option_item = div()
+        // Build option item with Stateful for hover visual updates
+        let option_item = Stateful::with_shared_state(button_state)
             .w_full()
             .h_fit()
-            .flex_row()
-            .items_center()
             .py(padding / 4.0)
             .px(padding / 2.0)
-            .bg(item_bg)
+            .bg(base_bg)
             .cursor(if is_opt_disabled {
                 CursorStyle::NotAllowed
             } else {
                 CursorStyle::Pointer
             })
-            .on_hover_enter(move |_ctx| {
-                hover_state_for_enter.set(true);
-                // Request redraw (not full content rebuild) so hover state change is reflected
-                get_overlay_manager().request_redraw();
-            })
-            .on_hover_leave(move |_ctx| {
-                hover_state_for_leave.set(false);
-                // Request redraw (not full content rebuild) so hover state change is reflected
-                get_overlay_manager().request_redraw();
+            .on_state(move |state, container: &mut Div| {
+                // Apply hover background based on button state
+                let item_bg = if *state == ButtonState::Hovered && !is_opt_disabled {
+                    surface_elevated
+                } else {
+                    base_bg
+                };
+
+                let content = div()
+                    .w_full()
+                    .h_fit()
+                    .flex_row()
+                    .items_center()
+                    .bg(item_bg)
+                    .child(
+                        // Use custom content if available, otherwise fall back to label text
+                        if let Some(ref content_fn) = opt_content {
+                            content_fn()
+                        } else {
+                            div().child(
+                                text(&opt_label)
+                                    .size(font_size)
+                                    .no_cursor()
+                                    .color(option_text_color),
+                            )
+                        },
+                    );
+
+                container.merge(content);
             })
             .on_click(move |_ctx| {
                 if !is_opt_disabled {
@@ -699,20 +708,7 @@ fn build_dropdown_content(
                         cb(&opt_value_for_click);
                     }
                 }
-            })
-            .child(
-                // Use custom content if available, otherwise fall back to label text
-                if let Some(ref content_fn) = opt_content {
-                    content_fn()
-                } else {
-                    div().child(
-                        text(&opt_label)
-                            .size(font_size)
-                            .no_cursor()
-                            .color(option_text_color),
-                    )
-                },
-            );
+            });
 
         dropdown_div = dropdown_div.child(option_item);
     }
