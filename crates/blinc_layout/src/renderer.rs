@@ -3655,6 +3655,7 @@ impl RenderTree {
                 RenderLayer::Background,
                 false,
                 render_state,
+                1.0, // Start with full opacity at root
             );
 
             // Pass 2: Glass (primitives go to glass batch)
@@ -3665,6 +3666,7 @@ impl RenderTree {
                 RenderLayer::Glass,
                 false,
                 render_state,
+                1.0, // Start with full opacity at root
             );
 
             // Pass 3: Foreground (primitives go to foreground batch, rendered after glass)
@@ -3676,6 +3678,7 @@ impl RenderTree {
                 RenderLayer::Foreground,
                 false,
                 render_state,
+                1.0, // Start with full opacity at root
             );
             ctx.set_foreground_layer(false);
 
@@ -3687,6 +3690,9 @@ impl RenderTree {
     }
 
     /// Render a layer with motion animation support
+    ///
+    /// The `inherited_opacity` parameter allows parent motion containers to pass
+    /// their opacity down to children, ensuring the entire motion group fades together.
     fn render_layer_with_motion(
         &self,
         ctx: &mut dyn DrawContext,
@@ -3695,6 +3701,7 @@ impl RenderTree {
         target_layer: RenderLayer,
         inside_glass: bool,
         render_state: &crate::render_state::RenderState,
+        inherited_opacity: f32,
     ) {
         let Some(bounds) = self.layout_tree.get_bounds(node, parent_offset) else {
             return;
@@ -3731,10 +3738,14 @@ impl RenderTree {
         let binding_transform = self.get_motion_transform(node);
         let binding_opacity = self.get_motion_opacity(node);
 
-        // Calculate motion-adjusted opacity (combine both sources)
-        let motion_opacity = motion_values
+        // Calculate this node's motion opacity (combine motion values and bindings)
+        let node_motion_opacity = motion_values
             .and_then(|m| m.opacity)
             .unwrap_or_else(|| binding_opacity.unwrap_or(1.0));
+
+        // Combine with inherited opacity from parent motion containers
+        // This ensures children fade together with their parent motion container
+        let motion_opacity = inherited_opacity * node_motion_opacity;
 
         // Skip rendering if completely transparent
         if motion_opacity <= 0.001 {
@@ -3984,7 +3995,8 @@ impl RenderTree {
             ctx.push_transform(Transform::translate(scroll_offset.0, scroll_offset.1));
         }
 
-        // Render children
+        // Render children, passing down the effective opacity
+        // This ensures all children inherit the parent motion's opacity
         for child_id in self.layout_tree.children(node) {
             self.render_layer_with_motion(
                 ctx,
@@ -3993,6 +4005,7 @@ impl RenderTree {
                 target_layer,
                 children_inside_glass,
                 render_state,
+                motion_opacity, // Pass current opacity to children
             );
         }
 
