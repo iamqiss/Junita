@@ -3229,6 +3229,9 @@ impl RenderTree {
     ///
     /// Returns true if any rebuild requires layout recomputation.
     /// Visual-only rebuilds (hover/press) return false.
+    ///
+    /// Processes only rebuilds for nodes that exist in this tree.
+    /// Rebuilds for nodes in other trees (e.g., overlay) are put back in the queue.
     pub fn process_pending_subtree_rebuilds(&mut self) -> bool {
         let pending = crate::stateful::take_pending_subtree_rebuilds();
         if pending.is_empty() {
@@ -3236,7 +3239,14 @@ impl RenderTree {
         }
 
         let mut needs_layout = false;
+        let mut not_in_this_tree = Vec::new();
+
         for rebuild in pending {
+            // Skip if this node doesn't exist in this tree - save for other trees
+            if !self.layout_tree.node_exists(rebuild.parent_id) {
+                not_in_this_tree.push(rebuild);
+                continue;
+            }
             if rebuild.needs_layout {
                 // Full structural rebuild - remove old children and build new ones
                 needs_layout = true;
@@ -3261,6 +3271,11 @@ impl RenderTree {
                 // Don't remove/rebuild, just walk the tree and update props
                 self.update_subtree_props_recursive(rebuild.parent_id, &rebuild.new_child);
             }
+        }
+
+        // Put back rebuilds for nodes not in this tree (for other trees to process)
+        if !not_in_this_tree.is_empty() {
+            crate::stateful::requeue_subtree_rebuilds(not_in_this_tree);
         }
 
         needs_layout

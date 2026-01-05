@@ -154,6 +154,11 @@ pub fn take_pending_subtree_rebuilds() -> Vec<PendingSubtreeRebuild> {
     std::mem::take(&mut *PENDING_SUBTREE_REBUILDS.lock().unwrap())
 }
 
+/// Put subtree rebuilds back in the queue (for other trees to process)
+pub fn requeue_subtree_rebuilds(rebuilds: Vec<PendingSubtreeRebuild>) {
+    PENDING_SUBTREE_REBUILDS.lock().unwrap().extend(rebuilds);
+}
+
 /// Check if there are pending subtree rebuilds without consuming them
 ///
 /// Used to determine if layout recomputation is needed before processing.

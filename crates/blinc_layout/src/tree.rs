@@ -82,6 +82,11 @@ impl LayoutTree {
             .and_then(|&taffy_node| self.taffy.layout(taffy_node).ok())
     }
 
+    /// Check if a node exists in this tree
+    pub fn node_exists(&self, id: LayoutNodeId) -> bool {
+        self.node_map.contains_key(id)
+    }
+
     /// Remove a node
     pub fn remove_node(&mut self, id: LayoutNodeId) {
         if let Some(taffy_node) = self.node_map.remove(id) {

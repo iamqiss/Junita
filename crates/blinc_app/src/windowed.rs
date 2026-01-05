@@ -2234,27 +2234,39 @@ impl WindowedApp {
                                     }
                                 }
 
-                                // Process subtree rebuilds for main tree
-                                // This must happen even when overlay is visible, because
-                                // Select/DropdownMenu buttons are in the main tree and need
-                                // their children rebuilt when the value changes
-                                if let Some(ref mut tree) = render_tree {
-                                    // Process pending subtree rebuilds
-                                    // Returns true only if structural changes need layout recomputation
-                                    // Visual-only rebuilds (hover/press) skip layout for performance
-                                    let needs_layout = tree.process_pending_subtree_rebuilds();
+                                // Process subtree rebuilds for BOTH trees
+                                // We pass the same rebuilds to both - each tree skips nodes it doesn't have.
+                                // Note: We can't clone the rebuilds (Div doesn't implement Clone),
+                                // so we process the main tree first, then the overlay tree.
+                                // Each tree's process_subtree_rebuilds skips nodes that don't exist in it.
+                                let mut main_needs_layout = false;
+                                let mut overlay_needs_layout = false;
 
-                                    if needs_layout {
-                                        tracing::debug!("Subtree rebuilds processed, recomputing layout");
+                                // Process main tree first
+                                if let Some(ref mut tree) = render_tree {
+                                    main_needs_layout = tree.process_pending_subtree_rebuilds();
+                                }
+                                // Then overlay tree gets any remaining (since main tree skips nodes not in it)
+                                if let Some(ref mut overlay_tree) = windowed_ctx.overlay_tree {
+                                    overlay_needs_layout = overlay_tree.process_pending_subtree_rebuilds();
+                                }
+
+                                if main_needs_layout {
+                                    if let Some(ref mut tree) = render_tree {
+                                        tracing::debug!("Main tree subtree rebuilds processed, recomputing layout");
                                         tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
-                                        // Initialize motion animations for any new motion() containers
-                                        // added during the subtree rebuild (e.g., tab content changes)
                                         tree.initialize_motion_animations(rs);
-                                        // Process any motion replay requests queued during tree building
                                         rs.process_global_motion_replays();
-                                    } else if had_prop_updates {
-                                        tracing::trace!("Visual-only prop updates, skipping layout");
                                     }
+                                }
+                                if overlay_needs_layout {
+                                    if let Some(ref mut overlay_tree) = windowed_ctx.overlay_tree {
+                                        tracing::debug!("Overlay tree subtree rebuilds processed, recomputing layout");
+                                        overlay_tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                                    }
+                                }
+                                if had_prop_updates && !main_needs_layout && !overlay_needs_layout {
+                                    tracing::trace!("Visual-only prop updates, skipping layout");
                                 }
 
                                 // Request window redraw without rebuild
@@ -2466,7 +2478,8 @@ impl WindowedApp {
                                     // Content changed or no tree - full rebuild
                                     windowed_ctx.overlay_tree = windowed_ctx.overlay_manager.build_overlay_tree();
                                 }
-                                // Animation dirty just means we re-render the existing tree
+                                // Note: Subtree rebuilds for overlay are processed in PHASE 1
+                                // along with main tree rebuilds, so we don't need to process again here.
 
                                 if let Some(ref overlay_tree) = windowed_ctx.overlay_tree {
                                     // Initialize motion animations for overlay content
