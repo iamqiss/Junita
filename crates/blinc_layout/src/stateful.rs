@@ -2470,12 +2470,12 @@ mod tests {
         let mut elem = stateful_button()
             .w(100.0)
             .h(40.0)
-            .on_state(|state, div| match state {
+            .on_state(|state, container| match state {
                 ButtonState::Idle => {
-                    *div = div.swap().bg(Color::BLUE);
+                    container.merge(crate::div().bg(Color::BLUE));
                 }
                 ButtonState::Hovered => {
-                    *div = div.swap().bg(Color::GREEN);
+                    container.merge(crate::div().bg(Color::GREEN));
                 }
                 _ => {}
             });

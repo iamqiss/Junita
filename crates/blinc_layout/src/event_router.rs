@@ -887,6 +887,18 @@ impl EventRouter {
             return None;
         }
 
+        // Debug log for nodes in hit path
+        tracing::debug!(
+            "hit_test_node: HIT node={:?}, bounds=({:.1}, {:.1}, {:.1}x{:.1}), point=({:.1}, {:.1})",
+            node,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            x,
+            y
+        );
+
         ancestors.push(node);
 
         // Get scroll offset for this node (if it's a scroll container)
@@ -916,7 +928,7 @@ impl EventRouter {
 
         // No child hit, this node is the target
         tracing::trace!(
-            "hit_test_node: returning node={:?} as target (no children hit)",
+            "hit_test_node: FINAL target node={:?} (no children hit at point)",
             node
         );
         Some(HitTestResult {

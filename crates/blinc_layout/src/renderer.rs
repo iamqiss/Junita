@@ -3238,18 +3238,35 @@ impl RenderTree {
             return false;
         }
 
+        tracing::debug!("Processing {} pending subtree rebuilds", pending.len());
+
         let mut needs_layout = false;
         let mut not_in_this_tree = Vec::new();
 
         for rebuild in pending {
             // Skip if this node doesn't exist in this tree - save for other trees
             if !self.layout_tree.node_exists(rebuild.parent_id) {
+                tracing::debug!("Subtree rebuild: node {:?} not in this tree, requeuing", rebuild.parent_id);
                 not_in_this_tree.push(rebuild);
                 continue;
             }
+            tracing::debug!("Subtree rebuild: processing node {:?}, needs_layout={}", rebuild.parent_id, rebuild.needs_layout);
             if rebuild.needs_layout {
                 // Full structural rebuild - remove old children and build new ones
                 needs_layout = true;
+
+                // Update the parent node's own render props AND layout style
+                // This is critical for overlay layer where size changes from 0x0 to full viewport
+                if let Some(render_node) = self.render_nodes.get_mut(&rebuild.parent_id) {
+                    let mut new_props = rebuild.new_child.render_props();
+                    new_props.node_id = Some(rebuild.parent_id);
+                    new_props.motion = render_node.props.motion.clone();
+                    render_node.props = new_props;
+                }
+                // Also update the taffy layout style (width, height, padding, etc.)
+                if let Some(style) = rebuild.new_child.layout_style() {
+                    self.layout_tree.set_style(rebuild.parent_id, style.clone());
+                }
 
                 // Always remove old children first (even if new children is empty)
                 // This fixes the bug where SVG checkmarks would persist after unchecking

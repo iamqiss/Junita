@@ -1078,7 +1078,11 @@ impl OverlayManagerInner {
         self.overlays.len()
     }
 
-    /// Build the overlay render tree
+    /// Build the overlay render tree (DEPRECATED - use build_overlay_layer instead)
+    ///
+    /// This method creates a separate RenderTree for overlays. Prefer using
+    /// `build_overlay_layer()` which returns a Div that can be composed into
+    /// the main UI tree for unified event routing and incremental updates.
     pub fn build_overlay_tree(&self) -> Option<RenderTree> {
         if !self.has_visible_overlays() {
             return None;
@@ -1099,7 +1103,7 @@ impl OverlayManagerInner {
                     "build_overlay_tree: adding overlay {:?}",
                     overlay.config.kind
                 );
-                root = root.child(self.build_overlay_layer(overlay, width, height));
+                root = root.child(self.build_single_overlay(overlay, width, height));
             }
         }
 
@@ -1112,8 +1116,78 @@ impl OverlayManagerInner {
         Some(tree)
     }
 
-    /// Build a single overlay layer
-    fn build_overlay_layer(&self, overlay: &ActiveOverlay, vp_width: f32, vp_height: f32) -> Div {
+}
+
+/// The element ID used for the overlay layer container
+pub const OVERLAY_LAYER_ID: &'static str = "__blinc_overlay_layer__";
+
+impl OverlayManagerInner {
+
+    /// Build the overlay layer container for the main UI tree
+    ///
+    /// This ALWAYS returns a Div container with a stable ID, even when empty.
+    /// This enables subtree rebuilds to update overlay content without
+    /// triggering a full UI rebuild.
+    ///
+    /// The container uses absolute positioning so it doesn't affect main UI layout.
+    /// When empty (no visible overlays), the container has zero size so it doesn't
+    /// block events to the UI below.
+    pub fn build_overlay_layer(&self) -> Div {
+        let (width, height) = self.viewport;
+        let has_visible = self.has_visible_overlays();
+        let overlay_count = self.overlays.len();
+
+        tracing::info!(
+            "build_overlay_layer: viewport={}x{}, has_visible={}, overlay_count={}",
+            width, height, has_visible, overlay_count
+        );
+
+        // Container size: full viewport when overlays visible, zero when empty
+        // Zero size ensures the empty container doesn't block events to UI below
+        let (layer_w, layer_h) = if has_visible && width > 0.0 && height > 0.0 {
+            (width, height)
+        } else {
+            (0.0, 0.0)
+        };
+
+        tracing::info!("build_overlay_layer: layer size={}x{}", layer_w, layer_h);
+
+        // Always return a container with a stable ID
+        // This allows subtree rebuilds to find and update it
+        let mut layer = div()
+            .id(OVERLAY_LAYER_ID)
+            .w(layer_w)
+            .h(layer_h)
+            .absolute()
+            .left(0.0)
+            .top(0.0);
+
+        // Add visible overlays as children
+        if has_visible && width > 0.0 && height > 0.0 {
+            for overlay in self.overlays_sorted() {
+                if overlay.is_visible() {
+                    tracing::info!(
+                        "build_overlay_layer: adding overlay {:?}, state={:?}",
+                        overlay.config.kind, overlay.state
+                    );
+                    layer = layer.child(self.build_single_overlay(overlay, width, height));
+                }
+            }
+        }
+
+        layer
+    }
+
+    /// Build overlay layer content for subtree rebuild
+    ///
+    /// This is called when overlay content changes to queue a subtree rebuild
+    /// instead of triggering a full UI rebuild.
+    pub fn build_overlay_content(&self) -> Div {
+        self.build_overlay_layer()
+    }
+
+    /// Build a single overlay with backdrop and content
+    fn build_single_overlay(&self, overlay: &ActiveOverlay, vp_width: f32, vp_height: f32) -> Div {
         // Set the closing flag if this overlay is closing, so motion() containers
         // know to start their exit animations instead of reinitializing
         let is_closing = overlay.state == OverlayState::Closing;
@@ -1341,8 +1415,10 @@ pub trait OverlayManagerExt {
     fn set_viewport(&self, width: f32, height: f32);
     /// Update viewport dimensions with scale factor
     fn set_viewport_with_scale(&self, width: f32, height: f32, scale_factor: f32);
-    /// Build overlay render tree
+    /// Build overlay render tree (DEPRECATED - use build_overlay_layer instead)
     fn build_overlay_tree(&self) -> Option<RenderTree>;
+    /// Build overlay layer as a Div for composing into main UI tree (always returns a container)
+    fn build_overlay_layer(&self) -> Div;
     /// Check if any blocking overlay is active
     fn has_blocking_overlay(&self) -> bool;
     /// Check if any dismissable overlay is visible (dropdown, context menu, etc.)
@@ -1440,6 +1516,10 @@ impl OverlayManagerExt for OverlayManager {
 
     fn build_overlay_tree(&self) -> Option<RenderTree> {
         self.lock().unwrap().build_overlay_tree()
+    }
+
+    fn build_overlay_layer(&self) -> Div {
+        self.lock().unwrap().build_overlay_layer()
     }
 
     fn has_blocking_overlay(&self) -> bool {
