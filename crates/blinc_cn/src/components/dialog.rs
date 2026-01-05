@@ -86,7 +86,7 @@ pub struct DialogBuilder {
     enter_animation: Option<MultiKeyframeAnimation>,
     /// Custom exit animation (defaults to dialog_out)
     exit_animation: Option<MultiKeyframeAnimation>,
-    key: InstanceKey,
+    // key: InstanceKey,
 }
 
 impl DialogBuilder {
@@ -106,7 +106,7 @@ impl DialogBuilder {
             show_cancel: true,
             enter_animation: None,
             exit_animation: None,
-            key: InstanceKey::new("dialog")
+            // key: InstanceKey::new("dialog")
         }
     }
 
@@ -256,7 +256,7 @@ impl DialogBuilder {
             .unwrap_or_else(|| AnimationPreset::grow_out(150));
 
         let mgr = get_overlay_manager();
-        let overlay_key = self.key.derive("overlay_handle");
+        // let overlay_key = self.key.derive("overlay_handle");
 
         mgr.modal()
             .dismiss_on_escape(true)
@@ -281,7 +281,7 @@ impl DialogBuilder {
                     show_cancel,
                     &enter_animation,
                     &exit_animation,
-                    &overlay_key
+                  
                 )
             })
             .show()
@@ -403,8 +403,7 @@ fn build_dialog_content(
     confirm_destructive: bool,
     show_cancel: bool,
     enter_animation: &MultiKeyframeAnimation,
-    exit_animation: &MultiKeyframeAnimation,
-    overlay_key: &str,
+    exit_animation: &MultiKeyframeAnimation
 ) -> Div {
     // Use theme spacing tokens via helper methods (.p_6(), .gap_2(), .m_4(), etc.)
     let theme = ThemeState::get();
@@ -513,7 +512,7 @@ fn build_dialog_content(
 
     // Wrap dialog in outer motion container for scale+fade animations
     div().child(
-        motion_derived(&format!("dialog_motion_{}", overlay_key))
+        motion()
             .enter_animation(enter_animation.clone())
             .exit_animation(exit_animation.clone())
             .child(dialog).replay(),

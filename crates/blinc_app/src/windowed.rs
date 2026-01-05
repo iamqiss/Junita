@@ -2221,6 +2221,10 @@ impl WindowedApp {
                                 // Reset call counters for stable key generation
                                 reset_call_counters();
 
+                                // Reset stable motions so they replay on full rebuild
+                                // This ensures motion animations play when UI is reconstructed
+                                rs.reset_stable_motions_for_rebuild();
+
                                 // Note: Viewport and overlay state are already updated in PHASE 1
                                 // so build_overlay_layer() has correct dimensions
 

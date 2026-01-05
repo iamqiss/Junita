@@ -1132,6 +1132,49 @@ impl RenderState {
             .unwrap_or(false)
     }
 
+    /// Reset all stable motions to replay on next frame
+    ///
+    /// Call this before a full UI rebuild to ensure all motion animations
+    /// replay when the UI is reconstructed. This resets motions in `Visible`
+    /// state back to their initial `Waiting` or `Entering` state.
+    ///
+    /// Motions that are currently animating (Entering/Exiting) or already
+    /// Removed are left alone.
+    pub fn reset_stable_motions_for_rebuild(&mut self) {
+        for motion in self.stable_motions.values_mut() {
+            if matches!(motion.state, MotionState::Visible) {
+                let config = &motion.config;
+                motion.state = if config.enter_delay_ms > 0 {
+                    MotionState::Waiting {
+                        remaining_delay_ms: config.enter_delay_ms as f32,
+                    }
+                } else if config.enter_from.is_some() && config.enter_duration_ms > 0 {
+                    MotionState::Entering {
+                        progress: 0.0,
+                        duration_ms: config.enter_duration_ms as f32,
+                    }
+                } else {
+                    MotionState::Visible
+                };
+                motion.current = if matches!(motion.state, MotionState::Visible) {
+                    MotionKeyframe::default()
+                } else {
+                    motion.config.enter_from.clone().unwrap_or_default()
+                };
+            }
+        }
+    }
+
+    /// Clear all stable motions
+    ///
+    /// Use this for a complete reset, e.g., when navigating to a completely
+    /// different view. For normal full rebuilds, prefer `reset_stable_motions_for_rebuild()`
+    /// which preserves motion configs but replays animations.
+    pub fn clear_stable_motions(&mut self) {
+        self.stable_motions.clear();
+        self.stable_motions_used.clear();
+    }
+
     /// Remove a stable-keyed motion (after exit animation completes)
     pub fn remove_stable_motion(&mut self, key: &str) {
         self.stable_motions.remove(key);
