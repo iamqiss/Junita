@@ -202,8 +202,7 @@ pub fn check_stateful_deps(changed_signals: &[SignalId]) -> bool {
     let mut triggered = false;
     for (_key, (deps, refresh_fn)) in registry.iter() {
         // If any dep is in changed_signals, trigger the refresh
-        let matched = deps.iter().any(|d| changed_signals.contains(d));
-        if matched {
+        if deps.iter().any(|d| changed_signals.contains(d)) {
             refresh_fn();
             triggered = true;
         }
@@ -633,6 +632,11 @@ pub struct StatefulInner<S: StateTransitions> {
     /// When state changes, we start from base and apply callback changes on top.
     pub(crate) base_render_props: Option<RenderProps>,
 
+    /// Base taffy Style (before state callback is applied)
+    /// This captures layout properties like width, height, overflow, padding, etc.
+    /// When rebuilding subtree, we start from base style to preserve container properties.
+    pub(crate) base_style: Option<taffy::Style>,
+
     /// The layout node ID for this element (set on first event)
     /// Used to apply incremental prop updates without tree rebuild
     pub(crate) node_id: Option<LayoutNodeId>,
@@ -657,6 +661,7 @@ impl<S: StateTransitions> StatefulInner<S> {
             state_callback: None,
             needs_visual_update: false,
             base_render_props: None,
+            base_style: None,
             node_id: None,
             deps: Vec::new(),
             ancestor_motion_key: None,
@@ -810,6 +815,7 @@ impl<S: StateTransitions> Stateful<S> {
                 state_callback: None,
                 needs_visual_update: false,
                 base_render_props: None,
+                base_style: None,
                 node_id: None,
                 deps: Vec::new(),
                 ancestor_motion_key: None,
@@ -921,15 +927,19 @@ impl<S: StateTransitions> Stateful<S> {
     where
         F: Fn(&S, &mut Div) + Send + Sync + 'static,
     {
-        // Capture base render props BEFORE applying state callback
-        // This preserves properties like rounded corners, shadows, etc.
-        let base_props = self.inner.borrow().render_props();
+        // Capture base render props and style BEFORE applying state callback
+        // This preserves properties like rounded corners, shadows, overflow, etc.
+        let inner_div = self.inner.borrow();
+        let base_props = inner_div.render_props();
+        let base_style = inner_div.layout_style().cloned();
+        drop(inner_div);
 
-        // Store the callback and base props
+        // Store the callback, base props, and base style
         {
             let mut inner = self.shared_state.lock().unwrap();
             inner.state_callback = Some(Arc::new(callback));
             inner.base_render_props = Some(base_props);
+            inner.base_style = base_style;
         }
 
         // Register event handlers BEFORE applying state callback
@@ -1114,10 +1124,16 @@ impl<S: StateTransitions> Stateful<S> {
             let state_copy = guard.state;
             let cached_node_id = guard.node_id;
             let base_props = guard.base_render_props.clone();
+            let base_style = guard.base_style.clone();
             drop(guard); // Release lock before calling callback
 
-            // Create temp div, apply callback to get state-specific changes
-            let mut temp_div = Div::new();
+            // Create temp div with base style to preserve container properties (overflow, etc.)
+            // Then apply callback to get state-specific changes
+            let mut temp_div = if let Some(style) = base_style {
+                Div::with_style(style)
+            } else {
+                Div::new()
+            };
             callback(&state_copy, &mut temp_div);
             let callback_props = temp_div.render_props();
 
@@ -1150,20 +1166,27 @@ impl<S: StateTransitions> Stateful<S> {
         let guard = shared.lock().unwrap();
 
         // Need node_id and callback to refresh
-        let (callback, state_copy, cached_node_id, base_props) =
+        let (callback, state_copy, cached_node_id, base_props, base_style) =
             match (guard.state_callback.as_ref(), guard.node_id) {
                 (Some(cb), Some(nid)) => {
                     let callback = Arc::clone(cb);
                     let state = guard.state;
                     let base = guard.base_render_props.clone();
+                    let style = guard.base_style.clone();
                     drop(guard);
-                    (callback, state, nid, base)
+                    (callback, state, nid, base, style)
                 }
                 _ => return,
             };
 
-        // Create temp div, apply callback to get state-specific changes
-        let mut temp_div = Div::new();
+        // Create temp div with base style to preserve container properties (overflow, etc.)
+        // Then apply callback to get state-specific changes
+        let base_style_clone = base_style.clone();
+        let mut temp_div = if let Some(style) = base_style {
+            Div::with_style(style)
+        } else {
+            Div::new()
+        };
         callback(&state_copy, &mut temp_div);
         let callback_props = temp_div.render_props();
 
@@ -1174,9 +1197,18 @@ impl<S: StateTransitions> Stateful<S> {
         // Queue the prop update for this node
         queue_prop_update(cached_node_id, final_props);
 
-        // Check if children were set - if so, queue a subtree rebuild
+        // Check if children were set OR if layout style changed - if so, queue a subtree rebuild
+        // This is necessary because the callback may have modified height, overflow, etc.
         let children = temp_div.children_builders();
-        if !children.is_empty() {
+        let style_changed = temp_div.layout_style() != base_style_clone.as_ref();
+
+        tracing::trace!(
+            "refresh_props_internal: children={}, style_changed={}",
+            !children.is_empty(),
+            style_changed
+        );
+
+        if !children.is_empty() || style_changed {
             queue_subtree_rebuild(cached_node_id, temp_div);
         }
 

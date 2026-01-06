@@ -416,6 +416,32 @@ impl Div {
         }
     }
 
+    /// Create a new div element with a pre-configured taffy Style
+    ///
+    /// This is useful for preserving layout properties (width, height, overflow, etc.)
+    /// when rebuilding subtrees in Stateful elements.
+    pub fn with_style(style: Style) -> Self {
+        Self {
+            style,
+            children: Vec::new(),
+            background: None,
+            border_radius: CornerRadius::default(),
+            border_color: None,
+            border_width: 0.0,
+            border_sides: crate::element::BorderSides::default(),
+            render_layer: RenderLayer::default(),
+            material: None,
+            shadow: None,
+            transform: None,
+            opacity: 1.0,
+            cursor: None,
+            pointer_events_none: false,
+            is_stack_layer: false,
+            event_handlers: crate::event_handler::EventHandlers::new(),
+            element_id: None,
+        }
+    }
+
     /// Set an element ID for selector API queries
     ///
     /// Elements with IDs can be looked up programmatically:
@@ -558,6 +584,12 @@ impl Div {
     #[inline]
     pub fn set_h(&mut self, px: f32) {
         self.style.size.height = taffy::Dimension::Length(px);
+    }
+
+    /// Set height to auto without consuming self
+    #[inline]
+    pub fn set_h_auto(&mut self) {
+        self.style.size.height = taffy::Dimension::Auto;
     }
 
     // =========================================================================

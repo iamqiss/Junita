@@ -104,8 +104,8 @@ Layout helpers.
 
 | Component | Primitives Used | Status |
 |-----------|-----------------|--------|
-| **Accordion** | Stateful, motion | Planned |
-| **Collapsible** | Stateful, motion | Planned |
+| **Accordion** | motion, SharedAnimatedValue | ✅ Done |
+| **Collapsible** | motion, SharedAnimatedValue | ✅ Done |
 | **Resizable** | div, drag | Planned |
 | **Scroll Area** | scroll | Planned |
 | **Aspect Ratio** | div | Planned |
@@ -545,3 +545,35 @@ impl ElementBuilder for MyComponentBuilder {
 ```
 
 This ensures `children_builders()` returns the actual children, which the layout tree diff algorithm requires.
+
+### Collapsible/Accordion Animation Pattern
+
+The Collapsible and Accordion components use a `scale_y` animation pattern for smooth expand/collapse:
+
+```rust
+// Animation approach:
+// 1. Use scale_y(0.0 → 1.0) for vertical collapse/expand
+// 2. Use opacity(0.0 → 1.0) for fade effect
+// 3. Wrap content in overflow_clip() to hide scaled content
+// 4. Spring physics via SharedAnimatedValue for natural feel
+
+let scale_anim = SharedAnimatedValue::new(scheduler, initial_scale, SpringConfig::snappy());
+let opacity_anim = SharedAnimatedValue::new(scheduler, initial_opacity, SpringConfig::snappy());
+
+// Content wrapper with animation
+let animated_content = motion()
+    .scale_y(scale_anim.clone())
+    .opacity(opacity_anim.clone())
+    .child(content);
+
+// Clip overflow during animation
+let collapsible = div().w_full().overflow_clip().child(animated_content);
+
+// Toggle open/close by setting targets
+scale_anim.lock().unwrap().set_target(if open { 1.0 } else { 0.0 });
+opacity_anim.lock().unwrap().set_target(if open { 1.0 } else { 0.0 });
+```
+
+Accordion manages multiple Collapsible sections with optional single-open mode:
+- `AccordionMode::Single` - Only one section open at a time
+- `AccordionMode::Multi` - Multiple sections can be open simultaneously

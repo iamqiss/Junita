@@ -7,11 +7,13 @@
 //! - Implements `ElementBuilder` for rendering
 //! - Implements `Deref` to inner element for full customization
 
+pub mod accordion;
 pub mod alert;
 pub mod badge;
 pub mod button;
 pub mod card;
 pub mod checkbox;
+pub mod collapsible;
 pub mod combobox;
 pub mod context_menu;
 pub mod dialog;
@@ -32,9 +34,13 @@ pub mod textarea;
 pub mod toast;
 
 // Re-export all components
+pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
 pub use alert::{alert, alert_box, Alert, AlertBox, AlertVariant};
 pub use badge::{badge, Badge, BadgeVariant};
 pub use button::{button, Button, ButtonBuilder, ButtonSize, ButtonVariant, IconPosition};
+pub use collapsible::{
+    collapsible, collapsible_section, Collapsible, CollapsibleBuilder, CollapsibleTrigger,
+};
 // Re-export ButtonState for users who need it
 pub use blinc_layout::stateful::ButtonState;
 pub use card::{

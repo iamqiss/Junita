@@ -76,6 +76,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(hover_card_section())
                         .child(dialog_section(ctx))
                         .child(tabs_section(ctx))
+                        .child(accordion_section())
                         .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(misc_section()),
@@ -1119,6 +1120,95 @@ fn tabs_section(ctx: &WindowedContext) -> impl ElementBuilder {
                     ),
             ),
     )
+}
+
+// ============================================================================
+// ACCORDION SECTION
+// ============================================================================
+
+fn accordion_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    section_container()
+        .child(section_title("Accordion"))
+        .child(
+            div()
+                .flex_row()
+                .flex_wrap()
+                .h_fit()
+                .gap(24.0)
+                // Single-open accordion (default)
+                .child(
+                    div()
+                        .w_full()
+                        .h_fit()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(cn::label("Single Open (default)"))
+                        .child(
+                            cn::accordion()
+                                .default_open("faq-1")
+                                .item("faq-1", "What is Blinc?", || {
+                                    div().w_full().py(4.0).items_start().child(
+                                        text("Blinc is a Rust UI framework for building beautiful, performant user interfaces with a declarative, GPUI-inspired API.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                .item("faq-2", "How do animations work?", || {
+                                    div().w_full().py(4.0).items_start().child(
+                                        text("Blinc uses spring physics animations via the blinc_animation crate. Animations are scheduled through a global scheduler for smooth performance.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                .item("faq-3", "Is it production ready?", || {
+                                    div().w_full().py(4.0).items_start().child(
+                                        text("Blinc is under active development. It's suitable for experimentation and side projects, with a growing component library.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                ,
+                        ),
+                )
+                // Multi-open accordion
+                .child(
+                    div()
+                        .w_full()
+                         .h_fit()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(cn::label("Multi Open"))
+                        .child(
+                            cn::accordion()
+                                .multi_open()
+                                .item("settings-1", "Appearance", || {
+                                    div().w_full().h(60.0).p(4.0).child(
+                                        text("Customize the look and feel of your application including themes, colors, and fonts.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                .item("settings-2", "Notifications", || {
+                                    div().w_full().h(60.0).p(4.0).child(
+                                        text("Configure how and when you receive notifications, including email and push notifications.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                .item("settings-3", "Privacy", || {
+                                    div().w_full().h(60.0).p(4.0).child(
+                                        text("Control your privacy settings, data sharing preferences, and account visibility.")
+                                            .size(14.0)
+                                            .color(ThemeState::get().color(ColorToken::TextSecondary)),
+                                    )
+                                })
+                                .build_component(),
+                        ),
+                ),
+        )
 }
 
 // ============================================================================

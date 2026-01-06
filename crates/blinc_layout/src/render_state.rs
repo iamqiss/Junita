@@ -61,6 +61,47 @@ pub fn create_shared_motion_states() -> SharedMotionStates {
 }
 
 // =============================================================================
+// Global animation scheduler handle
+// =============================================================================
+
+/// Global storage for the animation scheduler handle
+///
+/// This allows components to access animations without needing explicit context.
+/// Set by RenderState on initialization, used by blinc_cn components.
+static GLOBAL_SCHEDULER: LazyLock<RwLock<Option<SchedulerHandle>>> =
+    LazyLock::new(|| RwLock::new(None));
+
+/// Set the global animation scheduler handle
+///
+/// Called by RenderState during initialization to make the scheduler
+/// available to all components.
+pub fn set_global_scheduler(handle: SchedulerHandle) {
+    let mut storage = GLOBAL_SCHEDULER.write().unwrap();
+    *storage = Some(handle);
+}
+
+/// Get the global animation scheduler handle
+///
+/// Returns `None` if the scheduler hasn't been set yet (before app initialization).
+///
+/// # Example
+///
+/// ```ignore
+/// let scheduler = get_global_scheduler()
+///     .expect("Animation scheduler not initialized");
+///
+/// let scale = AnimatedValue::new(scheduler, 1.0, SpringConfig::snappy());
+/// ```
+pub fn get_global_scheduler() -> Option<SchedulerHandle> {
+    GLOBAL_SCHEDULER.read().unwrap().clone()
+}
+
+/// Check if the global scheduler is available
+pub fn has_global_scheduler() -> bool {
+    GLOBAL_SCHEDULER.read().unwrap().is_some()
+}
+
+// =============================================================================
 // Global pending motion replay queue
 // =============================================================================
 
@@ -408,6 +449,10 @@ pub struct RenderState {
 impl RenderState {
     /// Create a new render state with the given animation scheduler
     pub fn new(animations: Arc<Mutex<AnimationScheduler>>) -> Self {
+        // Set global scheduler so components can access animations without context
+        let handle = animations.lock().unwrap().handle();
+        set_global_scheduler(handle);
+
         Self {
             node_states: HashMap::new(),
             stable_motions: HashMap::new(),

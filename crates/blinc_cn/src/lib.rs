@@ -48,11 +48,13 @@ pub use blinc_layout::InstanceKey;
 
 /// Convenience module for accessing components with `cn::` prefix
 pub mod cn {
+    pub use crate::components::accordion::accordion;
     pub use crate::components::alert::{alert, alert_box};
     pub use crate::components::badge::badge;
     pub use crate::components::button::button;
     pub use crate::components::card::{card, card_content, card_footer, card_header};
     pub use crate::components::checkbox::checkbox;
+    pub use crate::components::collapsible::{collapsible, collapsible_section};
     pub use crate::components::combobox::combobox;
     pub use crate::components::context_menu::context_menu;
     pub use crate::components::dialog::{alert_dialog, dialog};
@@ -79,6 +81,7 @@ pub mod cn {
 pub mod prelude {
     pub use crate::cn;
     // Components
+    pub use crate::components::accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
     pub use crate::components::alert::{alert, alert_box, Alert, AlertBox, AlertVariant};
     pub use crate::components::badge::{badge, Badge, BadgeVariant};
     pub use crate::components::button::{
@@ -89,6 +92,9 @@ pub mod prelude {
         card, card_content, card_footer, card_header, Card, CardContent, CardFooter, CardHeader,
     };
     pub use crate::components::checkbox::{checkbox, Checkbox, CheckboxSize};
+    pub use crate::components::collapsible::{
+        collapsible, collapsible_section, Collapsible, CollapsibleBuilder, CollapsibleTrigger,
+    };
     pub use crate::components::context_menu::{
         context_menu, ContextMenuBuilder, ContextMenuItem, SubmenuBuilder,
     };
