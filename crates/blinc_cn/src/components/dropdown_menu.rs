@@ -377,9 +377,9 @@ impl DropdownMenuBuilder {
                         let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
 
-                        // Check if overlay is already closing (exit animation in progress)
-                        if mgr.is_closing(handle) {
-                            // Exit animation already in progress, don't trigger again
+                        // Check if overlay is already closing or pending close
+                        if mgr.is_closing(handle) || mgr.is_pending_close(handle) {
+                            // Close already in progress, don't trigger again
                             return;
                         }
 
@@ -574,7 +574,7 @@ fn build_dropdown_content(
             let has_submenu = item.has_submenu();
 
             let handle_state_for_click = overlay_handle_state.clone();
-            let open_state_for_click = open_state.clone();
+            let handle_overflow_state_for_click = handle_state_for_click.clone();
 
             // Create a stable key for this item's button state
             let item_key = format!("{}_item-{}", key, idx);
@@ -601,6 +601,19 @@ fn build_dropdown_content(
                     CursorStyle::Pointer
                 })
                 .on_state(move |state, container: &mut Div| {
+
+                    if let Some(handle_id) = handle_overflow_state_for_click.get() {
+                        let mgr = get_overlay_manager();
+                        let handle = OverlayHandle::from_raw(handle_id);
+
+                        // Check if overlay is already closing or pending close
+                        if mgr.is_closing(handle) || mgr.is_pending_close(handle) {
+                            // Close already in progress, don't trigger again
+                            return;
+                        }
+                    }
+
+
                     let theme = ThemeState::get();
                     // Apply hover background based on button state
                     let item_bg = if *state == ButtonState::Hovered && !item_disabled {

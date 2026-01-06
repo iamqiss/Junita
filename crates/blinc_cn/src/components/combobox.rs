@@ -344,9 +344,9 @@ impl Combobox {
                         let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
 
-                        // Check if overlay is already closing (exit animation in progress)
-                        if mgr.is_closing(handle) {
-                            // Exit animation already in progress, don't trigger again
+                        // Check if overlay is already closing or pending close
+                        if mgr.is_closing(handle) || mgr.is_pending_close(handle) {
+                            // Close already in progress, don't trigger again
                             return;
                         }
 
@@ -841,9 +841,9 @@ fn build_dropdown_content(
                                 let mgr = get_overlay_manager();
                                 let handle = OverlayHandle::from_raw(handle_id);
 
-                                // Check if overlay is already closing (exit animation in progress)
-                                if mgr.is_closing(handle) {
-                                    // Exit animation already in progress, don't trigger again
+                                // Check if overlay is already closing or pending close
+                                if mgr.is_closing(handle) || mgr.is_pending_close(handle) {
+                                    // Close already in progress, don't trigger again
                                     return;
                                 }
 
@@ -940,9 +940,9 @@ fn build_dropdown_content(
                                     let mgr = get_overlay_manager();
                                     let handle = OverlayHandle::from_raw(handle_id);
 
-                                    // Check if overlay is already closing (exit animation in progress)
-                                    if mgr.is_closing(handle) {
-                                        // Exit animation already in progress, don't trigger again
+                                    // Check if overlay is already closing or pending close
+                                    if mgr.is_closing(handle) || mgr.is_pending_close(handle) {
+                                        // Close already in progress, don't trigger again
                                         return;
                                     }
 
