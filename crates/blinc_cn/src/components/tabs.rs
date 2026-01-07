@@ -597,7 +597,7 @@ impl TabsBuilder {
             .w_full()
             .bg(tab_list_bg)
             .rounded(radius)
-            .p(4.0)
+            .padding(Length::Px(4.0))
             .flex_row()
             .items_center()
             .gap(4.0)
@@ -610,7 +610,7 @@ impl TabsBuilder {
                     .w_full()
                     .bg(tab_list_bg)
                     .rounded(radius)
-                    .p(4.0)
+                    .padding(Length::Px(6.0))
                     .flex_row()
                     .items_center()
                     .border(1.0, border)
@@ -774,7 +774,7 @@ fn build_tab_trigger(
     let disabled = menu_item.disabled;
 
     // Calculate inner height (tab list height minus padding)
-    let inner_height = size.height() - 8.0;
+    let inner_height = size.height() - 16.0;
 
     // Determine colors based on state
     // Use TextPrimary for active, TextSecondary for inactive (better contrast on muted bg)
@@ -844,6 +844,7 @@ fn build_tab_trigger(
     let mut trigger = stateful(trigger_btn_state)
         .h(inner_height)
         .padding_x(Length::Px(size.padding_x()))
+        .padding_y(Length::Px(size.padding_x()/2.0))
         .flex_row()
         .items_center()
         .justify_center()
