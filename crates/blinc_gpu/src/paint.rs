@@ -459,6 +459,10 @@ impl<'a> GpuPaintContext<'a> {
     ///
     /// For multiple rect clips, computes the intersection of all clips.
     /// For mixed clip types, uses the topmost clip (conservative approximation).
+    ///
+    /// Corner radius handling: A rectangular clip (non-rounded) will reset the
+    /// corner radius to 0 for any corners it covers. This ensures that a child
+    /// with overflow_clip() doesn't inherit rounded corners from a parent.
     fn get_clip_data(&self) -> ([f32; 4], [f32; 4], ClipType) {
         if self.clip_stack.is_empty() {
             // No clip - use large bounds
@@ -476,7 +480,19 @@ impl<'a> GpuPaintContext<'a> {
         let mut intersect_max_x = f32::INFINITY;
         let mut intersect_max_y = f32::INFINITY;
         let mut has_rect_clips = false;
-        let mut combined_radius = [0.0f32; 4];
+
+        // Track corner radii with their source bounds
+        // Each corner's radius is only valid if the intersection edge matches the source edge
+        // Format: (radius, source_min_x, source_min_y, source_max_x, source_max_y)
+        let mut corner_sources: [(f32, f32, f32, f32, f32); 4] = [
+            (0.0, f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY), // top_left
+            (0.0, f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY), // top_right
+            (0.0, f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY), // bottom_right
+            (0.0, f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY), // bottom_left
+        ];
+
+        // Track whether the topmost clip is a plain Rect (not rounded)
+        let mut topmost_is_plain_rect = false;
 
         for clip in &self.clip_stack {
             match clip {
@@ -487,27 +503,46 @@ impl<'a> GpuPaintContext<'a> {
                     intersect_max_x = intersect_max_x.min(rect.x() + rect.width());
                     intersect_max_y = intersect_max_y.min(rect.y() + rect.height());
                     has_rect_clips = true;
+                    topmost_is_plain_rect = true;
                 }
                 ClipShape::RoundedRect {
                     rect,
                     corner_radius,
                 } => {
+                    let rx = rect.x();
+                    let ry = rect.y();
+                    let rmax_x = rect.x() + rect.width();
+                    let rmax_y = rect.y() + rect.height();
+
                     // Intersect with this rect
-                    intersect_min_x = intersect_min_x.max(rect.x());
-                    intersect_min_y = intersect_min_y.max(rect.y());
-                    intersect_max_x = intersect_max_x.min(rect.x() + rect.width());
-                    intersect_max_y = intersect_max_y.min(rect.y() + rect.height());
-                    // Use the maximum corner radius (conservative)
-                    combined_radius[0] = combined_radius[0].max(corner_radius.top_left);
-                    combined_radius[1] = combined_radius[1].max(corner_radius.top_right);
-                    combined_radius[2] = combined_radius[2].max(corner_radius.bottom_right);
-                    combined_radius[3] = combined_radius[3].max(corner_radius.bottom_left);
+                    intersect_min_x = intersect_min_x.max(rx);
+                    intersect_min_y = intersect_min_y.max(ry);
+                    intersect_max_x = intersect_max_x.min(rmax_x);
+                    intersect_max_y = intersect_max_y.min(rmax_y);
+
+                    // Track corner radii with their source bounds
+                    // Only update if this corner radius is larger (take max)
+                    if corner_radius.top_left > corner_sources[0].0 {
+                        corner_sources[0] = (corner_radius.top_left, rx, ry, rmax_x, rmax_y);
+                    }
+                    if corner_radius.top_right > corner_sources[1].0 {
+                        corner_sources[1] = (corner_radius.top_right, rx, ry, rmax_x, rmax_y);
+                    }
+                    if corner_radius.bottom_right > corner_sources[2].0 {
+                        corner_sources[2] = (corner_radius.bottom_right, rx, ry, rmax_x, rmax_y);
+                    }
+                    if corner_radius.bottom_left > corner_sources[3].0 {
+                        corner_sources[3] = (corner_radius.bottom_left, rx, ry, rmax_x, rmax_y);
+                    }
+
                     has_rect_clips = true;
+                    topmost_is_plain_rect = false;
                 }
                 // For non-rect clips, fall back to topmost-only behavior
                 ClipShape::Circle { .. } | ClipShape::Ellipse { .. } | ClipShape::Path(_) => {
                     // Can't easily intersect with circles/ellipses/paths
                     // Fall through to use the topmost clip
+                    topmost_is_plain_rect = false;
                 }
             }
         }
@@ -516,9 +551,88 @@ impl<'a> GpuPaintContext<'a> {
         if has_rect_clips {
             let width = (intersect_max_x - intersect_min_x).max(0.0);
             let height = (intersect_max_y - intersect_min_y).max(0.0);
+
+            // Determine final corner radii based on whether intersection edges match source edges
+            // A corner radius is only preserved if both edges forming that corner match the source
+            let epsilon = 0.5; // Tolerance for floating point comparison
+
+            let final_radius = if topmost_is_plain_rect {
+                // Topmost is plain rect, but we may need to preserve parent's rounded corners
+                // if the intersection boundary coincides with the parent's boundary
+                let mut radii = [0.0f32; 4];
+
+                // Top-left: needs min_x and min_y to match source
+                let (r, src_min_x, src_min_y, _, _) = corner_sources[0];
+                if (intersect_min_x - src_min_x).abs() < epsilon
+                    && (intersect_min_y - src_min_y).abs() < epsilon
+                {
+                    radii[0] = r;
+                }
+
+                // Top-right: needs max_x and min_y to match source
+                let (r, _, src_min_y, src_max_x, _) = corner_sources[1];
+                if (intersect_max_x - src_max_x).abs() < epsilon
+                    && (intersect_min_y - src_min_y).abs() < epsilon
+                {
+                    radii[1] = r;
+                }
+
+                // Bottom-right: needs max_x and max_y to match source
+                let (r, _, _, src_max_x, src_max_y) = corner_sources[2];
+                if (intersect_max_x - src_max_x).abs() < epsilon
+                    && (intersect_max_y - src_max_y).abs() < epsilon
+                {
+                    radii[2] = r;
+                }
+
+                // Bottom-left: needs min_x and max_y to match source
+                let (r, src_min_x, _, _, src_max_y) = corner_sources[3];
+                if (intersect_min_x - src_min_x).abs() < epsilon
+                    && (intersect_max_y - src_max_y).abs() < epsilon
+                {
+                    radii[3] = r;
+                }
+
+                radii
+            } else {
+                // Topmost is rounded rect, use the accumulated corner radii
+                // but still check edge alignment
+                let mut radii = [0.0f32; 4];
+
+                let (r, src_min_x, src_min_y, _, _) = corner_sources[0];
+                if (intersect_min_x - src_min_x).abs() < epsilon
+                    && (intersect_min_y - src_min_y).abs() < epsilon
+                {
+                    radii[0] = r;
+                }
+
+                let (r, _, src_min_y, src_max_x, _) = corner_sources[1];
+                if (intersect_max_x - src_max_x).abs() < epsilon
+                    && (intersect_min_y - src_min_y).abs() < epsilon
+                {
+                    radii[1] = r;
+                }
+
+                let (r, _, _, src_max_x, src_max_y) = corner_sources[2];
+                if (intersect_max_x - src_max_x).abs() < epsilon
+                    && (intersect_max_y - src_max_y).abs() < epsilon
+                {
+                    radii[2] = r;
+                }
+
+                let (r, src_min_x, _, _, src_max_y) = corner_sources[3];
+                if (intersect_min_x - src_min_x).abs() < epsilon
+                    && (intersect_max_y - src_max_y).abs() < epsilon
+                {
+                    radii[3] = r;
+                }
+
+                radii
+            };
+
             return (
                 [intersect_min_x, intersect_min_y, width, height],
-                combined_radius,
+                final_radius,
                 ClipType::Rect,
             );
         }
