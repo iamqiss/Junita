@@ -67,9 +67,9 @@ User feedback components.
 
 | Component | Primitives Used | Status |
 |-----------|-----------------|--------|
-| **Alert** | div, text, icon | Planned |
+| **Alert** | div, text, icon | ✅ Done |
 | **Toast** | overlay, motion | ✅ Done |
-| **Tooltip** | overlay, motion | Planned |
+| **Tooltip** | overlay, motion | ✅ Done |
 | **Popover** | overlay | Planned |
 
 ### 5. Overlays (Priority: Medium)

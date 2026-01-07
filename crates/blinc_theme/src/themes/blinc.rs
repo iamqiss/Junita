@@ -135,6 +135,9 @@ impl BlincTheme {
                 selection_text: latte::TEXT,
                 accent: latte::BLUE,
                 accent_subtle: latte::BLUE.with_alpha(0.1),
+                // Tooltip (inverted for light theme)
+                tooltip_bg: mocha::BASE,
+                tooltip_text: mocha::TEXT,
             },
             typography: TypographyTokens::default(),
             spacing: SpacingTokens::default(),
@@ -184,6 +187,9 @@ impl BlincTheme {
                 selection_text: mocha::TEXT,
                 accent: mocha::BLUE,
                 accent_subtle: mocha::BLUE.with_alpha(0.15),
+                // Tooltip (inverted for dark theme)
+                tooltip_bg: latte::BASE,
+                tooltip_text: latte::TEXT,
             },
             typography: TypographyTokens::default(),
             spacing: SpacingTokens::default(),

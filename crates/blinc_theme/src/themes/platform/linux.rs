@@ -81,6 +81,9 @@ impl LinuxTheme {
                 // Accent
                 accent: Color::from_hex(0x3584E4),
                 accent_subtle: Color::from_hex(0x3584E4).with_alpha(0.1),
+                // Tooltip (inverted for light theme)
+                tooltip_bg: Color::from_hex(0x242424),
+                tooltip_text: Color::from_hex(0xFAFAFA),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new(
@@ -181,6 +184,9 @@ impl LinuxTheme {
                 // Accent
                 accent: Color::from_hex(0x3584E4),
                 accent_subtle: Color::from_hex(0x3584E4).with_alpha(0.15),
+                // Tooltip (inverted for dark theme)
+                tooltip_bg: Color::from_hex(0xFAFAFA),
+                tooltip_text: Color::from_hex(0x242424),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new(

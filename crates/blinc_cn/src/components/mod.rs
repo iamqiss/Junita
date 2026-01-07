@@ -32,6 +32,7 @@ pub mod switch;
 pub mod tabs;
 pub mod textarea;
 pub mod toast;
+pub mod tooltip;
 
 // Re-export all components
 pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
@@ -69,3 +70,4 @@ pub use textarea::{textarea, Textarea, TextareaSize};
 pub use toast::{
     toast, toast_custom, toast_error, toast_success, toast_warning, ToastBuilder, ToastVariant,
 };
+pub use tooltip::{tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide};

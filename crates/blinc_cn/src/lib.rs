@@ -75,6 +75,7 @@ pub mod cn {
     pub use crate::components::toast::{
         toast, toast_custom, toast_error, toast_success, toast_warning,
     };
+    pub use crate::components::tooltip::tooltip;
 }
 
 /// Prelude for convenient imports
@@ -127,6 +128,9 @@ pub mod prelude {
     pub use crate::components::textarea::{textarea, Textarea, TextareaSize};
     pub use crate::components::toast::{
         toast, toast_custom, toast_error, toast_success, toast_warning, ToastBuilder, ToastVariant,
+    };
+    pub use crate::components::tooltip::{
+        tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide,
     };
     pub use blinc_layout::stateful::ButtonState;
     // Re-export State for checkbox/switch/radio usage

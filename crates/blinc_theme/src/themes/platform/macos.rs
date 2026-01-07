@@ -66,6 +66,9 @@ impl MacOSTheme {
                 // Accent
                 accent: Color::from_hex(0x007AFF),
                 accent_subtle: Color::from_hex(0x007AFF).with_alpha(0.1),
+                // Tooltip (inverted for light theme)
+                tooltip_bg: Color::from_hex(0x1C1C1E),
+                tooltip_text: Color::from_hex(0xF5F5F7),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new("SF Pro", vec!["system-ui", "-apple-system"]),
@@ -135,6 +138,9 @@ impl MacOSTheme {
                 // Accent
                 accent: Color::from_hex(0x0A84FF),
                 accent_subtle: Color::from_hex(0x0A84FF).with_alpha(0.15),
+                // Tooltip (inverted for dark theme)
+                tooltip_bg: Color::from_hex(0xF5F5F7),
+                tooltip_text: Color::from_hex(0x1C1C1E),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new("SF Pro", vec!["system-ui", "-apple-system"]),

@@ -178,6 +178,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(context_menu_section())
                         .child(dropdown_menu_section())
                         .child(hover_card_section())
+                        .child(tooltip_section())
                         .child(dialog_section(ctx))
                         .child(tabs_section(ctx))
                         .child(toast_section(ctx))
@@ -1528,6 +1529,115 @@ fn hover_card_section() -> impl ElementBuilder {
                         ),
                 ),
         )
+}
+
+// ============================================================================
+// Tooltip Section
+// ============================================================================
+
+fn tooltip_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_primary = theme.color(ColorToken::TextPrimary);
+
+    section_container().child(section_title("Tooltip")).child(
+        div()
+            .flex_col()
+            .gap(24.0)
+            // Basic tooltip
+            .child(
+                div()
+                    .flex_col()
+                    .gap(8.0)
+                    .child(
+                        text("Basic Tooltip")
+                            .size(14.0)
+                            .medium()
+                            .color(text_primary),
+                    )
+                    .child(
+                        cn::tooltip(|| {
+                            div().child(cn::button("Hover me").variant(ButtonVariant::Outline))
+                        })
+                        .text("This is a tooltip"),
+                    ),
+            )
+            // Side positions
+            .child(
+                div()
+                    .flex_col()
+                    .gap(8.0)
+                    .child(
+                        text("Side Positions")
+                            .size(14.0)
+                            .medium()
+                            .color(text_primary),
+                    )
+                    .child(
+                        div()
+                            .flex_row()
+                            .gap(16.0)
+                            .child(
+                                cn::tooltip(|| {
+                                    div().child(cn::button("Top").variant(ButtonVariant::Outline))
+                                })
+                                .text("Appears above")
+                                .side(TooltipSide::Top),
+                            )
+                            .child(
+                                cn::tooltip(|| {
+                                    div()
+                                        .child(cn::button("Bottom").variant(ButtonVariant::Outline))
+                                })
+                                .text("Appears below")
+                                .side(TooltipSide::Bottom),
+                            )
+                            .child(
+                                cn::tooltip(|| {
+                                    div().child(cn::button("Left").variant(ButtonVariant::Outline))
+                                })
+                                .text("Appears left")
+                                .side(TooltipSide::Left),
+                            )
+                            .child(
+                                cn::tooltip(|| {
+                                    div().child(cn::button("Right").variant(ButtonVariant::Outline))
+                                })
+                                .text("Appears right")
+                                .side(TooltipSide::Right),
+                            ),
+                    ),
+            )
+            // Custom delay
+            .child(
+                div()
+                    .flex_col()
+                    .gap(8.0)
+                    .child(text("Custom Delay").size(14.0).medium().color(text_primary))
+                    .child(
+                        div()
+                            .flex_row()
+                            .gap(16.0)
+                            .child(
+                                cn::tooltip(|| {
+                                    div().child(
+                                        cn::button("Instant").variant(ButtonVariant::Secondary),
+                                    )
+                                })
+                                .text("No delay!")
+                                .open_delay_ms(0),
+                            )
+                            .child(
+                                cn::tooltip(|| {
+                                    div().child(
+                                        cn::button("Slow (1s)").variant(ButtonVariant::Secondary),
+                                    )
+                                })
+                                .text("Waited for it...")
+                                .open_delay_ms(1000),
+                            ),
+                    ),
+            ),
+    )
 }
 
 fn misc_section() -> impl ElementBuilder {

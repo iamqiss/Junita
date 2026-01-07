@@ -55,6 +55,10 @@ pub enum ColorToken {
     // Accent
     Accent,
     AccentSubtle,
+
+    // Tooltip colors (inverted colors)
+    TooltipBackground,
+    TooltipText,
 }
 
 /// Complete set of semantic color tokens
@@ -110,6 +114,10 @@ pub struct ColorTokens {
     // Accent
     pub accent: Color,
     pub accent_subtle: Color,
+
+    // Tooltip colors (inverted colors)
+    pub tooltip_bg: Color,
+    pub tooltip_text: Color,
 }
 
 impl ColorTokens {
@@ -151,6 +159,8 @@ impl ColorTokens {
             ColorToken::SelectionText => self.selection_text,
             ColorToken::Accent => self.accent,
             ColorToken::AccentSubtle => self.accent_subtle,
+            ColorToken::TooltipBackground => self.tooltip_bg,
+            ColorToken::TooltipText => self.tooltip_text,
         }
     }
 
@@ -192,6 +202,8 @@ impl ColorTokens {
             selection_text: Color::lerp(&from.selection_text, &to.selection_text, t),
             accent: Color::lerp(&from.accent, &to.accent, t),
             accent_subtle: Color::lerp(&from.accent_subtle, &to.accent_subtle, t),
+            tooltip_bg: Color::lerp(&from.tooltip_bg, &to.tooltip_bg, t),
+            tooltip_text: Color::lerp(&from.tooltip_text, &to.tooltip_text, t),
         }
     }
 }
@@ -235,6 +247,8 @@ impl Default for ColorTokens {
             selection_text: Color::from_hex(0x4C4F69),
             accent: Color::from_hex(0x1E66F5),
             accent_subtle: Color::from_hex(0x1E66F5).with_alpha(0.1),
+            tooltip_bg: Color::from_hex(0x1C1C1E), // Dark bg for light theme
+            tooltip_text: Color::from_hex(0xF5F5F5), // Light text for dark bg
         }
     }
 }

@@ -80,6 +80,9 @@ impl WindowsTheme {
                 // Accent
                 accent: Color::from_hex(0x0078D4),
                 accent_subtle: Color::from_hex(0x0078D4).with_alpha(0.1),
+                // Tooltip (inverted for light theme)
+                tooltip_bg: Color::from_hex(0x2D2D2D),
+                tooltip_text: Color::from_hex(0xF3F3F3),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new(
@@ -177,6 +180,9 @@ impl WindowsTheme {
                 // Accent
                 accent: Color::from_hex(0x60CDFF),
                 accent_subtle: Color::from_hex(0x60CDFF).with_alpha(0.15),
+                // Tooltip (inverted for dark theme)
+                tooltip_bg: Color::from_hex(0xF3F3F3),
+                tooltip_text: Color::from_hex(0x2D2D2D),
             },
             typography: TypographyTokens {
                 font_sans: FontFamily::new(
