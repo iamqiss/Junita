@@ -1052,6 +1052,24 @@ impl OverlayManagerInner {
         }
     }
 
+    /// Close an overlay immediately, skipping any exit animation
+    ///
+    /// This directly sets the overlay to Closed state so it will be
+    /// removed on the next update cycle. Use this when you need to
+    /// ensure an overlay is gone before opening a replacement.
+    pub fn close_immediate(&mut self, handle: OverlayHandle) {
+        if let Some(overlay) = self.overlays.get_mut(&handle) {
+            // Skip animation and go directly to Closed
+            overlay.state = OverlayState::Closed;
+            // Call on_close callback if present
+            if let Some(cb) = overlay.on_close.take() {
+                cb();
+            }
+            // Mark animation dirty to trigger redraw without full UI rebuild
+            self.mark_animation_dirty();
+        }
+    }
+
     /// Cancel a pending close and return overlay to Open state
     ///
     /// Used when mouse re-enters a hover card during exit animation.
@@ -1845,6 +1863,10 @@ pub trait OverlayManagerExt {
 
     /// Close an overlay by handle
     fn close(&self, handle: OverlayHandle);
+    /// Close an overlay immediately, skipping any exit animation
+    ///
+    /// Use this when you need to ensure an overlay is removed before opening a replacement.
+    fn close_immediate(&self, handle: OverlayHandle);
     /// Cancel a pending close (Closing -> Open)
     ///
     /// Used when mouse re-enters a hover card during exit animation.
@@ -1954,6 +1976,10 @@ impl OverlayManagerExt for OverlayManager {
 
     fn close(&self, handle: OverlayHandle) {
         self.lock().unwrap().close(handle);
+    }
+
+    fn close_immediate(&self, handle: OverlayHandle) {
+        self.lock().unwrap().close_immediate(handle);
     }
 
     fn cancel_close(&self, handle: OverlayHandle) {

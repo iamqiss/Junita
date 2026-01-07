@@ -931,13 +931,13 @@ fn build_menubar_hover_dropdown_content(
                 let submenu_key_for_hover = submenu_key.clone();
 
                 row = row.on_hover_enter(move |ctx| {
-                    // Close any existing submenu
+                    let mgr = get_overlay_manager();
+
+                    // Close any existing submenu tracked in state
                     if let Some(handle_id) = submenu_handle_for_hover.get() {
-                        let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        // Force close without animation delay
+                        mgr.close_immediate(handle);
                     }
 
                     // Show submenu to the right of this item
@@ -963,9 +963,9 @@ fn build_menubar_hover_dropdown_content(
                     if let Some(handle_id) = submenu_handle_for_leave.get() {
                         let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        // Force close without animation delay
+                        mgr.close_immediate(handle);
+                        submenu_handle_for_leave.set(None);
                     }
                 });
             }
@@ -1239,13 +1239,12 @@ fn build_menubar_submenu_content(
                 let submenu_key_for_hover = submenu_key.clone();
 
                 row = row.on_hover_enter(move |ctx| {
-                    // Close any existing nested submenu
+                    let mgr = get_overlay_manager();
+
+                    // Close any existing nested submenu immediately
                     if let Some(handle_id) = nested_submenu_for_hover.get() {
-                        let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        mgr.close_immediate(handle);
                     }
 
                     // Show new nested submenu
@@ -1271,9 +1270,8 @@ fn build_menubar_submenu_content(
                     if let Some(handle_id) = nested_submenu_for_leave.get() {
                         let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        mgr.close_immediate(handle);
+                        nested_submenu_for_leave.set(None);
                     }
                 });
             }
@@ -1461,13 +1459,12 @@ fn build_menubar_dropdown_content(
                 let submenu_key_for_hover = submenu_key.clone();
 
                 row = row.on_hover_enter(move |ctx| {
-                    // Close any existing submenu
+                    let mgr = get_overlay_manager();
+
+                    // Close any existing submenu immediately
                     if let Some(handle_id) = submenu_handle_for_hover.get() {
-                        let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        mgr.close_immediate(handle);
                     }
 
                     // Show submenu to the right of this item
@@ -1493,9 +1490,8 @@ fn build_menubar_dropdown_content(
                     if let Some(handle_id) = submenu_handle_for_leave.get() {
                         let mgr = get_overlay_manager();
                         let handle = OverlayHandle::from_raw(handle_id);
-                        if !mgr.is_closing(handle) && !mgr.is_pending_close(handle) {
-                            mgr.close(handle);
-                        }
+                        mgr.close_immediate(handle);
+                        submenu_handle_for_leave.set(None);
                     }
                 });
             }
@@ -1504,13 +1500,6 @@ fn build_menubar_dropdown_content(
         }
     }
 
-    // // Wrap in motion for animation
-    // div().child(
-    //     motion_derived(key)
-    //         .enter_animation(AnimationPreset::dropdown_in(150))
-    //         .exit_animation(AnimationPreset::dropdown_out(100))
-    //         .child(menu),
-    // )
     div().child(menu)
 }
 
