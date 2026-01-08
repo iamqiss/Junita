@@ -9,7 +9,6 @@ use blinc_app::prelude::*;
 use blinc_app::windowed::{WindowedApp, WindowedContext};
 use blinc_cn::prelude::*;
 use blinc_core::Color;
-use blinc_layout::layout_animation::LayoutAnimationConfig;
 use blinc_layout::selector::ScrollRef;
 use blinc_layout::widgets::text_input::text_input_data;
 use blinc_theme::{ColorScheme, ColorToken, ThemeState};
@@ -85,6 +84,10 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(sheet_section(ctx))
                         .child(drawer_section(ctx))
                         .child(tabs_section(ctx))
+                        .child(breadcrumb_section())
+                        .child(pagination_section(ctx))
+                        .child(navigation_menu_section())
+                        .child(sidebar_section(ctx))
                         .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(misc_section()),
@@ -1661,6 +1664,334 @@ fn tabs_section(ctx: &WindowedContext) -> impl ElementBuilder {
                                     .tab("x", "Overview", || div())
                                     .tab("y", "Details", || div())
                             }),
+                    ),
+            ),
+    )
+}
+
+// ============================================================================
+// BREADCRUMB SECTION
+// ============================================================================
+
+fn breadcrumb_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    // Home icon for breadcrumb
+    let home_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>"#;
+
+    section_container()
+        .child(section_title("Breadcrumb"))
+        .child(
+            div()
+                .flex_col()
+                .gap(20.0)
+                // Basic breadcrumb
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Basic Breadcrumb").size(14.0).color(text_secondary))
+                        .child(
+                            cn::breadcrumb()
+                                .item("Home", || tracing::info!("Home clicked"))
+                                .item("Products", || tracing::info!("Products clicked"))
+                                .item("Electronics", || tracing::info!("Electronics clicked"))
+                                .current("Laptop"),
+                        ),
+                )
+                // With icon
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("With Home Icon").size(14.0).color(text_secondary))
+                        .child(
+                            cn::breadcrumb()
+                                .item_with_icon("Home", home_icon, || {
+                                    tracing::info!("Home clicked")
+                                })
+                                .item("Settings", || tracing::info!("Settings clicked"))
+                                .current("Profile"),
+                        ),
+                )
+                // Slash separator
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Slash Separator").size(14.0).color(text_secondary))
+                        .child(
+                            cn::breadcrumb()
+                                .slash_separator()
+                                .item("Home", || {})
+                                .item("Documents", || {})
+                                .item("Projects", || {})
+                                .current("Current Project"),
+                        ),
+                )
+                // Custom text separator
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Custom Separator").size(14.0).color(text_secondary))
+                        .child(
+                            cn::breadcrumb()
+                                .text_separator("→")
+                                .item("Start", || {})
+                                .item("Middle", || {})
+                                .current("End"),
+                        ),
+                )
+                // Different sizes
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Sizes").size(14.0).color(text_secondary))
+                        .child(
+                            div()
+                                .flex_col()
+                                .gap(12.0)
+                                .child(
+                                    cn::breadcrumb()
+                                        .small()
+                                        .item("Home", || {})
+                                        .current("Small"),
+                                )
+                                .child(
+                                    cn::breadcrumb()
+                                        .item("Home", || {})
+                                        .current("Medium (default)"),
+                                )
+                                .child(
+                                    cn::breadcrumb()
+                                        .large()
+                                        .item("Home", || {})
+                                        .current("Large"),
+                                ),
+                        ),
+                ),
+        )
+}
+
+// ============================================================================
+// PAGINATION SECTION
+// ============================================================================
+
+fn pagination_section(ctx: &WindowedContext) -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    // State for each pagination demo
+    let page1 = ctx.use_state_keyed("pagination_page1", || 1usize);
+    let page2 = ctx.use_state_keyed("pagination_page2", || 5usize);
+    let page3 = ctx.use_state_keyed("pagination_page3", || 1usize);
+
+    section_container()
+        .child(section_title("Pagination"))
+        .child(
+            div()
+                .flex_col()
+                .gap(24.0)
+                // Basic pagination
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Basic Pagination (10 pages)")
+                                .size(14.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::pagination(10, page1.clone())
+                                .on_page_change(|page| tracing::info!("Page changed to: {}", page)),
+                        ),
+                )
+                // With first/last buttons
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("With First/Last Buttons (50 pages)")
+                                .size(14.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::pagination(50, page2.clone())
+                                .visible_pages(7)
+                                .show_first_last(true)
+                                .on_page_change(|page| tracing::info!("Page changed to: {}", page)),
+                        ),
+                )
+                // Size variants
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(12.0)
+                        .child(text("Size Variants").size(14.0).color(text_secondary))
+                        .child(
+                            div()
+                                .flex_row()
+                                .flex_wrap()
+                                .gap(24.0)
+                                .items_center()
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .gap(4.0)
+                                        .child(text("Small").size(12.0).color(text_secondary))
+                                        .child(cn::pagination(5, page3.clone()).small()),
+                                )
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .gap(4.0)
+                                        .child(text("Large").size(12.0).color(text_secondary))
+                                        .child(cn::pagination(5, page3.clone()).large()),
+                                ),
+                        ),
+                ),
+        )
+}
+
+// ============================================================================
+// NAVIGATION MENU SECTION
+// ============================================================================
+
+fn navigation_menu_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    section_container()
+        .child(section_title("Navigation Menu"))
+        .child(
+            div()
+                .flex_col()
+                .gap(20.0)
+                .child(
+                    text("Hover over triggers to see dropdown menus")
+                        .size(14.0)
+                        .color(text_secondary),
+                )
+                .child(
+                    cn::navigation_menu()
+                        .item("Home", || tracing::info!("Home clicked"))
+                        .trigger("Products", || {
+                            div()
+                                .flex_col()
+                                .gap(4.0)
+                                .child(
+                                    cn::navigation_link("Electronics")
+                                        .description("Browse our electronic devices")
+                                        .on_click(|| tracing::info!("Electronics clicked")),
+                                )
+                                .child(
+                                    cn::navigation_link("Clothing")
+                                        .description("Fashion and apparel")
+                                        .on_click(|| tracing::info!("Clothing clicked")),
+                                )
+                                .child(
+                                    cn::navigation_link("Home & Garden")
+                                        .description("Everything for your home")
+                                        .on_click(|| tracing::info!("Home & Garden clicked")),
+                                )
+                        })
+                        .trigger("Services", || {
+                            div()
+                                .flex_col()
+                                .gap(4.0)
+                                .child(
+                                    cn::navigation_link("Consulting")
+                                        .description("Expert advice for your business")
+                                        .on_click(|| tracing::info!("Consulting clicked")),
+                                )
+                                .child(
+                                    cn::navigation_link("Development")
+                                        .description("Custom software solutions")
+                                        .on_click(|| tracing::info!("Development clicked")),
+                                )
+                                .child(
+                                    cn::navigation_link("Support")
+                                        .description("24/7 customer support")
+                                        .on_click(|| tracing::info!("Support clicked")),
+                                )
+                        })
+                        .item("About", || tracing::info!("About clicked"))
+                        .item("Contact", || tracing::info!("Contact clicked")),
+                ),
+        )
+}
+
+// ============================================================================
+// SIDEBAR SECTION
+// ============================================================================
+
+fn sidebar_section(ctx: &WindowedContext) -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+    let border = theme.color(ColorToken::Border);
+
+    // State for sidebar collapse
+    let sidebar_collapsed = ctx.use_state_keyed("sidebar_collapsed", || false);
+
+    // Icon SVGs
+    let home_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>"#;
+    let search_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>"#;
+    let inbox_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>"#;
+    let settings_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>"#;
+    let user_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>"#;
+    let help_icon = r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>"#;
+
+    section_container().child(section_title("Sidebar")).child(
+        div()
+            .flex_col()
+            .gap(12.0)
+            .child(
+                text("Click the toggle button to collapse/expand the sidebar")
+                    .size(14.0)
+                    .color(text_secondary),
+            )
+            .child(
+                div()
+                    .animate_layout(
+                        LayoutAnimationConfig::all()
+                            .with_key("sidebar_demo_container")
+                            .snappy(),
+                    )
+                    .h(400.0)
+                    .border(1.0, border)
+                    .rounded(8.0)
+                    .overflow_clip()
+                    .flex_row()
+                    .child(
+                        cn::sidebar(&sidebar_collapsed)
+                            .item_active("Dashboard", home_icon, || {
+                                tracing::info!("Dashboard clicked")
+                            })
+                            .item("Search", search_icon, || tracing::info!("Search clicked"))
+                            .item("Inbox", inbox_icon, || tracing::info!("Inbox clicked"))
+                            .section("Account")
+                            .item("Profile", user_icon, || tracing::info!("Profile clicked"))
+                            .item("Settings", settings_icon, || {
+                                tracing::info!("Settings clicked")
+                            })
+                            .section("Help")
+                            .item("Support", help_icon, || tracing::info!("Support clicked")),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .bg(theme.color(ColorToken::Background))
+                            .p(24.0)
+                            .child(
+                                text("Main Content Area")
+                                    .size(18.0)
+                                    .color(theme.color(ColorToken::TextPrimary)),
+                            ),
                     ),
             ),
     )

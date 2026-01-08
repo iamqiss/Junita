@@ -411,7 +411,7 @@ pub fn check_stateful_deps(changed_signals: &[SignalId]) -> bool {
     let callbacks_to_call: Vec<Arc<dyn Fn() + Send + Sync>> = {
         let registry = STATEFUL_DEPS.lock().unwrap();
         if !changed_signals.is_empty() {
-            tracing::info!(
+            tracing::debug!(
                 "check_stateful_deps: checking {} changed signals against {} registered statefuls",
                 changed_signals.len(),
                 registry.len()
@@ -421,7 +421,7 @@ pub fn check_stateful_deps(changed_signals: &[SignalId]) -> bool {
             .iter()
             .filter_map(|(key, (deps, refresh_fn))| {
                 if deps.iter().any(|d| changed_signals.contains(d)) {
-                    tracing::info!(
+                    tracing::debug!(
                         "check_stateful_deps: will trigger refresh for stateful_key={}",
                         key
                     );
@@ -1885,11 +1885,7 @@ impl<S: StateTransitions> StateContext<S> {
     ///     })
     /// ```
     pub fn query_motion(&self, name: &str) -> crate::selector::MotionHandle {
-        let motion_key = format!(
-            "motion:{}:motion:{}:child:0",
-            self.full_key(),
-            name
-        );
+        let motion_key = format!("motion:{}:motion:{}:child:0", self.full_key(), name);
         crate::selector::query_motion(&motion_key)
     }
 

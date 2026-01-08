@@ -51,6 +51,7 @@ pub mod cn {
     pub use crate::components::accordion::accordion;
     pub use crate::components::alert::{alert, alert_box};
     pub use crate::components::badge::badge;
+    pub use crate::components::breadcrumb::breadcrumb;
     pub use crate::components::button::button;
     pub use crate::components::card::{card, card_content, card_footer, card_header};
     pub use crate::components::checkbox::checkbox;
@@ -64,11 +65,14 @@ pub mod cn {
     pub use crate::components::input::input;
     pub use crate::components::label::label;
     pub use crate::components::menubar::{menubar, MenuTriggerMode, MenuTriggerStyle};
+    pub use crate::components::navigation_menu::{navigation_link, navigation_menu};
+    pub use crate::components::pagination::pagination;
     pub use crate::components::progress::{progress, progress_animated};
     pub use crate::components::radio::radio_group;
     pub use crate::components::select::select;
     pub use crate::components::separator::separator;
     pub use crate::components::sheet::{sheet, sheet_bottom, sheet_left, sheet_right, sheet_top};
+    pub use crate::components::sidebar::sidebar;
     pub use crate::components::skeleton::{skeleton, skeleton_circle};
     pub use crate::components::slider::slider;
     pub use crate::components::spinner::spinner;
@@ -88,6 +92,9 @@ pub mod prelude {
     pub use crate::components::accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
     pub use crate::components::alert::{alert, alert_box, Alert, AlertBox, AlertVariant};
     pub use crate::components::badge::{badge, Badge, BadgeVariant};
+    pub use crate::components::breadcrumb::{
+        breadcrumb, Breadcrumb, BreadcrumbBuilder, BreadcrumbItem, BreadcrumbSeparator, BreadcrumbSize,
+    };
     pub use crate::components::button::{
         button, Button, ButtonBuilder, ButtonSize, ButtonVariant, IconPosition,
     };
@@ -120,6 +127,13 @@ pub mod prelude {
         menubar, MenuTriggerMode, MenuTriggerStyle, Menubar, MenubarBuilder, MenubarMenu,
         MenubarTrigger,
     };
+    pub use crate::components::navigation_menu::{
+        navigation_link, navigation_menu, NavigationLink, NavigationLinkBuilder, NavigationMenu,
+        NavigationMenuBuilder,
+    };
+    pub use crate::components::pagination::{
+        pagination, Pagination, PaginationBuilder, PaginationSize,
+    };
     pub use crate::components::progress::{
         progress, progress_animated, AnimatedProgress, Progress, ProgressSize,
     };
@@ -130,6 +144,9 @@ pub mod prelude {
     pub use crate::components::separator::{separator, Separator, SeparatorOrientation};
     pub use crate::components::sheet::{
         sheet, sheet_bottom, sheet_left, sheet_right, sheet_top, SheetBuilder, SheetSide, SheetSize,
+    };
+    pub use crate::components::sidebar::{
+        sidebar, Sidebar, SidebarBuilder, SidebarItem, SidebarSection,
     };
     pub use crate::components::skeleton::{skeleton, skeleton_circle, Skeleton};
     pub use crate::components::slider::{slider, Slider, SliderBuilder, SliderSize};

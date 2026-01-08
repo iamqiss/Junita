@@ -10,6 +10,7 @@
 pub mod accordion;
 pub mod alert;
 pub mod badge;
+pub mod breadcrumb;
 pub mod button;
 pub mod card;
 pub mod checkbox;
@@ -23,11 +24,14 @@ pub mod hover_card;
 pub mod input;
 pub mod label;
 pub mod menubar;
+pub mod navigation_menu;
+pub mod pagination;
 pub mod progress;
 pub mod radio;
 pub mod select;
 pub mod separator;
 pub mod sheet;
+pub mod sidebar;
 pub mod skeleton;
 pub mod slider;
 pub mod spinner;
@@ -41,6 +45,9 @@ pub mod tooltip;
 pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
 pub use alert::{alert, alert_box, Alert, AlertBox, AlertVariant};
 pub use badge::{badge, Badge, BadgeVariant};
+pub use breadcrumb::{
+    breadcrumb, Breadcrumb, BreadcrumbBuilder, BreadcrumbItem, BreadcrumbSeparator, BreadcrumbSize,
+};
 pub use button::{button, Button, ButtonBuilder, ButtonSize, ButtonVariant, IconPosition};
 pub use collapsible::{
     collapsible, collapsible_section, Collapsible, CollapsibleBuilder, CollapsibleTrigger,
@@ -65,6 +72,11 @@ pub use menubar::{
     menubar, MenuTriggerMode, MenuTriggerStyle, Menubar, MenubarBuilder, MenubarMenu,
     MenubarTrigger,
 };
+pub use navigation_menu::{
+    navigation_link, navigation_menu, NavigationLink, NavigationLinkBuilder, NavigationMenu,
+    NavigationMenuBuilder,
+};
+pub use pagination::{pagination, Pagination, PaginationBuilder, PaginationSize};
 pub use progress::{progress, progress_animated, AnimatedProgress, Progress, ProgressSize};
 pub use radio::{radio_group, RadioGroup, RadioGroupBuilder, RadioLayout, RadioSize};
 pub use select::{select, Select, SelectBuilder, SelectOption, SelectSize};
@@ -72,6 +84,7 @@ pub use separator::{separator, Separator, SeparatorOrientation};
 pub use sheet::{
     sheet, sheet_bottom, sheet_left, sheet_right, sheet_top, SheetBuilder, SheetSide, SheetSize,
 };
+pub use sidebar::{sidebar, Sidebar, SidebarBuilder, SidebarItem, SidebarSection};
 pub use skeleton::{skeleton, skeleton_circle, Skeleton};
 pub use slider::{slider, Slider, SliderSize};
 pub use spinner::{spinner, Spinner, SpinnerSize};

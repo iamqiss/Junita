@@ -93,10 +93,10 @@ Navigation components.
 | Component | Primitives Used | Status |
 |-----------|-----------------|--------|
 | **Tabs** | Stateful, div, text | ✅ Done |
-| **Breadcrumb** | div, link | Planned |
-| **Pagination** | div, button | Planned |
-| **Navigation Menu** | div, overlay | Planned |
-| **Sidebar** | div, scroll | Planned |
+| **Breadcrumb** | div, link | ✅ Done |
+| **Pagination** | div, button | ✅ Done |
+| **Navigation Menu** | div, overlay | ✅ Done |
+| **Sidebar** | div, scroll, SharedAnimatedValue | ✅ Done |
 
 ### 7. Layout (Priority: Low)
 
