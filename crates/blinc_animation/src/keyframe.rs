@@ -17,6 +17,7 @@ pub struct Keyframe {
 }
 
 /// A keyframe-based animation (single value)
+#[derive(Clone, Debug)]
 pub struct KeyframeAnimation {
     duration_ms: u32,
     keyframes: Vec<Keyframe>,
@@ -96,6 +97,11 @@ impl KeyframeAnimation {
             self.current_time = self.duration_ms as f32;
             self.playing = false;
         }
+    }
+
+    /// Get the keyframes
+    pub fn keyframes(&self) -> &[Keyframe] {
+        &self.keyframes
     }
 }
 
@@ -529,5 +535,330 @@ impl MultiKeyframeAnimation {
 impl Default for MultiKeyframeAnimation {
     fn default() -> Self {
         Self::new(300)
+    }
+}
+
+// ============================================================================
+// Keyframe Track Builder - Fluent API for single-value keyframe animations
+// ============================================================================
+
+/// A point in time with a value for keyframe animation
+#[derive(Clone, Debug)]
+pub struct KeyframePoint {
+    /// Time in milliseconds
+    pub time_ms: u32,
+    /// Value at this time
+    pub value: f32,
+    /// Easing to use when transitioning TO this point
+    pub easing: Easing,
+}
+
+/// Builder for creating keyframe animations with a fluent API
+///
+/// # Example
+///
+/// ```ignore
+/// let track = KeyframeTrackBuilder::new()
+///     .at(0, 0.8)
+///     .at(800, 1.2)
+///     .ease(Easing::EaseInOut)
+///     .ping_pong()
+///     .loop_infinite()
+///     .build();
+/// ```
+#[derive(Clone, Debug)]
+pub struct KeyframeTrackBuilder {
+    /// Keyframe points (time_ms, value)
+    points: Vec<KeyframePoint>,
+    /// Default easing for all keyframes (can be overridden per-keyframe)
+    default_easing: Easing,
+    /// Play direction
+    direction: PlayDirection,
+    /// Number of iterations (-1 for infinite)
+    iterations: i32,
+    /// Delay before starting (ms)
+    delay_ms: u32,
+    /// Fill mode
+    fill_mode: FillMode,
+    /// Whether to auto-start
+    auto_start: bool,
+}
+
+impl Default for KeyframeTrackBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeyframeTrackBuilder {
+    /// Create a new keyframe track builder
+    pub fn new() -> Self {
+        Self {
+            points: Vec::new(),
+            default_easing: Easing::Linear,
+            direction: PlayDirection::Forward,
+            iterations: 1,
+            delay_ms: 0,
+            fill_mode: FillMode::Forwards,
+            auto_start: false,
+        }
+    }
+
+    /// Add a keyframe at a specific time (in milliseconds)
+    pub fn at(mut self, time_ms: u32, value: f32) -> Self {
+        self.points.push(KeyframePoint {
+            time_ms,
+            value,
+            easing: self.default_easing,
+        });
+        self
+    }
+
+    /// Add a keyframe with specific easing
+    pub fn at_with_ease(mut self, time_ms: u32, value: f32, easing: Easing) -> Self {
+        self.points.push(KeyframePoint {
+            time_ms,
+            value,
+            easing,
+        });
+        self
+    }
+
+    /// Set the default easing for all keyframes
+    ///
+    /// This applies to keyframes added after this call, and updates
+    /// existing keyframes that haven't had explicit easing set.
+    pub fn ease(mut self, easing: Easing) -> Self {
+        self.default_easing = easing;
+        // Update existing points that use the default
+        for point in &mut self.points {
+            point.easing = easing;
+        }
+        self
+    }
+
+    /// Enable ping-pong mode (alternate between forward and reverse)
+    ///
+    /// The animation plays forward, then backward, creating a smooth
+    /// back-and-forth effect without needing duplicate keyframes.
+    pub fn ping_pong(mut self) -> Self {
+        self.direction = PlayDirection::Alternate;
+        self
+    }
+
+    /// Alias for ping_pong()
+    pub fn alternate(self) -> Self {
+        self.ping_pong()
+    }
+
+    /// Play in reverse direction
+    pub fn reverse(mut self) -> Self {
+        self.direction = PlayDirection::Reverse;
+        self
+    }
+
+    /// Set the number of loop iterations
+    pub fn loop_count(mut self, count: i32) -> Self {
+        self.iterations = count;
+        self
+    }
+
+    /// Loop infinitely
+    pub fn loop_infinite(mut self) -> Self {
+        self.iterations = -1;
+        self
+    }
+
+    /// Set delay before animation starts (in milliseconds)
+    pub fn delay(mut self, delay_ms: u32) -> Self {
+        self.delay_ms = delay_ms;
+        self
+    }
+
+    /// Set fill mode (what happens before/after animation)
+    pub fn fill(mut self, fill_mode: FillMode) -> Self {
+        self.fill_mode = fill_mode;
+        self
+    }
+
+    /// Auto-start the animation when built
+    pub fn start(mut self) -> Self {
+        self.auto_start = true;
+        self
+    }
+
+    /// Get the total duration based on keyframe times
+    pub fn duration_ms(&self) -> u32 {
+        self.points.iter().map(|p| p.time_ms).max().unwrap_or(0)
+    }
+
+    /// Build into a KeyframeTrack
+    pub fn build(mut self) -> KeyframeTrack {
+        // Sort points by time
+        self.points.sort_by_key(|p| p.time_ms);
+
+        let duration = self.duration_ms();
+
+        // Convert to normalized keyframes (time as 0.0-1.0)
+        let keyframes: Vec<Keyframe> = self
+            .points
+            .iter()
+            .map(|p| {
+                let time = if duration > 0 {
+                    p.time_ms as f32 / duration as f32
+                } else {
+                    0.0
+                };
+                Keyframe {
+                    time,
+                    value: p.value,
+                    easing: p.easing,
+                }
+            })
+            .collect();
+
+        let mut animation = KeyframeAnimation::new(duration, keyframes);
+
+        if self.auto_start {
+            animation.start();
+        }
+
+        KeyframeTrack {
+            animation,
+            direction: self.direction,
+            iterations: self.iterations,
+            current_iteration: 0,
+            reversed: self.direction == PlayDirection::Reverse,
+            delay_ms: self.delay_ms,
+            fill_mode: self.fill_mode,
+            duration_ms: duration,
+        }
+    }
+}
+
+/// A complete keyframe track with playback controls
+///
+/// Wraps KeyframeAnimation with additional features like ping-pong,
+/// looping, and fill modes.
+#[derive(Clone, Debug)]
+pub struct KeyframeTrack {
+    animation: KeyframeAnimation,
+    direction: PlayDirection,
+    iterations: i32,
+    current_iteration: i32,
+    reversed: bool,
+    delay_ms: u32,
+    fill_mode: FillMode,
+    duration_ms: u32,
+}
+
+impl KeyframeTrack {
+    /// Create a new builder
+    pub fn builder() -> KeyframeTrackBuilder {
+        KeyframeTrackBuilder::new()
+    }
+
+    /// Start the animation
+    pub fn start(&mut self) {
+        self.current_iteration = 0;
+        self.reversed = self.direction == PlayDirection::Reverse;
+        self.animation.start();
+    }
+
+    /// Stop the animation
+    pub fn stop(&mut self) {
+        self.animation.stop();
+    }
+
+    /// Restart the animation from the beginning
+    pub fn restart(&mut self) {
+        self.start();
+    }
+
+    /// Check if the animation is playing
+    pub fn is_playing(&self) -> bool {
+        self.animation.is_playing() || self.should_continue()
+    }
+
+    /// Check if we should continue to next iteration
+    fn should_continue(&self) -> bool {
+        self.iterations < 0 || self.current_iteration < self.iterations
+    }
+
+    /// Get the current value with ping-pong and iteration support
+    pub fn value(&self) -> f32 {
+        let keyframes = self.animation.keyframes();
+        if keyframes.is_empty() {
+            return 0.0;
+        }
+
+        let progress = self.animation.progress().clamp(0.0, 1.0);
+
+        // Apply reverse if in ping-pong mode and on reverse phase
+        let effective_progress = if self.reversed {
+            1.0 - progress
+        } else {
+            progress
+        };
+
+        // Find surrounding keyframes
+        let mut prev_kf = &keyframes[0];
+        let mut next_kf = &keyframes[0];
+
+        for kf in keyframes {
+            if kf.time <= effective_progress {
+                prev_kf = kf;
+            }
+            if kf.time >= effective_progress {
+                next_kf = kf;
+                break;
+            }
+        }
+
+        if (prev_kf.time - next_kf.time).abs() < f32::EPSILON {
+            return prev_kf.value;
+        }
+
+        // Interpolate between keyframes
+        let local_progress = (effective_progress - prev_kf.time) / (next_kf.time - prev_kf.time);
+        let eased = next_kf.easing.apply(local_progress);
+
+        prev_kf.value + (next_kf.value - prev_kf.value) * eased
+    }
+
+    /// Get the current progress (0.0 to 1.0)
+    pub fn progress(&self) -> f32 {
+        let progress = self.animation.progress();
+        if self.reversed {
+            1.0 - progress
+        } else {
+            progress
+        }
+    }
+
+    /// Advance the animation by delta time (in milliseconds)
+    pub fn tick(&mut self, dt_ms: f32) {
+        self.animation.tick(dt_ms);
+
+        // Check if we've completed an iteration
+        if self.animation.progress() >= 1.0 && !self.animation.is_playing() {
+            self.current_iteration += 1;
+
+            // Check if we should continue
+            if self.iterations < 0 || self.current_iteration < self.iterations {
+                // Reset for next iteration
+                self.animation.start();
+
+                // Handle alternate direction
+                if self.direction == PlayDirection::Alternate {
+                    self.reversed = !self.reversed;
+                }
+            }
+        }
+    }
+
+    /// Get the duration in milliseconds
+    pub fn duration_ms(&self) -> u32 {
+        self.duration_ms
     }
 }

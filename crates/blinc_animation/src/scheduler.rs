@@ -984,6 +984,18 @@ pub struct AnimatedKeyframe {
     duration_ms: u32,
     keyframes: Vec<Keyframe>,
     auto_start: bool,
+    /// Number of iterations (-1 for infinite, 0 for none, 1 for once, etc.)
+    iterations: i32,
+    /// Whether to reverse direction on each iteration (ping-pong)
+    ping_pong: bool,
+    /// Current iteration count
+    current_iteration: i32,
+    /// Whether currently playing in reverse
+    reversed: bool,
+    /// Delay before animation starts (ms)
+    delay_ms: u32,
+    /// Time when animation started (for delay tracking)
+    start_time: Option<std::time::Instant>,
 }
 
 impl AnimatedKeyframe {
@@ -995,6 +1007,12 @@ impl AnimatedKeyframe {
             duration_ms,
             keyframes: Vec::new(),
             auto_start: false,
+            iterations: 1, // Play once by default
+            ping_pong: false,
+            current_iteration: 0,
+            reversed: false,
+            delay_ms: 0,
+            start_time: None,
         }
     }
 
@@ -1014,6 +1032,30 @@ impl AnimatedKeyframe {
         self
     }
 
+    /// Set number of iterations (-1 for infinite)
+    pub fn iterations(mut self, count: i32) -> Self {
+        self.iterations = count;
+        self
+    }
+
+    /// Enable infinite looping
+    pub fn loop_infinite(mut self) -> Self {
+        self.iterations = -1;
+        self
+    }
+
+    /// Enable ping-pong mode (reverse direction on each iteration)
+    pub fn ping_pong(mut self, enabled: bool) -> Self {
+        self.ping_pong = enabled;
+        self
+    }
+
+    /// Set delay before animation starts (in milliseconds)
+    pub fn delay(mut self, delay_ms: u32) -> Self {
+        self.delay_ms = delay_ms;
+        self
+    }
+
     /// Build and register the animation, returning self for chaining
     pub fn build(mut self) -> Self {
         // Sort keyframes by time
@@ -1023,14 +1065,16 @@ impl AnimatedKeyframe {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let mut animation = KeyframeAnimation::new(self.duration_ms, self.keyframes.clone());
-
-        if self.auto_start {
-            animation.start();
-        }
+        // Create the underlying animation (don't start it yet - we handle that)
+        let animation = KeyframeAnimation::new(self.duration_ms, self.keyframes.clone());
 
         if let Some(id) = self.handle.register_keyframe(animation) {
             self.keyframe_id = Some(id);
+        }
+
+        // If auto_start, call our start() method which handles delay properly
+        if self.auto_start {
+            self.start();
         }
 
         self
@@ -1038,10 +1082,23 @@ impl AnimatedKeyframe {
 
     /// Start the animation
     pub fn start(&mut self) {
-        if let Some(id) = self.keyframe_id {
-            self.handle.start_keyframe(id);
+        self.current_iteration = 0;
+        self.reversed = false;
+
+        // Track start time for delay
+        if self.delay_ms > 0 {
+            self.start_time = Some(std::time::Instant::now());
         } else {
-            // Not yet registered - register now and start
+            self.start_time = None;
+        }
+
+        if let Some(id) = self.keyframe_id {
+            if self.delay_ms == 0 {
+                self.handle.start_keyframe(id);
+            }
+            // If there's a delay, don't start yet - check_and_update will handle it
+        } else {
+            // Not yet registered - register now
             self.keyframes.sort_by(|a, b| {
                 a.time
                     .partial_cmp(&b.time)
@@ -1049,7 +1106,9 @@ impl AnimatedKeyframe {
             });
 
             let mut animation = KeyframeAnimation::new(self.duration_ms, self.keyframes.clone());
-            animation.start();
+            if self.delay_ms == 0 {
+                animation.start();
+            }
 
             if let Some(id) = self.handle.register_keyframe(animation) {
                 self.keyframe_id = Some(id);
@@ -1058,17 +1117,93 @@ impl AnimatedKeyframe {
     }
 
     /// Stop the animation
-    pub fn stop(&self) {
+    pub fn stop(&mut self) {
+        self.start_time = None;
         if let Some(id) = self.keyframe_id {
             self.handle.stop_keyframe(id);
         }
     }
 
-    /// Get the current animated value
-    pub fn get(&self) -> f32 {
+    /// Restart the animation from the beginning
+    pub fn restart(&mut self) {
+        self.stop();
+        self.start();
+    }
+
+    /// Check and handle iteration completion, delay, etc.
+    /// Returns true if animation should continue running.
+    fn check_and_update(&mut self) -> bool {
+        // Handle delay
+        if let Some(start_time) = self.start_time {
+            let elapsed = start_time.elapsed().as_millis() as u32;
+            if elapsed < self.delay_ms {
+                return true; // Still in delay period
+            }
+            // Delay complete - start the actual animation
+            self.start_time = None;
+            if let Some(id) = self.keyframe_id {
+                self.handle.start_keyframe(id);
+            }
+        }
+
+        // Check if current iteration completed
         if let Some(id) = self.keyframe_id {
-            self.handle.get_keyframe_value(id).unwrap_or(0.0)
-        } else if !self.keyframes.is_empty() {
+            if !self.handle.is_keyframe_playing(id) {
+                // Animation finished this iteration
+                self.current_iteration += 1;
+
+                // Check if we should continue
+                let should_continue =
+                    self.iterations < 0 || self.current_iteration < self.iterations;
+
+                if should_continue {
+                    // Handle ping-pong
+                    if self.ping_pong {
+                        self.reversed = !self.reversed;
+                    }
+                    // Restart the animation for next iteration
+                    self.handle.start_keyframe(id);
+                    return true;
+                }
+            } else {
+                return true; // Still playing
+            }
+        }
+
+        false
+    }
+
+    /// Get the current animated value
+    pub fn get(&mut self) -> f32 {
+        // Check for iteration completion and handle looping
+        self.check_and_update();
+
+        // If in delay period, return initial value
+        if self.start_time.is_some() {
+            return self.get_initial_value();
+        }
+
+        if let Some(id) = self.keyframe_id {
+            let raw_value = self.handle.get_keyframe_value(id).unwrap_or(0.0);
+
+            // Apply reverse if in ping-pong and on reverse phase
+            if self.reversed && !self.keyframes.is_empty() {
+                // Map value from [start, end] to [end, start]
+                let first = self.keyframes.first().map(|k| k.value).unwrap_or(0.0);
+                let last = self.keyframes.last().map(|k| k.value).unwrap_or(0.0);
+                // Reverse: if raw is at 'first' position, return 'last', and vice versa
+                first + last - raw_value
+            } else {
+                raw_value
+            }
+        } else {
+            self.get_initial_value()
+        }
+    }
+
+    /// Get immutable value (doesn't check iteration)
+    fn get_initial_value(&self) -> f32 {
+        if !self.keyframes.is_empty() {
             self.keyframes[0].value
         } else {
             0.0
@@ -1078,16 +1213,34 @@ impl AnimatedKeyframe {
     /// Get the current progress (0.0 to 1.0)
     pub fn progress(&self) -> f32 {
         if let Some(id) = self.keyframe_id {
-            self.handle.get_keyframe_progress(id).unwrap_or(0.0)
+            let raw_progress = self.handle.get_keyframe_progress(id).unwrap_or(0.0);
+            if self.reversed {
+                1.0 - raw_progress
+            } else {
+                raw_progress
+            }
         } else {
             0.0
         }
     }
 
-    /// Check if the animation is playing
-    pub fn is_playing(&self) -> bool {
+    /// Check if the animation is playing (including during delay and looping)
+    pub fn is_playing(&mut self) -> bool {
+        // In delay period counts as playing
+        if self.start_time.is_some() {
+            return true;
+        }
+
+        // Check and update iteration state
+        self.check_and_update();
+
+        // Check if underlying animation is playing
         if let Some(id) = self.keyframe_id {
-            self.handle.is_keyframe_playing(id)
+            if self.handle.is_keyframe_playing(id) {
+                return true;
+            }
+            // If not playing, check if we should continue looping
+            self.iterations < 0 || self.current_iteration < self.iterations
         } else {
             false
         }
@@ -1252,11 +1405,52 @@ impl AnimatedTimeline {
         }
     }
 
+    /// Add an animation with a specific easing function
+    pub fn add_with_easing(
+        &mut self,
+        offset_ms: i32,
+        duration_ms: u32,
+        start_value: f32,
+        end_value: f32,
+        easing: Easing,
+    ) -> crate::timeline::TimelineEntryId {
+        if let Some(id) = self.timeline_id {
+            self.handle
+                .with_timeline(id, |timeline| {
+                    timeline.add_with_easing(offset_ms, duration_ms, start_value, end_value, easing)
+                })
+                .expect("Timeline should exist")
+        } else {
+            panic!("Timeline not registered - scheduler may have been dropped")
+        }
+    }
+
     /// Set loop count (-1 for infinite)
     pub fn set_loop(&mut self, count: i32) {
         if let Some(id) = self.timeline_id {
             self.handle.with_timeline(id, |timeline| {
                 timeline.set_loop(count);
+            });
+        }
+    }
+
+    /// Enable/disable alternate (ping-pong) mode
+    ///
+    /// When enabled, the timeline reverses direction each loop instead of
+    /// jumping back to the start.
+    pub fn set_alternate(&mut self, enabled: bool) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.set_alternate(enabled);
+            });
+        }
+    }
+
+    /// Set playback rate (1.0 = normal speed, 2.0 = 2x speed)
+    pub fn set_playback_rate(&mut self, rate: f32) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.set_playback_rate(rate);
             });
         }
     }
@@ -1290,6 +1484,42 @@ impl AnimatedTimeline {
         }
     }
 
+    /// Pause the timeline (can be resumed)
+    pub fn pause(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.pause();
+            });
+        }
+    }
+
+    /// Resume a paused timeline
+    pub fn resume(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.resume();
+            });
+        }
+    }
+
+    /// Reverse the playback direction
+    pub fn reverse(&self) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.reverse();
+            });
+        }
+    }
+
+    /// Seek to a specific time position (in milliseconds)
+    pub fn seek(&self, time_ms: f32) {
+        if let Some(id) = self.timeline_id {
+            self.handle.with_timeline(id, |timeline| {
+                timeline.seek(time_ms);
+            });
+        }
+    }
+
     /// Get the current value for a timeline entry
     pub fn get(&self, entry_id: crate::timeline::TimelineEntryId) -> Option<f32> {
         if let Some(id) = self.timeline_id {
@@ -1307,6 +1537,28 @@ impl AnimatedTimeline {
             self.handle.is_timeline_playing(id)
         } else {
             false
+        }
+    }
+
+    /// Get the overall timeline progress (0.0 to 1.0)
+    pub fn progress(&self) -> f32 {
+        if let Some(id) = self.timeline_id {
+            self.handle
+                .with_timeline(id, |timeline| timeline.progress())
+                .unwrap_or(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Get progress of a specific entry (0.0 to 1.0)
+    pub fn entry_progress(&self, entry_id: crate::timeline::TimelineEntryId) -> Option<f32> {
+        if let Some(id) = self.timeline_id {
+            self.handle
+                .with_timeline(id, |timeline| timeline.entry_progress(entry_id))
+                .flatten()
+        } else {
+            None
         }
     }
 

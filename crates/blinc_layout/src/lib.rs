@@ -136,10 +136,10 @@ pub use render_state::{
 
 // Stateful elements
 pub use stateful::{
-    check_stateful_deps, has_pending_subtree_rebuilds, queue_prop_update, queue_subtree_rebuild,
-    request_redraw, take_needs_redraw, take_pending_prop_updates, take_pending_subtree_rebuilds,
-    use_shared_state, use_shared_state_with, PendingSubtreeRebuild, SharedState, StateTransitions,
-    StatefulInner,
+    check_stateful_animations, check_stateful_deps, has_animating_statefuls,
+    has_pending_subtree_rebuilds, queue_prop_update, queue_subtree_rebuild, request_redraw,
+    take_needs_redraw, take_pending_prop_updates, take_pending_subtree_rebuilds, use_shared_state,
+    use_shared_state_with, PendingSubtreeRebuild, SharedState, StateTransitions, StatefulInner,
 };
 
 // Animation integration
@@ -232,8 +232,10 @@ pub mod prelude {
         NoState,
         ScrollContainer,
         ScrollState,
+        KeyframeHandle,
         SharedAnimatedTimeline,
         SharedAnimatedValue,
+        SharedKeyframeTrack,
         SharedState,
         StateContext,
         StateTransitions,

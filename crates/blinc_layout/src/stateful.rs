@@ -65,7 +65,9 @@ use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use crate::div::{Div, ElementBuilder, ElementRef, ElementTypeId};
 use crate::element::RenderProps;
 use crate::tree::{LayoutNodeId, LayoutTree};
-use blinc_animation::{AnimatedTimeline, AnimatedValue, SchedulerHandle, SpringConfig};
+use blinc_animation::{
+    AnimatedKeyframe, AnimatedTimeline, AnimatedValue, Easing, SchedulerHandle, SpringConfig,
+};
 use blinc_core::reactive::SignalId;
 
 /// Re-export SharedAnimatedValue from motion module
@@ -74,12 +76,200 @@ pub use crate::motion::SharedAnimatedValue;
 /// Shared animated timeline that can be cloned and accessed from multiple places
 pub type SharedAnimatedTimeline = Arc<Mutex<AnimatedTimeline>>;
 
+/// Shared keyframe animation that can be cloned and accessed from multiple places
+pub type SharedKeyframeTrack = Arc<Mutex<AnimatedKeyframe>>;
+
+/// Handle for interacting with an animated timeline
+///
+/// Provides convenient methods without requiring manual mutex locking.
+#[derive(Clone)]
+pub struct TimelineHandle {
+    inner: SharedAnimatedTimeline,
+}
+
+impl TimelineHandle {
+    /// Get the current value for a timeline entry
+    pub fn get(&self, entry_id: blinc_animation::TimelineEntryId) -> Option<f32> {
+        self.inner.lock().unwrap().get(entry_id)
+    }
+
+    /// Restart the timeline from the beginning
+    pub fn restart(&self) {
+        self.inner.lock().unwrap().restart();
+    }
+
+    /// Start the timeline (if not already playing)
+    pub fn start(&self) {
+        self.inner.lock().unwrap().start();
+    }
+
+    /// Stop the timeline
+    pub fn stop(&self) {
+        self.inner.lock().unwrap().stop();
+    }
+
+    /// Check if the timeline is currently playing
+    pub fn is_playing(&self) -> bool {
+        self.inner.lock().unwrap().is_playing()
+    }
+}
+
+/// Handle for interacting with an animated keyframe track
+///
+/// Provides convenient methods without requiring manual mutex locking.
+#[derive(Clone)]
+pub struct KeyframeHandle {
+    inner: SharedKeyframeTrack,
+}
+
+/// Builder for keyframe animations with a user-friendly API
+///
+/// Collects keyframe points and settings, then builds into an AnimatedKeyframe.
+pub struct KeyframeBuilder {
+    points: Vec<(u32, f32)>, // (time_ms, value)
+    default_easing: Easing,
+    ping_pong: bool,
+    iterations: i32,
+    delay_ms: u32,
+    auto_start: bool,
+}
+
+impl KeyframeBuilder {
+    /// Create a new keyframe builder
+    pub fn new() -> Self {
+        Self {
+            points: Vec::new(),
+            default_easing: Easing::Linear,
+            ping_pong: false,
+            iterations: 1,
+            delay_ms: 0,
+            auto_start: false,
+        }
+    }
+
+    /// Add a keyframe at the given time (in milliseconds)
+    pub fn at(mut self, time_ms: u32, value: f32) -> Self {
+        self.points.push((time_ms, value));
+        self
+    }
+
+    /// Set the default easing function for keyframes
+    pub fn ease(mut self, easing: Easing) -> Self {
+        self.default_easing = easing;
+        self
+    }
+
+    /// Enable ping-pong mode (reverse direction on each iteration)
+    pub fn ping_pong(mut self) -> Self {
+        self.ping_pong = true;
+        self
+    }
+
+    /// Set number of iterations (-1 for infinite)
+    pub fn loop_count(mut self, count: i32) -> Self {
+        self.iterations = count;
+        self
+    }
+
+    /// Enable infinite looping
+    pub fn loop_infinite(mut self) -> Self {
+        self.iterations = -1;
+        self
+    }
+
+    /// Set delay before animation starts (in milliseconds)
+    pub fn delay(mut self, delay_ms: u32) -> Self {
+        self.delay_ms = delay_ms;
+        self
+    }
+
+    /// Auto-start the animation when created
+    pub fn start(mut self) -> Self {
+        self.auto_start = true;
+        self
+    }
+
+    /// Build into an AnimatedKeyframe using the given scheduler handle
+    pub(crate) fn build_with_handle(self, handle: SchedulerHandle) -> AnimatedKeyframe {
+        // Calculate duration from keyframe points
+        let duration_ms = self.points.iter().map(|(t, _)| *t).max().unwrap_or(0);
+
+        // Create AnimatedKeyframe
+        let mut anim = AnimatedKeyframe::new(handle, duration_ms);
+
+        // Add keyframes (convert time_ms to normalized 0.0-1.0)
+        for (time_ms, value) in &self.points {
+            let time = if duration_ms > 0 {
+                *time_ms as f32 / duration_ms as f32
+            } else {
+                0.0
+            };
+            anim = anim.keyframe(time, *value, self.default_easing);
+        }
+
+        // Apply settings
+        anim = anim
+            .iterations(self.iterations)
+            .ping_pong(self.ping_pong)
+            .delay(self.delay_ms);
+
+        if self.auto_start {
+            anim = anim.auto_start(true);
+        }
+
+        // Build and register with scheduler
+        anim.build()
+    }
+}
+
+impl Default for KeyframeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeyframeHandle {
+    /// Get the current animated value
+    pub fn get(&self) -> f32 {
+        self.inner.lock().unwrap().get()
+    }
+
+    /// Get the current progress (0.0 to 1.0)
+    pub fn progress(&self) -> f32 {
+        self.inner.lock().unwrap().progress()
+    }
+
+    /// Start the animation
+    pub fn start(&self) {
+        self.inner.lock().unwrap().start();
+    }
+
+    /// Stop the animation
+    pub fn stop(&self) {
+        self.inner.lock().unwrap().stop();
+    }
+
+    /// Restart the animation from the beginning
+    pub fn restart(&self) {
+        self.inner.lock().unwrap().restart();
+    }
+
+    /// Check if the animation is currently playing
+    pub fn is_playing(&self) -> bool {
+        self.inner.lock().unwrap().is_playing()
+    }
+}
+
 /// Global storage for persisted animated values keyed by stateful context
 static PERSISTED_ANIMATED_VALUES: LazyLock<RwLock<HashMap<String, SharedAnimatedValue>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Global storage for persisted animated timelines keyed by stateful context
 static PERSISTED_ANIMATED_TIMELINES: LazyLock<RwLock<HashMap<String, SharedAnimatedTimeline>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Global storage for persisted keyframe tracks keyed by stateful context
+static PERSISTED_KEYFRAME_TRACKS: LazyLock<RwLock<HashMap<String, SharedKeyframeTrack>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // =========================================================================
@@ -248,6 +438,132 @@ pub fn check_stateful_deps(changed_signals: &[SignalId]) -> bool {
         callback();
     }
     triggered
+}
+
+// =========================================================================
+// Animation-Driven Refresh Registry
+// =========================================================================
+
+/// Registry of stateful elements with active animations
+///
+/// Maps stateful_key -> (animation_keys, refresh_fn) where animation_keys are
+/// the persisted animated value keys and refresh_fn triggers a callback re-run.
+/// The windowed app checks these on animation frames to update animating statefuls.
+static STATEFUL_ANIMATIONS: LazyLock<
+    Mutex<std::collections::HashMap<u64, (Vec<String>, Arc<dyn Fn() + Send + Sync>)>>,
+> = LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
+
+/// Register a stateful element for animation-driven refresh
+///
+/// Called internally when `use_spring()` or `use_animated_value()` is used
+/// and the animation is active (not settled).
+pub(crate) fn register_stateful_animation(
+    stateful_key: u64,
+    animation_keys: Vec<String>,
+    refresh_fn: Arc<dyn Fn() + Send + Sync>,
+) {
+    STATEFUL_ANIMATIONS
+        .lock()
+        .unwrap()
+        .insert(stateful_key, (animation_keys, refresh_fn));
+}
+
+/// Unregister a stateful element from animation refresh
+///
+/// Called when all animations for a stateful have settled.
+#[allow(dead_code)]
+pub(crate) fn unregister_stateful_animation(stateful_key: u64) {
+    STATEFUL_ANIMATIONS.lock().unwrap().remove(&stateful_key);
+}
+
+/// Check all registered statefuls with animations and trigger refresh for active ones
+///
+/// Called by windowed app on animation frames (when scheduler.take_needs_redraw() is true).
+/// Returns true if any statefuls were refreshed.
+pub fn check_stateful_animations() -> bool {
+    // Collect callbacks to call and animation keys to check
+    let entries: Vec<(u64, Vec<String>, Arc<dyn Fn() + Send + Sync>)> = {
+        let registry = STATEFUL_ANIMATIONS.lock().unwrap();
+        registry
+            .iter()
+            .map(|(key, (anim_keys, refresh_fn))| (*key, anim_keys.clone(), Arc::clone(refresh_fn)))
+            .collect()
+    };
+
+    if entries.is_empty() {
+        return false;
+    }
+
+    // Check which statefuls have active (not settled) animations
+    let persisted_values = PERSISTED_ANIMATED_VALUES.read().unwrap();
+    let persisted_timelines = PERSISTED_ANIMATED_TIMELINES.read().unwrap();
+    let persisted_keyframes = PERSISTED_KEYFRAME_TRACKS.read().unwrap();
+    let mut callbacks_to_call = Vec::new();
+    let mut settled_statefuls = Vec::new();
+
+    for (stateful_key, anim_keys, refresh_fn) in entries {
+        let mut has_active = false;
+        for anim_key in &anim_keys {
+            // Check spring/animated values
+            if let Some(animated) = persisted_values.get(anim_key) {
+                if let Ok(guard) = animated.lock() {
+                    if guard.is_animating() {
+                        has_active = true;
+                        break;
+                    }
+                }
+            }
+            // Check timelines
+            if let Some(timeline) = persisted_timelines.get(anim_key) {
+                if let Ok(guard) = timeline.lock() {
+                    if guard.is_playing() {
+                        has_active = true;
+                        break;
+                    }
+                }
+            }
+            // Check keyframe tracks
+            if let Some(track) = persisted_keyframes.get(anim_key) {
+                if let Ok(mut guard) = track.lock() {
+                    if guard.is_playing() {
+                        has_active = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if has_active {
+            callbacks_to_call.push(refresh_fn);
+        } else {
+            // All animations settled - mark for unregistration
+            settled_statefuls.push(stateful_key);
+        }
+    }
+    drop(persisted_values);
+    drop(persisted_timelines);
+    drop(persisted_keyframes);
+
+    // Unregister settled statefuls
+    if !settled_statefuls.is_empty() {
+        let mut registry = STATEFUL_ANIMATIONS.lock().unwrap();
+        for key in settled_statefuls {
+            registry.remove(&key);
+        }
+    }
+
+    // Call refresh callbacks (lock is released)
+    let triggered = !callbacks_to_call.is_empty();
+    for callback in callbacks_to_call {
+        callback();
+    }
+
+    triggered
+}
+
+/// Check if there are stateful elements registered for animation refresh
+pub fn has_animating_statefuls() -> bool {
+    !STATEFUL_ANIMATIONS.lock().unwrap().is_empty()
 }
 
 /// Take all pending prop updates
@@ -723,6 +1039,10 @@ pub struct StatefulInner<S: StateTransitions> {
     /// Refresh callback for re-registering deps dynamically
     /// Set during StatefulBuilder::on_state() and used by use_effect()
     pub(crate) refresh_callback: Option<Arc<dyn Fn() + Send + Sync>>,
+
+    /// Animation keys used by this stateful (for animation-driven refresh)
+    /// Updated after each callback invocation with keys of active animations.
+    pub(crate) animation_keys: Vec<String>,
 }
 
 impl<S: StateTransitions> StatefulInner<S> {
@@ -739,6 +1059,7 @@ impl<S: StateTransitions> StatefulInner<S> {
             ancestor_motion_key: None,
             current_event: None,
             refresh_callback: None,
+            animation_keys: Vec::new(),
         }
     }
 }
@@ -939,6 +1260,17 @@ pub struct StateContext<S: StateTransitions> {
     /// The event that triggered this callback (if any)
     /// None when triggered by dependency changes, Some when triggered by user events.
     event: Option<crate::event_handler::EventContext>,
+
+    /// Animation keys used during this callback (for animation-driven refresh)
+    animation_keys: Arc<RefCell<Vec<String>>>,
+
+    /// Timeline references tracked for animation refresh
+    /// Stores (key, timeline) pairs - checked at end of callback to see if playing
+    timeline_refs: Arc<RefCell<Vec<(String, SharedAnimatedTimeline)>>>,
+
+    /// Keyframe track references tracked for animation refresh
+    /// Stores (key, track) pairs - checked at end of callback to see if playing
+    keyframe_refs: Arc<RefCell<Vec<(String, SharedKeyframeTrack)>>>,
 }
 
 impl<S: StateTransitions> StateContext<S> {
@@ -961,6 +1293,43 @@ impl<S: StateTransitions> StateContext<S> {
             parent_key,
             deps,
             event,
+            animation_keys: Arc::new(RefCell::new(Vec::new())),
+            timeline_refs: Arc::new(RefCell::new(Vec::new())),
+            keyframe_refs: Arc::new(RefCell::new(Vec::new())),
+        }
+    }
+
+    /// Get the animation keys used during this callback
+    ///
+    /// This includes spring animation keys, timeline keys for any timelines
+    /// that are currently playing, and keyframe track keys for any that are playing.
+    pub(crate) fn take_animation_keys(&self) -> Vec<String> {
+        let mut keys = std::mem::take(&mut *self.animation_keys.borrow_mut());
+
+        // Check timeline refs and include keys for any that are playing
+        let timeline_refs = self.timeline_refs.borrow();
+        for (key, timeline) in timeline_refs.iter() {
+            if timeline.lock().unwrap().is_playing() {
+                keys.push(key.clone());
+            }
+        }
+
+        // Check keyframe refs and include keys for any that are playing
+        let keyframe_refs = self.keyframe_refs.borrow();
+        for (key, track) in keyframe_refs.iter() {
+            if track.lock().unwrap().is_playing() {
+                keys.push(key.clone());
+            }
+        }
+
+        keys
+    }
+
+    /// Add an animation key to track (deduplicates)
+    fn track_animation_key(&self, key: String) {
+        let mut keys = self.animation_keys.borrow_mut();
+        if !keys.contains(&key) {
+            keys.push(key);
         }
     }
 
@@ -1166,10 +1535,19 @@ impl<S: StateTransitions> StateContext<S> {
     /// let current_scale = ctx.use_spring("scale", target_scale, SpringConfig::wobbly());
     /// ```
     pub fn use_spring(&self, name: &str, target: f32, config: SpringConfig) -> f32 {
+        let anim_key = format!("{}:anim:{}", self.full_key(), name);
         let animated = self.use_animated_value_with_config(name, target, config);
         let mut guard = animated.lock().unwrap();
         guard.set_target(target);
-        guard.get()
+        let value = guard.get();
+
+        // Track this animation key for animation-driven refresh
+        // Only track if animation is active (not settled)
+        if guard.is_animating() {
+            self.track_animation_key(anim_key);
+        }
+
+        value
     }
 
     /// Declarative spring animation with default stiff config
@@ -1190,47 +1568,139 @@ impl<S: StateTransitions> StateContext<S> {
     /// The timeline is keyed with format: `{stateful_key}:timeline:{name}`
     /// This ensures the timeline persists across rebuilds with the same key.
     ///
+    /// The configuration callback is only called on first use - subsequent calls
+    /// return the existing entry IDs without re-running the callback.
+    ///
     /// Uses the global animation scheduler (must be initialized via
     /// `blinc_animation::set_global_scheduler()` at app startup).
     ///
     /// # Example
     ///
     /// ```ignore
-    /// let timeline = ctx.use_timeline("fade_sequence");
-    ///
-    /// // Configure on first use, get existing entry IDs on subsequent calls
-    /// let entry_id = timeline.lock().unwrap().configure(|t| {
+    /// // Configure on first use, returns (entry_ids, handle)
+    /// let (entry_id, timeline) = ctx.use_timeline("fade_sequence", |t| {
     ///     let id = t.add(0, 500, 0.0, 1.0);
     ///     t.set_loop(-1);  // Loop forever
     ///     t.start();
     ///     id
     /// });
     ///
-    /// let opacity = timeline.lock().unwrap().get(entry_id);
+    /// // Read current value
+    /// let opacity = timeline.get(entry_id).unwrap_or(0.0);
+    ///
+    /// // Restart on click
+    /// if let Some(event) = ctx.event() {
+    ///     if event.event_type == event_types::POINTER_UP {
+    ///         timeline.restart();
+    ///     }
+    /// }
     /// ```
-    pub fn use_timeline(&self, name: &str) -> SharedAnimatedTimeline {
+    pub fn use_timeline<T, F>(&self, name: &str, configure: F) -> (T, TimelineHandle)
+    where
+        F: FnOnce(&mut AnimatedTimeline) -> T,
+        T: blinc_animation::ConfigureResult,
+    {
         let timeline_key = format!("{}:timeline:{}", self.full_key(), name);
 
-        // Check if we already have this timeline
-        {
+        // Get or create the timeline
+        let shared = {
             let timelines = PERSISTED_ANIMATED_TIMELINES.read().unwrap();
             if let Some(existing) = timelines.get(&timeline_key) {
-                return Arc::clone(existing);
+                Arc::clone(existing)
+            } else {
+                drop(timelines);
+
+                // Create a new timeline
+                let handle = blinc_animation::get_scheduler();
+                let timeline = AnimatedTimeline::new(handle);
+                let shared = Arc::new(Mutex::new(timeline));
+
+                // Store it for future lookups
+                let mut timelines = PERSISTED_ANIMATED_TIMELINES.write().unwrap();
+                timelines.insert(timeline_key.clone(), Arc::clone(&shared));
+                shared
+            }
+        };
+
+        // Configure and get entry IDs
+        let result = {
+            let mut tl = shared.lock().unwrap();
+            tl.configure(configure)
+        };
+
+        // Track this timeline for animation refresh (only if not already tracked)
+        {
+            let mut refs = self.timeline_refs.borrow_mut();
+            if !refs.iter().any(|(k, _)| k == &timeline_key) {
+                refs.push((timeline_key, Arc::clone(&shared)));
             }
         }
 
-        // Create a new timeline
-        let handle = blinc_animation::get_scheduler();
-        let timeline = AnimatedTimeline::new(handle);
-        let shared = Arc::new(Mutex::new(timeline));
+        (result, TimelineHandle { inner: shared })
+    }
 
-        // Store it for future lookups
+    /// Create or retrieve a persisted keyframe animation
+    ///
+    /// Keyframe animations provide a fluent API for defining animations with multiple
+    /// keyframes, easing, and playback options like ping-pong and looping.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Unique name for this keyframe track (scoped to this stateful element)
+    /// * `configure` - Configuration closure that builds the keyframe track
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Pulsing animation with ping-pong and easing
+    /// let scale = ctx.use_keyframes("scale", |k| {
+    ///     k.at(0, 0.8)
+    ///      .at(800, 1.2)
+    ///      .ease(Easing::EaseInOut)
+    ///      .ping_pong()
+    ///      .loop_infinite()
+    ///      .start()
+    /// });
+    ///
+    /// let current_scale = scale.get();
+    /// ```
+    pub fn use_keyframes<F>(&self, name: &str, configure: F) -> KeyframeHandle
+    where
+        F: FnOnce(KeyframeBuilder) -> KeyframeBuilder,
+    {
+        let keyframe_key = format!("{}:keyframes:{}", self.full_key(), name);
+
+        // Get or create the keyframe animation
+        let shared = {
+            let tracks = PERSISTED_KEYFRAME_TRACKS.read().unwrap();
+            if let Some(existing) = tracks.get(&keyframe_key) {
+                Arc::clone(existing)
+            } else {
+                drop(tracks);
+
+                // Create new keyframe animation using the builder
+                let builder = KeyframeBuilder::new();
+                let configured = configure(builder);
+                let handle = blinc_animation::get_scheduler();
+                let anim = configured.build_with_handle(handle);
+                let shared = Arc::new(Mutex::new(anim));
+
+                // Store it for future lookups
+                let mut tracks = PERSISTED_KEYFRAME_TRACKS.write().unwrap();
+                tracks.insert(keyframe_key.clone(), Arc::clone(&shared));
+                shared
+            }
+        };
+
+        // Track this keyframe animation for animation refresh (only if not already tracked)
         {
-            let mut timelines = PERSISTED_ANIMATED_TIMELINES.write().unwrap();
-            timelines.insert(timeline_key, Arc::clone(&shared));
+            let mut refs = self.keyframe_refs.borrow_mut();
+            if !refs.iter().any(|(k, _)| k == &keyframe_key) {
+                refs.push((keyframe_key, Arc::clone(&shared)));
+            }
         }
 
-        shared
+        KeyframeHandle { inner: shared }
     }
 
     /// Access a dependent signal's value by its index in the deps array
@@ -1516,6 +1986,13 @@ impl<S: StateTransitions + Default> StatefulBuilder<S> {
 
                 // Merge the returned Div onto the base container
                 div.merge(user_div);
+
+                // Store animation keys from this callback invocation
+                // This enables animation-driven refresh when springs are active
+                let anim_keys = ctx.take_animation_keys();
+                if !anim_keys.is_empty() {
+                    shared_state_clone.lock().unwrap().animation_keys = anim_keys;
+                }
             });
 
         // Create Stateful using the existing infrastructure
@@ -1553,12 +2030,26 @@ impl<S: StateTransitions + Default> StatefulBuilder<S> {
         // Register deps with the signal framework so changes trigger callback refresh
         // Note: deps may have been added by use_signal() during apply_state_callback()
         let current_deps = stateful.shared_state.lock().unwrap().deps.clone();
+        let stateful_key = Arc::as_ptr(&shared) as u64;
         if !current_deps.is_empty() {
-            let stateful_key = Arc::as_ptr(&shared) as u64;
             register_stateful_deps(
                 stateful_key,
                 current_deps,
-                Arc::new(move || refresh_callback()),
+                Arc::new({
+                    let refresh_callback = Arc::clone(&refresh_callback);
+                    move || refresh_callback()
+                }),
+            );
+        }
+
+        // Register for animation-driven refresh if there are active animations
+        // This ensures the callback re-runs while springs are animating
+        let anim_keys = stateful.shared_state.lock().unwrap().animation_keys.clone();
+        if !anim_keys.is_empty() {
+            register_stateful_animation(
+                stateful_key,
+                anim_keys,
+                Arc::clone(&refresh_callback),
             );
         }
 
@@ -1686,6 +2177,7 @@ impl<S: StateTransitions> Stateful<S> {
                 ancestor_motion_key: None,
                 current_event: None,
                 refresh_callback: None,
+                animation_keys: Vec::new(),
             })),
             children_cache: RefCell::new(Vec::new()),
             event_handlers_cache: RefCell::new(crate::event_handler::EventHandlers::new()),
@@ -2044,7 +2536,21 @@ impl<S: StateTransitions> Stateful<S> {
             }
 
             // Clear current event after callback completes
-            shared.lock().unwrap().current_event = None;
+            let mut inner = shared.lock().unwrap();
+            inner.current_event = None;
+
+            // Register for animation-driven refresh if there are active animations
+            // This ensures the callback re-runs while springs are animating
+            let anim_keys = inner.animation_keys.clone();
+            let refresh_cb = inner.refresh_callback.clone();
+            drop(inner);
+
+            if !anim_keys.is_empty() {
+                if let Some(refresh_cb) = refresh_cb {
+                    let stateful_key = Arc::as_ptr(&shared) as u64;
+                    register_stateful_animation(stateful_key, anim_keys, refresh_cb);
+                }
+            }
         }
 
         // Just request redraw, not rebuild
@@ -2064,15 +2570,16 @@ impl<S: StateTransitions> Stateful<S> {
         guard.current_event = None;
 
         // Need node_id and callback to refresh
-        let (callback, state_copy, cached_node_id, base_props, base_style) =
+        let (callback, state_copy, cached_node_id, base_props, base_style, refresh_callback) =
             match (guard.state_callback.as_ref(), guard.node_id) {
                 (Some(cb), Some(nid)) => {
                     let callback = Arc::clone(cb);
                     let state = guard.state;
                     let base = guard.base_render_props.clone();
                     let style = guard.base_style.clone();
+                    let refresh_cb = guard.refresh_callback.clone();
                     drop(guard);
-                    (callback, state, nid, base, style)
+                    (callback, state, nid, base, style, refresh_cb)
                 }
                 _ => return,
             };
@@ -2108,6 +2615,16 @@ impl<S: StateTransitions> Stateful<S> {
 
         if !children.is_empty() || style_changed {
             queue_subtree_rebuild(cached_node_id, temp_div);
+        }
+
+        // Register for animation-driven refresh if there are active animations
+        // This ensures the callback re-runs while springs are animating
+        let anim_keys = shared.lock().unwrap().animation_keys.clone();
+        if !anim_keys.is_empty() {
+            if let Some(refresh_cb) = refresh_callback {
+                let stateful_key = Arc::as_ptr(shared) as u64;
+                register_stateful_animation(stateful_key, anim_keys, refresh_cb);
+            }
         }
 
         // Request redraw

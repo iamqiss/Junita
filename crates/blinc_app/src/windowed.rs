@@ -2549,6 +2549,12 @@ impl WindowedApp {
                             let needs_animation_redraw = scheduler.take_needs_redraw();
                             drop(scheduler); // Release lock before request_redraw
 
+                            // Check if stateful elements have active spring animations
+                            // If so, re-run their callbacks to get updated animation values
+                            if needs_animation_redraw && blinc_layout::has_animating_statefuls() {
+                                blinc_layout::check_stateful_animations();
+                            }
+
                             // Check if text widgets need continuous redraws (cursor blink)
                             let needs_cursor_redraw = blinc_layout::widgets::take_needs_continuous_redraw();
 

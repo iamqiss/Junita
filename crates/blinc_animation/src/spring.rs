@@ -130,10 +130,10 @@ impl Spring {
 
     /// Check if the spring has settled (within epsilon of target with minimal velocity)
     pub fn is_settled(&self) -> bool {
-        // Use larger epsilons for scroll-friendly settling
-        // Being within 0.5px and having velocity under 5px/s is imperceptible
-        const EPSILON: f32 = 0.5;
-        const VELOCITY_EPSILON: f32 = 5.0;
+        // Use small epsilons that work for both pixel-based values (scroll)
+        // and normalized values (scale, opacity). 0.01 is imperceptible in both cases.
+        const EPSILON: f32 = 0.01;
+        const VELOCITY_EPSILON: f32 = 0.1;
 
         (self.value - self.target).abs() < EPSILON && self.velocity.abs() < VELOCITY_EPSILON
     }

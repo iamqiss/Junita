@@ -25,14 +25,14 @@ pub use context::{
 };
 pub use easing::Easing;
 pub use keyframe::{
-    FillMode, Keyframe, KeyframeAnimation, KeyframeProperties, MultiKeyframe,
-    MultiKeyframeAnimation, PlayDirection,
+    FillMode, Keyframe, KeyframeAnimation, KeyframePoint, KeyframeProperties, KeyframeTrack,
+    KeyframeTrackBuilder, MultiKeyframe, MultiKeyframeAnimation, PlayDirection,
 };
 pub use presets::AnimationPreset;
 pub use scheduler::{
     get_scheduler, is_scheduler_initialized, set_global_scheduler, try_get_scheduler,
-    AnimatedKeyframe, AnimatedTimeline, AnimatedValue, AnimationScheduler, KeyframeId,
-    SchedulerHandle, SpringId, TimelineId,
+    AnimatedKeyframe, AnimatedTimeline, AnimatedValue, AnimationScheduler, ConfigureResult,
+    KeyframeId, SchedulerHandle, SpringId, TimelineId,
 };
 pub use spring::{Spring, SpringConfig};
-pub use timeline::{Timeline, TimelineEntryId};
+pub use timeline::{StaggerBuilder, Timeline, TimelineEntryId};

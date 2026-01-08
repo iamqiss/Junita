@@ -60,61 +60,56 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
 
 /// A counter button demonstrating ctx.use_signal() and ctx.use_spring()
 fn counter_button() -> impl ElementBuilder {
-    stateful::<ButtonState>().on_state(|ctx| {
-        // Scoped signal - persists across rebuilds, keyed to this stateful
-        // Automatically registered as dependency - on_state re-runs when count changes
-        let count = ctx.use_signal("count", || 0i32);
+    stateful::<ButtonState>()
+        .initial(ButtonState::Idle)
+        .on_state(|ctx| {
+            // Scoped signal - persists across rebuilds, keyed to this stateful
+            // Automatically registered as dependency - on_state re-runs when count changes
+            let count = ctx.use_signal("count", || 0i32);
 
-        // Declarative spring animation - specify target, get current value
-        let target_scale = match ctx.state() {
-            ButtonState::Idle => 1.0,
-            ButtonState::Hovered => 1.08,
-            ButtonState::Pressed => 0.95,
-            ButtonState::Disabled => 1.0,
-        };
-        let current_scale = ctx.use_spring("scale", target_scale, SpringConfig::snappy());
+            // Declarative spring animation - specify target and bg, get current value
+            let (target_scale, bg) = match ctx.state() {
+                ButtonState::Idle => (1.0, Color::rgba(0.3, 0.5, 0.9, 1.0)),
+                ButtonState::Hovered => (1.08, Color::rgba(0.4, 0.6, 1.0, 1.0)),
+                ButtonState::Pressed => (0.95, Color::rgba(0.25, 0.4, 0.8, 1.0)),
+                ButtonState::Disabled => (1.0, Color::GRAY),
+            };
 
-        // Handle click via ctx.event()
-        if let Some(event) = ctx.event() {
-            if event.event_type == event_types::POINTER_UP {
-                count.update(|n| n + 1);
-                tracing::info!("Counter incremented to {}", count.get());
+            let current_scale = ctx.use_spring("scale", target_scale, SpringConfig::snappy());
+
+            // Handle click via ctx.event()
+            if let Some(event) = ctx.event() {
+                if event.event_type == event_types::POINTER_UP {
+                    count.update(|n| n + 1);
+                    tracing::info!("Counter incremented to {}", count.get());
+                }
             }
-        }
 
-        // Background color based on state
-        let bg = match ctx.state() {
-            ButtonState::Idle => Color::rgba(0.3, 0.5, 0.9, 1.0),
-            ButtonState::Hovered => Color::rgba(0.4, 0.6, 1.0, 1.0),
-            ButtonState::Pressed => Color::rgba(0.25, 0.4, 0.8, 1.0),
-            ButtonState::Disabled => Color::GRAY,
-        };
-
-        div()
-            .w(200.0)
-            .h(80.0)
-            .bg(bg)
-            .rounded(16.0)
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap(4.0)
-            .cursor_pointer()
-            .transform(Transform::scale(current_scale, current_scale))
-            .child(
-                text(&format!("{}", count.get()))
-                    .size(36.0)
-                    .weight(FontWeight::Bold)
-                    .color(Color::WHITE)
-                    .pointer_events_none(),
-            )
-            .child(
-                text("Click me!")
-                    .size(14.0)
-                    .color(Color::rgba(1.0, 1.0, 1.0, 0.8))
-                    .pointer_events_none(),
-            )
-    })
+            div()
+                .w(200.0)
+                .h(80.0)
+                .bg(bg)
+                .rounded(16.0)
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .gap_px(4.0)
+                .cursor_pointer()
+                .transform(Transform::scale(current_scale, current_scale))
+                .child(
+                    text(&format!("{}", count.get()))
+                        .size(36.0)
+                        .weight(FontWeight::Bold)
+                        .color(Color::WHITE)
+                        .pointer_events_none(),
+                )
+                .child(
+                    text("Click me!")
+                        .size(14.0)
+                        .color(Color::rgba(1.0, 1.0, 1.0, 0.8))
+                        .pointer_events_none(),
+                )
+        })
 }
 
 /// Display showing event information via ctx.event()
