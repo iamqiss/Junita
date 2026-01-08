@@ -162,18 +162,23 @@ impl Sidebar {
                                 };
 
                                 // Match item styling: w_fit, flex_row, same padding
+                                let toggle_anim_key = format!("{}_anim", ctx.key());
                                 div()
                                     .w_fit()
                                     .flex_row()
                                     .items_center()
-                                    .self_end()
                                     .gap(3.0)
                                     .px(3.0)
                                     .py(2.0)
                                     .bg(bg)
                                     .cursor(CursorStyle::Pointer)
+                                    .animate_layout(
+                                        LayoutAnimationConfig::position()
+                                            .with_key(&toggle_anim_key)
+                                            .snappy(),
+                                    )
                                     .child(
-                                        div().flex_shrink_0().items_end().child(
+                                        div().flex_shrink_0().self_end().child(
                                             svg(icon).size(18.0, 18.0).color(text_secondary),
                                         ),
                                     )
@@ -259,6 +264,8 @@ impl Sidebar {
                                 };
 
                                 // Conditionally render: icon-only when collapsed, icon+label when expanded
+                                // Animate position so items slide smoothly when section titles disappear
+                                let item_anim_key = format!("{}_anim", ctx.key());
                                 let mut item_div = div()
                                     .w_fit()
                                     .flex_row()
@@ -268,6 +275,11 @@ impl Sidebar {
                                     .py(2.0)
                                     .bg(bg)
                                     .cursor(CursorStyle::Pointer)
+                                    .animate_layout(
+                                        LayoutAnimationConfig::position()
+                                            .with_key(&item_anim_key)
+                                            .snappy(),
+                                    )
                                     .child(
                                         div().flex_shrink_0().child(
                                             svg(&item_icon).size(18.0, 18.0).color(icon_color),
