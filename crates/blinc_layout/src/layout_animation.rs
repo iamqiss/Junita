@@ -198,7 +198,9 @@ impl LayoutAnimationConfig {
 
 /// Active animation state for a layout-animating element
 pub struct LayoutAnimationState {
-    /// Target bounds (from taffy layout)
+    /// Start bounds (where animation began - the "old" layout)
+    pub start_bounds: ElementBounds,
+    /// Target bounds (from taffy layout - the "new" layout)
     pub end_bounds: ElementBounds,
     /// Animated height value (if animating height)
     pub height_anim: Option<AnimatedValue>,
@@ -265,6 +267,7 @@ impl LayoutAnimationState {
         };
 
         Some(Self {
+            start_bounds: old_bounds,
             end_bounds: new_bounds,
             height_anim,
             width_anim,
@@ -365,6 +368,50 @@ impl LayoutAnimationState {
             .as_ref()
             .map(|a| a.get())
             .unwrap_or(self.end_bounds.width)
+    }
+
+    /// Check if width is collapsing (animating from larger to smaller)
+    ///
+    /// During collapse, current animated width > target width.
+    /// This is important because children should be laid out at the larger
+    /// (animated) size during collapse, then clipped.
+    pub fn is_width_collapsing(&self) -> bool {
+        self.width_anim
+            .as_ref()
+            .map(|a| a.get() > self.end_bounds.width)
+            .unwrap_or(false)
+    }
+
+    /// Check if height is collapsing (animating from larger to smaller)
+    pub fn is_height_collapsing(&self) -> bool {
+        self.height_anim
+            .as_ref()
+            .map(|a| a.get() > self.end_bounds.height)
+            .unwrap_or(false)
+    }
+
+    /// Check if any dimension is collapsing
+    pub fn is_collapsing(&self) -> bool {
+        self.is_width_collapsing() || self.is_height_collapsing()
+    }
+
+    /// Get bounds that should be used for laying out children during animation
+    ///
+    /// During collapse: returns current animated bounds (larger than target)
+    /// During expand: returns target bounds (children at final size, revealed by clip)
+    ///
+    /// This ensures children are laid out at the larger size during collapse,
+    /// so there's content to clip as the animation progresses.
+    pub fn layout_constraint_bounds(&self) -> ElementBounds {
+        let current = self.current_bounds();
+
+        ElementBounds {
+            x: current.x,
+            y: current.y,
+            // Use the larger of current animated or target for layout
+            width: current.width.max(self.end_bounds.width),
+            height: current.height.max(self.end_bounds.height),
+        }
     }
 }
 

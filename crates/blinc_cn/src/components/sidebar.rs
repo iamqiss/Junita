@@ -112,9 +112,6 @@ impl Sidebar {
         let primary = theme.color(ColorToken::Primary);
 
         let key = builder.key.get().to_string();
-        // Width values in layout units (already scaled - user provides actual pixel values)
-        let collapsed_width_px = builder.collapsed_width;
-        // let expanded_width_px = builder.expanded_width;
         let sections = builder.sections.clone();
         let show_toggle = builder.show_toggle;
 
@@ -164,19 +161,21 @@ impl Sidebar {
                                     CHEVRON_LEFT_SVG
                                 };
 
+                                // Match item styling: w_fit, flex_row, same padding
                                 div()
-                                    .w_full()
-                                    .p(3.0)
+                                    .w_fit()
                                     .flex_row()
                                     .items_center()
-                                    .justify_center()
+                                    .self_end()
+                                    .gap(3.0)
+                                    .px(3.0)
+                                    .py(2.0)
                                     .bg(bg)
                                     .cursor(CursorStyle::Pointer)
-                                    .child(svg(icon).size(18.0, 18.0).color(text_secondary))
-                                    .animate_layout(
-                                        LayoutAnimationConfig::all()
-                                            .with_key(&format!("{}_toggle", ctx.key()))
-                                            .snappy(),
+                                    .child(
+                                        div().flex_shrink_0().items_end().child(
+                                            svg(icon).size(18.0, 18.0).color(text_secondary),
+                                        ),
                                     )
                             })
                             .on_click(move |_| {
@@ -187,16 +186,19 @@ impl Sidebar {
                 }
 
                 // Sections and items container
+                // Uses w_fit() so width is determined by children content
+                // Children conditionally render icon-only (collapsed) or icon+label (expanded)
+                // The infrastructure fix ensures children laid out at larger size during collapse
                 let mut items_container = div()
                     .flex_col()
                     .border_right(1.0, border)
                     .bg(surface)
                     .h_full()
                     .w_fit()
-                    .overflow_scroll()
+                    .overflow_clip() // Critical for animation clipping
                     .py(2.0)
                     .animate_layout(
-                        LayoutAnimationConfig::size()
+                        LayoutAnimationConfig::width()
                             .with_key(&layout_anim_key)
                             .snappy(),
                     );
@@ -223,23 +225,21 @@ impl Sidebar {
                         }
                     }
 
-                    // Items - use different layouts for collapsed vs expanded
+                    // Items - conditionally render icon-only (collapsed) or icon+label (expanded)
                     for (item_idx, item) in section.items.iter().enumerate() {
                         let item_key = format!("{}_item_{}_{}", ctx.key(), section_idx, item_idx);
                         let item_label = item.label.clone();
                         let item_icon = item.icon.clone();
                         let item_is_active = item.is_active;
                         let item_on_click = item.on_click.clone();
-                        // Clone collapsed state for the inner stateful to read
-                        let is_collapsed_for_item = collapsed.clone();
+                        let collapsed_for_item = collapsed.clone();
 
                         let item_element = stateful_with_key::<ButtonState>(&item_key)
                             .deps([collapsed.signal_id()])
                             .on_state(move |ctx| {
-                                // Read collapsed state inside stateful callback
-                                let item_collapsed = is_collapsed_for_item.get();
                                 let state = ctx.state();
                                 let theme = ThemeState::get();
+                                let is_collapsed = collapsed_for_item.get();
 
                                 let (bg, icon_color, text_col) = if item_is_active {
                                     (primary.with_alpha(0.15), primary, text_primary)
@@ -258,51 +258,36 @@ impl Sidebar {
                                     }
                                 };
 
-                                if item_collapsed {
-                                    // Collapsed: centered icon only, no label
-                                    div()
-                                        .w_full()
-                                        .flex_row()
-                                        .items_center()
-                                        .justify_center()
-                                        .py(2.0)
-                                        .bg(bg)
-                                        .cursor(CursorStyle::Pointer)
-                                        .child(svg(&item_icon).size(18.0, 18.0).color(icon_color))
-                                        .animate_layout(
-                                            LayoutAnimationConfig::all()
-                                                .with_key(&item_key)
-                                                .snappy(),
-                                        )
-                                } else {
-                                    // Expanded: icon + label with gap
-                                    div()
-                                        .w_full()
-                                        .flex_row()
-                                        .items_center()
-                                        .gap(3.0)
-                                        .px(3.0)
-                                        .py(2.0)
-                                        .bg(bg)
-                                        .cursor(CursorStyle::Pointer)
-                                        .child(div().flex_shrink_0().child(
+                                // Conditionally render: icon-only when collapsed, icon+label when expanded
+                                let mut item_div = div()
+                                    .w_fit()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap(3.0)
+                                    .px(3.0)
+                                    .py(2.0)
+                                    .bg(bg)
+                                    .cursor(CursorStyle::Pointer)
+                                    .child(
+                                        div().flex_shrink_0().child(
                                             svg(&item_icon).size(18.0, 18.0).color(icon_color),
-                                        ))
-                                        .child(
-                                            div().flex_1().overflow_clip().child(
-                                                text(&item_label)
-                                                    .size(14.0)
-                                                    .color(text_col)
-                                                    .no_cursor()
-                                                    .no_wrap(),
-                                            ),
-                                        )
-                                        .animate_layout(
-                                            LayoutAnimationConfig::all()
-                                                .with_key(&item_key)
-                                                .snappy(),
-                                        )
+                                        ),
+                                    );
+
+                                // Only add label when expanded
+                                if !is_collapsed {
+                                    item_div = item_div.child(
+                                        div().flex_shrink_0().child(
+                                            text(&item_label)
+                                                .size(14.0)
+                                                .color(text_col)
+                                                .no_cursor()
+                                                .no_wrap(),
+                                        ),
+                                    );
                                 }
+
+                                item_div
                             })
                             .on_click(move |_| {
                                 item_on_click();

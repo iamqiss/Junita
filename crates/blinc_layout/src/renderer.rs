@@ -1772,6 +1772,12 @@ impl RenderTree {
     /// Compute layout for the given viewport size
     pub fn compute_layout(&mut self, width: f32, height: f32) {
         if let Some(root) = self.root {
+            // Step 1: Check for existing collapsing animations and apply their constraints
+            // This ensures children are laid out at the larger (animated) size during collapse
+            let style_overrides = self.apply_collapsing_animation_constraints();
+            let had_collapsing = !style_overrides.is_empty();
+
+            // Step 2: Run taffy layout with potentially overridden styles
             self.layout_tree.compute_layout(
                 root,
                 Size {
@@ -1779,6 +1785,9 @@ impl RenderTree {
                     height: AvailableSpace::Definite(height),
                 },
             );
+
+            // Step 3: Restore original styles (cleanup for next frame)
+            self.restore_style_overrides(style_overrides);
 
             // Update scroll physics with computed content dimensions
             self.update_scroll_content_dimensions();
@@ -1789,11 +1798,119 @@ impl RenderTree {
             // Trigger layout animations for elements with changed bounds
             self.update_layout_animations();
 
+            // Step 4: If new collapsing animations were created, re-layout with constraints
+            // This handles the first frame of a collapse animation where children need
+            // to be laid out at the larger (start) size, not the smaller (target) size.
+            if !had_collapsing {
+                let new_overrides = self.apply_collapsing_animation_constraints();
+                if !new_overrides.is_empty() {
+                    tracing::debug!(
+                        "Re-running layout for {} new collapsing animations",
+                        new_overrides.len()
+                    );
+                    self.layout_tree.compute_layout(
+                        root,
+                        Size {
+                            width: AvailableSpace::Definite(width),
+                            height: AvailableSpace::Definite(height),
+                        },
+                    );
+                    self.restore_style_overrides(new_overrides);
+
+                    // Re-update bounds storages after second layout pass
+                    self.update_layout_bounds_storages();
+                }
+            }
+
             // Cache element bounds for ElementHandle.bounds() queries
             self.cache_element_bounds();
 
             // Process on_ready callbacks for newly laid out elements
             self.process_on_ready_callbacks();
+        }
+    }
+
+    /// Apply style overrides for nodes with active collapsing animations
+    ///
+    /// During collapse, we want children to be laid out at the larger (animated) size
+    /// so there's content to clip as the animation progresses.
+    ///
+    /// Returns a vec of (node_id, original_style) pairs for restoration.
+    fn apply_collapsing_animation_constraints(&mut self) -> Vec<(LayoutNodeId, Style)> {
+        let mut overrides = Vec::new();
+
+        // Check stable-key based animations
+        for (stable_key, anim_state) in &self.layout_animations_by_key {
+            if !anim_state.is_collapsing() {
+                continue;
+            }
+
+            // Find the node ID for this stable key
+            let Some(&node_id) = self.layout_animation_key_to_node.get(stable_key) else {
+                continue;
+            };
+
+            // Get current style
+            let Some(mut style) = self.layout_tree.get_style(node_id) else {
+                continue;
+            };
+
+            // Save original style for restoration
+            overrides.push((node_id, style.clone()));
+
+            // Get the constraint bounds (larger of animated or target)
+            let constraint_bounds = anim_state.layout_constraint_bounds();
+
+            // Override size to animated bounds (the larger size during collapse)
+            if anim_state.is_width_collapsing() {
+                style.size.width = Dimension::Length(constraint_bounds.width);
+            }
+            if anim_state.is_height_collapsing() {
+                style.size.height = Dimension::Length(constraint_bounds.height);
+            }
+
+            // Apply overridden style
+            self.layout_tree.set_style(node_id, style);
+
+            tracing::trace!(
+                "Applied collapsing constraint for key='{}': width={}, height={}",
+                stable_key,
+                constraint_bounds.width,
+                constraint_bounds.height
+            );
+        }
+
+        // Also check node-ID based animations
+        for (&node_id, anim_state) in &self.layout_animations {
+            if !anim_state.is_collapsing() {
+                continue;
+            }
+
+            let Some(mut style) = self.layout_tree.get_style(node_id) else {
+                continue;
+            };
+
+            overrides.push((node_id, style.clone()));
+
+            let constraint_bounds = anim_state.layout_constraint_bounds();
+
+            if anim_state.is_width_collapsing() {
+                style.size.width = Dimension::Length(constraint_bounds.width);
+            }
+            if anim_state.is_height_collapsing() {
+                style.size.height = Dimension::Length(constraint_bounds.height);
+            }
+
+            self.layout_tree.set_style(node_id, style);
+        }
+
+        overrides
+    }
+
+    /// Restore original styles after layout computation
+    fn restore_style_overrides(&mut self, overrides: Vec<(LayoutNodeId, Style)>) {
+        for (node_id, original_style) in overrides {
+            self.layout_tree.set_style(node_id, original_style);
         }
     }
 

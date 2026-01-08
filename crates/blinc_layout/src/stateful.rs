@@ -1286,7 +1286,7 @@ impl<S: StateTransitions> StateContext<S> {
     ) -> Self {
         Self {
             state,
-            key: Arc::new(key),
+            key: Arc::new(key.clone()),
             child_counter: Arc::new(RefCell::new(ChildKeyCounter::new())),
             reactive,
             shared_state,

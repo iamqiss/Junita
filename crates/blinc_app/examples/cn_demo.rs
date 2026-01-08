@@ -1957,11 +1957,6 @@ fn sidebar_section(ctx: &WindowedContext) -> impl ElementBuilder {
             )
             .child(
                 div()
-                    .animate_layout(
-                        LayoutAnimationConfig::all()
-                            .with_key("sidebar_demo_container")
-                            .snappy(),
-                    )
                     .h(400.0)
                     .border(1.0, border)
                     .rounded(8.0)
