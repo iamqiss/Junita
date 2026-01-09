@@ -2412,11 +2412,46 @@ impl GpuRenderer {
                 continue;
             }
 
-            let layer_pos = config.position.map(|p| (p.x, p.y)).unwrap_or((0.0, 0.0));
-            let layer_size = config
-                .size
-                .map(|s| (s.width, s.height))
-                .unwrap_or((self.viewport_size.0 as f32, self.viewport_size.1 as f32));
+            // Config position/size are in local coordinates (relative to parent)
+            // But primitives are at screen-space coordinates after transforms
+            // We need to compute the actual bounding box from primitives
+            let primitives = &batch.primitives[start_idx..end_idx];
+            let (layer_pos, layer_size) = if primitives.is_empty() {
+                // Fallback to config values if no primitives
+                let pos = config.position.map(|p| (p.x, p.y)).unwrap_or((0.0, 0.0));
+                let size = config.size.map(|s| (s.width, s.height))
+                    .unwrap_or((self.viewport_size.0 as f32, self.viewport_size.1 as f32));
+                (pos, size)
+            } else {
+                // Compute bounding box from primitives (which are in screen coordinates)
+                let mut min_x = f32::MAX;
+                let mut min_y = f32::MAX;
+                let mut max_x = f32::MIN;
+                let mut max_y = f32::MIN;
+                for p in primitives {
+                    let (px, py, pw, ph) = (p.bounds[0], p.bounds[1], p.bounds[2], p.bounds[3]);
+                    min_x = min_x.min(px);
+                    min_y = min_y.min(py);
+                    max_x = max_x.max(px + pw);
+                    max_y = max_y.max(py + ph);
+                }
+                let width = (max_x - min_x).max(1.0);
+                let height = (max_y - min_y).max(1.0);
+                ((min_x, min_y), (width, height))
+            };
+
+            // Skip layers that are entirely outside the viewport
+            let vp_w = self.viewport_size.0 as f32;
+            let vp_h = self.viewport_size.1 as f32;
+            let is_visible = layer_pos.0 < vp_w && layer_pos.1 < vp_h
+                && layer_pos.0 + layer_size.0 > 0.0
+                && layer_pos.1 + layer_size.1 > 0.0
+                && layer_size.0 > 0.0
+                && layer_size.1 > 0.0;
+
+            if !is_visible {
+                continue;
+            }
 
             // Render layer primitives to a viewport-sized texture
             let layer_texture = self
