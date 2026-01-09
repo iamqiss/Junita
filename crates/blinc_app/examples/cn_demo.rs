@@ -342,12 +342,12 @@ fn section_title(title: &str) -> impl ElementBuilder {
 /// Section container helper
 fn section_container() -> Div {
     let theme = ThemeState::get();
-    // let surface = theme.color(ColorToken);
+    let surface = theme.color(ColorToken::Surface);
     let border = theme.color(ColorToken::Border);
     let radius = theme.radii().radius_xl;
 
     div()
-        .bg(Color::WHITE)
+        .bg(surface)
         .rounded(radius)
         .border(1.5, border)
         .p(theme.spacing().space_5)
