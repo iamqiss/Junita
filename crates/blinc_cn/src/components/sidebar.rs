@@ -39,7 +39,7 @@ use std::sync::Arc;
 use blinc_core::State;
 use blinc_layout::div::{Div, ElementBuilder, ElementTypeId};
 use blinc_layout::element::CursorStyle;
-use blinc_layout::layout_animation::LayoutAnimationConfig;
+use blinc_layout::visual_animation::VisualAnimationConfig;
 use blinc_layout::prelude::*;
 use blinc_layout::stateful::{stateful_with_key, ButtonState, NoState};
 use blinc_layout::tree::{LayoutNodeId, LayoutTree};
@@ -114,12 +114,14 @@ impl Sidebar {
         let key = builder.key.get().to_string();
         let sections = builder.sections.clone();
         let show_toggle = builder.show_toggle;
+        let content_builder = builder.content_builder.clone();
 
         // Single source of truth: the collapsed state from parent
         let is_collapsed = builder.is_collapsed.get();
 
         // Layout animation key for smooth width transitions
         let layout_anim_key = format!("{}_layout", key.clone());
+        let content_anim_key = format!("{}_content", key.clone());
 
         // Create stateful container that rebuilds when collapsed state changes
         let container_key = format!("{}_container", key.clone());
@@ -140,54 +142,53 @@ impl Sidebar {
                     let is_collapsed_for_click = collapsed.clone();
                     let toggle_key = format!("{}_toggle", ctx.key());
 
-                    toggle_btn = toggle_btn.child(
-                        stateful_with_key::<ButtonState>(&toggle_key)
-                            .deps([collapsed.signal_id()])
-                            .on_state(move |ctx| {
-                                let state = ctx.state();
-                                let theme = ThemeState::get();
-                                let collapsed_inner = is_collapsed_for_state.get();
+                    toggle_btn =
+                        toggle_btn.child(
+                            stateful_with_key::<ButtonState>(&toggle_key)
+                                .deps([collapsed.signal_id()])
+                                .on_state(move |ctx| {
+                                    let state = ctx.state();
+                                    let theme = ThemeState::get();
+                                    let collapsed_inner = is_collapsed_for_state.get();
 
-                                let bg = match state {
-                                    ButtonState::Hovered | ButtonState::Pressed => {
-                                        theme.color(ColorToken::SecondaryHover).with_alpha(0.5)
-                                    }
-                                    _ => blinc_core::Color::TRANSPARENT,
-                                };
+                                    let bg = match state {
+                                        ButtonState::Hovered | ButtonState::Pressed => {
+                                            theme.color(ColorToken::SecondaryHover).with_alpha(0.5)
+                                        }
+                                        _ => blinc_core::Color::TRANSPARENT,
+                                    };
 
-                                let icon = if collapsed_inner {
-                                    CHEVRON_RIGHT_SVG
-                                } else {
-                                    CHEVRON_LEFT_SVG
-                                };
+                                    let icon = if collapsed_inner {
+                                        CHEVRON_RIGHT_SVG
+                                    } else {
+                                        CHEVRON_LEFT_SVG
+                                    };
 
-                                // Match item styling: w_fit, flex_row, same padding
-                                let toggle_anim_key = format!("{}_anim", ctx.key());
-                                div()
-                                    .w_fit()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap(3.0)
-                                    .px(3.0)
-                                    .py(2.0)
-                                    .bg(bg)
-                                    .cursor(CursorStyle::Pointer)
-                                    .animate_layout(
-                                        LayoutAnimationConfig::position()
-                                            .with_key(&toggle_anim_key)
-                                            .snappy(),
-                                    )
-                                    .child(
-                                        div().flex_shrink_0().self_end().child(
+                                    // Match item styling: w_fit, flex_row, same padding
+                                    let toggle_anim_key = format!("{}_anim", ctx.key());
+                                    div()
+                                        .w_fit()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap(3.0)
+                                        .px(3.0)
+                                        .py(2.0)
+                                        .bg(bg)
+                                        .cursor(CursorStyle::Pointer)
+                                        .animate_bounds(
+                                            VisualAnimationConfig::size()
+                                                .with_key(&toggle_anim_key)
+                                                .snappy(),
+                                        )
+                                        .child(div().flex_shrink_0().self_end().child(
                                             svg(icon).size(18.0, 18.0).color(text_secondary),
-                                        ),
-                                    )
-                            })
-                            .on_click(move |_| {
-                                // is_collapsed_for_click.set(!current);
-                                is_collapsed_for_click.update(|c| !c);
-                            }),
-                    );
+                                        ))
+                                })
+                                .on_click(move |_| {
+                                    // is_collapsed_for_click.set(!current);
+                                    is_collapsed_for_click.update(|c| !c);
+                                }),
+                        );
                 }
 
                 // Sections and items container
@@ -202,9 +203,10 @@ impl Sidebar {
                     .w_fit()
                     .overflow_clip() // Critical for animation clipping
                     .py(2.0)
-                    .animate_layout(
-                        LayoutAnimationConfig::width()
+                    .animate_bounds(
+                        VisualAnimationConfig::width()
                             .with_key(&layout_anim_key)
+                            .clip_to_animated()
                             .snappy(),
                     );
 
@@ -216,33 +218,38 @@ impl Sidebar {
                     // Section title - animate height to 0 when collapsed
                     if let Some(ref title) = section.title {
                         let is_collapsed = collapsed.get();
-                        let title_anim_key =
-                            format!("{}_section_{}_title", ctx.key(), section_idx);
+                        let title_anim_key = format!("{}_section_{}_title", ctx.key(), section_idx);
 
                         // Always render title, but height animates to 0 when collapsed
                         let mut title_div = div()
                             .w_fit()
+                            .h_fit()
                             .overflow_clip()
-                            .animate_layout(
-                                LayoutAnimationConfig::height()
+                            .animate_bounds(
+                                VisualAnimationConfig::all()
                                     .with_key(&title_anim_key)
+                                    .clip_to_animated()
                                     .snappy(),
                             )
-                            .child(
-                                div().px(3.0).py(2.0).child(
+                            
+                            .child(if !is_collapsed {
+                                div().child(
                                     text(&title.to_uppercase())
                                         .size(11.0)
                                         .color(text_tertiary)
                                         .weight(FontWeight::SemiBold)
                                         .no_cursor()
                                         .no_wrap(),
-                                ),
-                            );
+                                )
+                            } else {
+                                div().p(0.0).h(0.0).w(0.0)
+                            });
 
-                        // Set height based on collapsed state
-                        if is_collapsed {
-                            title_div = title_div.h(0.0);
-                        }
+                            if !is_collapsed {
+                                title_div = title_div.px(3.0).py(2.0);
+                            } else {
+                                title_div = title_div.p(0.0);
+                            }
 
                         items_container = items_container.child(title_div);
                     }
@@ -283,25 +290,25 @@ impl Sidebar {
                                 // Conditionally render: icon-only when collapsed, icon+label when expanded
                                 // Animate position so items slide smoothly when section titles disappear
                                 let item_anim_key = format!("{}_anim", ctx.key());
-                                let mut item_div = div()
-                                    .w_fit()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap(3.0)
-                                    .px(3.0)
-                                    .py(2.0)
-                                    .bg(bg)
-                                    .cursor(CursorStyle::Pointer)
-                                    .animate_layout(
-                                        LayoutAnimationConfig::all()
-                                            .with_key(&item_anim_key)
-                                            .gentle(),
-                                    )
-                                    .child(
-                                        div().flex_shrink_0().child(
+                                let mut item_div =
+                                    div()
+                                        .w_fit()
+                                        .h_fit()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap(3.0)
+                                        .px(3.0)
+                                        .py(2.0)
+                                        .bg(bg)
+                                        .cursor(CursorStyle::Pointer)
+                                        .animate_bounds(
+                                            VisualAnimationConfig::size()
+                                                .with_key(&item_anim_key)
+                                                .snappy(),
+                                        )
+                                        .child(div().flex_shrink_0().child(
                                             svg(&item_icon).size(18.0, 18.0).color(icon_color),
-                                        ),
-                                    );
+                                        ));
 
                                 // Only add label when expanded
                                 if !is_collapsed {
@@ -326,7 +333,32 @@ impl Sidebar {
                     }
                 }
 
-                sidebar_content.child(items_container)
+                let sidebar_menu = sidebar_content.child(items_container);
+
+                // If content builder is provided, wrap both in a flex-row container
+                if let Some(ref content_fn) = content_builder {
+                    let main_content = content_fn();
+                    // Wrap main content with flex_1 and animate_bounds for smooth expansion
+                    let content_wrapper = div()
+                        .flex_1()
+                        .h_full()
+                        .overflow_clip()
+                        .animate_bounds(
+                            VisualAnimationConfig::size()
+                                .with_key(&content_anim_key)
+                                .snappy(),
+                        )
+                        .child(main_content);
+
+                    div()
+                        .flex_row()
+                        .w_full()
+                        .h_full()
+                        .child(sidebar_menu)
+                        .child(content_wrapper)
+                } else {
+                    sidebar_menu
+                }
             });
 
         Self {
@@ -374,7 +406,16 @@ impl ElementBuilder for Sidebar {
     fn element_type_id(&self) -> ElementTypeId {
         ElementBuilder::element_type_id(&self.inner)
     }
+
+    fn visual_animation_config(
+        &self,
+    ) -> Option<blinc_layout::visual_animation::VisualAnimationConfig> {
+        self.inner.visual_animation_config()
+    }
 }
+
+/// Content builder function type
+type ContentBuilderFn = Arc<dyn Fn() -> Div + Send + Sync>;
 
 /// Builder for sidebar component
 pub struct SidebarBuilder {
@@ -384,6 +425,8 @@ pub struct SidebarBuilder {
     expanded_width: f32,
     sections: Vec<SidebarSection>,
     show_toggle: bool,
+    /// Optional main content area that sits next to the sidebar
+    content_builder: Option<ContentBuilderFn>,
     built: OnceCell<Sidebar>,
 }
 
@@ -401,6 +444,7 @@ impl SidebarBuilder {
                 items: Vec::new(),
             }],
             show_toggle: true,
+            content_builder: None,
             built: OnceCell::new(),
         }
     }
@@ -474,6 +518,32 @@ impl SidebarBuilder {
         });
         self
     }
+
+    /// Set the main content area that sits next to the sidebar
+    ///
+    /// When provided, the sidebar wraps both the sidebar menu and the main content
+    /// in a shared container, enabling smooth coordinated animations during
+    /// collapse/expand transitions.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// cn::sidebar(&collapsed)
+    ///     .item("Home", home_icon, || {})
+    ///     .item("Settings", settings_icon, || {})
+    ///     .content(|| {
+    ///         div()
+    ///             .p(24.0)
+    ///             .child(text("Main content area"))
+    ///     })
+    /// ```
+    pub fn content<F>(mut self, builder: F) -> Self
+    where
+        F: Fn() -> Div + Send + Sync + 'static,
+    {
+        self.content_builder = Some(Arc::new(builder));
+        self
+    }
 }
 
 impl ElementBuilder for SidebarBuilder {
@@ -499,6 +569,12 @@ impl ElementBuilder for SidebarBuilder {
 
     fn element_type_id(&self) -> ElementTypeId {
         self.get_or_build().element_type_id()
+    }
+
+    fn visual_animation_config(
+        &self,
+    ) -> Option<blinc_layout::visual_animation::VisualAnimationConfig> {
+        self.get_or_build().visual_animation_config()
     }
 }
 

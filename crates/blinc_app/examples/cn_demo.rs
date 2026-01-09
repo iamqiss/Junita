@@ -1961,7 +1961,6 @@ fn sidebar_section(ctx: &WindowedContext) -> impl ElementBuilder {
                     .border(1.0, border)
                     .rounded(8.0)
                     .overflow_clip()
-                    .flex_row()
                     .child(
                         cn::sidebar(&sidebar_collapsed)
                             .item_active("Dashboard", home_icon, || {
@@ -1975,18 +1974,18 @@ fn sidebar_section(ctx: &WindowedContext) -> impl ElementBuilder {
                                 tracing::info!("Settings clicked")
                             })
                             .section("Help")
-                            .item("Support", help_icon, || tracing::info!("Support clicked")),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .bg(theme.color(ColorToken::Background))
-                            .p(24.0)
-                            .child(
-                                text("Main Content Area")
-                                    .size(18.0)
-                                    .color(theme.color(ColorToken::TextPrimary)),
-                            ),
+                            .item("Support", help_icon, || tracing::info!("Support clicked"))
+                            .content(|| {
+                                let theme = ThemeState::get();
+                                div()
+                                    .bg(theme.color(ColorToken::Background))
+                                    .p(24.0)
+                                    .child(
+                                        text("Main Content Area")
+                                            .size(18.0)
+                                            .color(theme.color(ColorToken::TextPrimary)),
+                                    )
+                            }),
                     ),
             ),
     )
