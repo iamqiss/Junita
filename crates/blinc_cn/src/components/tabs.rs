@@ -597,7 +597,7 @@ impl TabsBuilder {
                     .h(size.height())
                     .w_full()
                     .bg(tab_list_bg)
-                    .rounded(radius)
+                    .rounded_md()
                     .padding(Length::Px(6.0))
                     .flex_row()
                     .items_center()
@@ -843,11 +843,14 @@ fn build_tab_trigger(
         let mut trigger_div = div()
             .h(inner_height)
             .padding_x(Length::Px(size.padding_x()))
-            .padding_y(Length::Px(size.padding_x() / 2.0))
+            .padding_y(Length::Px(
+                size.padding_x() / if size != TabsSize::Small { 2.0 } else { 1.0 },
+            ))
             .flex_row()
             .items_center()
             .justify_center()
-            .rounded(radius)
+            .when(size == TabsSize::Small, |d| d.rounded_sm())
+            .when(size != TabsSize::Small, |d| d.rounded_md())
             .bg(bg)
             .cursor(if disabled {
                 CursorStyle::Default

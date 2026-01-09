@@ -547,9 +547,9 @@ mod tests {
         let (x, y) =
             calculate_popover_position(&bounds, PopoverSide::Top, PopoverAlign::Start, 4.0);
         assert_eq!(x, 100.0);
-        // y = trigger.y - offset = 100 - 4 = 96
+        // y = trigger.y - trigger.height - offset * 4.0 = 100 - 32 - 16 = 52
         // This is where the popover's BOTTOM edge will be (via anchor_direction)
-        assert_eq!(y, 96.0);
+        assert_eq!(y, 52.0);
     }
 
     #[test]

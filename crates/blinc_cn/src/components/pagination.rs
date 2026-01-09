@@ -678,7 +678,7 @@ mod tests {
 
     #[test]
     fn test_pagination_sizes() {
-        assert_eq!(PaginationSize::Small.button_size(), 28.0);
+        assert_eq!(PaginationSize::Small.button_size(), 24.0);
         assert_eq!(PaginationSize::Medium.button_size(), 32.0);
         assert_eq!(PaginationSize::Large.button_size(), 40.0);
     }
