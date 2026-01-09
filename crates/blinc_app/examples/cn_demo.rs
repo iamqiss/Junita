@@ -33,7 +33,7 @@ fn main() -> Result<()> {
 fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     eprintln!("build_ui called");
     let theme = ThemeState::get();
-    theme.set_scheme(ColorScheme::Light);
+   
     eprintln!(
         "Current theme platform: {:?}",
         blinc_theme::platform::Platform::current()
@@ -342,12 +342,12 @@ fn section_title(title: &str) -> impl ElementBuilder {
 /// Section container helper
 fn section_container() -> Div {
     let theme = ThemeState::get();
-    let surface = theme.color(ColorToken::Background).with_alpha(0.6);
+    // let surface = theme.color(ColorToken);
     let border = theme.color(ColorToken::Border);
     let radius = theme.radii().radius_xl;
 
     div()
-        .bg(surface)
+        .bg(Color::WHITE)
         .rounded(radius)
         .border(1.5, border)
         .p(theme.spacing().space_5)
@@ -550,8 +550,6 @@ fn toggles_section(ctx: &WindowedContext) -> impl ElementBuilder {
     let switch2 = ctx.use_state_keyed("switch2", || true);
     let switch3 = ctx.use_state_keyed("switch3", || false);
 
-    let scheduler = ctx.animation_handle();
-
     section_container().child(section_title("Toggles")).child(
         div()
             .flex_row()
@@ -571,10 +569,10 @@ fn toggles_section(ctx: &WindowedContext) -> impl ElementBuilder {
                 div()
                     .flex_col()
                     .gap(12.0)
-                    .child(cn::switch(&switch1, scheduler.clone()).label("Notifications"))
-                    .child(cn::switch(&switch2, scheduler.clone()).label("Dark mode"))
+                    .child(cn::switch(&switch1).label("Notifications"))
+                    .child(cn::switch(&switch2).label("Dark mode"))
                     .child(
-                        cn::switch(&switch3, scheduler.clone())
+                        cn::switch(&switch3)
                             .label("Disabled")
                             .disabled(true),
                     ),
