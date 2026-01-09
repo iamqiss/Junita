@@ -710,6 +710,16 @@ impl ActiveOverlay {
                         full_motion_key
                     );
                 }
+
+                // Also trigger exit for backdrop motion if backdrop is configured
+                if self.config.backdrop.is_some() {
+                    let backdrop_motion_key = format!("motion:overlay_backdrop_{}", self.handle.0);
+                    crate::selector::query_motion(&backdrop_motion_key).exit();
+                    tracing::debug!(
+                        "Overlay {:?} transitioning to Closing - triggered backdrop motion exit",
+                        self.handle
+                    );
+                }
             }
 
             true
@@ -1851,39 +1861,23 @@ impl OverlayManagerInner {
             content
         };
 
-        // Calculate backdrop opacity based on animation state
-        let backdrop_opacity = if let Some((progress, is_entering)) =
-            overlay.animation_progress(self.current_time_ms)
-        {
-            if is_entering {
-                progress // Fade in: 0 -> 1
-            } else {
-                1.0 - progress // Fade out: 1 -> 0
-            }
-        } else {
-            match overlay.state {
-                OverlayState::Open | OverlayState::PendingClose => 1.0,
-                OverlayState::Closed => 0.0,
-                OverlayState::Opening => 0.0,
-                OverlayState::Closing => 1.0,
-            }
-        };
-
         // Build the layer with optional backdrop
         if let Some(ref backdrop_config) = overlay.config.backdrop {
-            // Apply opacity to backdrop color
-            let backdrop_color = backdrop_config
-                .color
-                .with_alpha(backdrop_config.color.a * backdrop_opacity);
+            // Use backdrop color at full opacity - motion animation handles opacity
+            let backdrop_color = backdrop_config.color;
+
+            // Get animation durations from overlay config
+            let enter_duration = overlay.config.animation.enter.duration_ms();
+            let exit_duration = overlay.config.animation.exit.duration_ms();
+
+            // Create motion key for backdrop (must match the key used in transition())
+            let backdrop_motion_key = format!("overlay_backdrop_{}", overlay.handle.0);
 
             // Build backdrop div with click-to-dismiss if enabled
             let backdrop_div = if backdrop_config.dismiss_on_click {
                 let overlay_handle = overlay.handle;
-                let backdrop_key =
-                    InstanceKey::explicit(format!("overlay_backdrop_{}", overlay_handle.0));
 
                 div()
-                    .id(backdrop_key.get())
                     .absolute()
                     .left(0.0)
                     .top(0.0)
@@ -1911,13 +1905,21 @@ impl OverlayManagerInner {
                     .bg(backdrop_color)
             };
 
+            // Wrap backdrop in motion for animated opacity
+            // Motion handles enter/exit animations, triggered via query_motion().exit() in transition()
+            // Use motion_derived for explicit key that matches the lookup in transition()
+            let animated_backdrop = crate::motion::motion_derived(&backdrop_motion_key)
+                .fade_in(enter_duration)
+                .fade_out(exit_duration)
+                .child(backdrop_div);
+
             // Use stack: first child (backdrop) renders behind, second child (content) on top
             div().w(vp_width).h(vp_height).child(
                 stack()
                     .w(vp_width)
                     .h(vp_height)
-                    // Backdrop layer (behind) - fills entire viewport with animated opacity
-                    .child(backdrop_div)
+                    // Backdrop layer (behind) - motion container handles opacity animation
+                    .child(animated_backdrop)
                     // Content layer (on top) - positioned according to config
                     // Content animation is handled by user via motion() container
                     .child(self.position_content(overlay, content, vp_width, vp_height)),
