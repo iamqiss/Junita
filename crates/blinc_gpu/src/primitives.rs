@@ -738,9 +738,9 @@ pub struct CompositeUniforms {
 /// Uniform buffer for layer composition
 ///
 /// Layout matches LAYER_COMPOSITE_SHADER uniforms:
-/// - source_rect: vec4<f32> (16 bytes) - Source rectangle in layer texture (normalized 0-1)
-/// - dest_rect: vec4<f32> (16 bytes) - Destination rectangle in viewport (pixels)
-/// - viewport_size: vec2<f32> (8 bytes)
+/// - source_rect: `vec4<f32>` (16 bytes) - Source rectangle in layer texture (normalized 0-1)
+/// - dest_rect: `vec4<f32>` (16 bytes) - Destination rectangle in viewport (pixels)
+/// - viewport_size: `vec2<f32>` (8 bytes)
 /// - opacity: f32 (4 bytes)
 /// - blend_mode: u32 (4 bytes)
 /// Total: 48 bytes
@@ -864,7 +864,7 @@ impl Default for PathUniforms {
             use_glass_effect: 0,     // Default: no glass effect
             image_uv_bounds: [0.0, 0.0, 1.0, 1.0], // Default: full UV range
             glass_params: [20.0, 1.0, 0.5, 0.9], // Default: blur=20, sat=1, tint=0.5, opacity=0.9
-            glass_tint: [1.0, 1.0, 1.0, 0.3],    // Default: white with 30% alpha
+            glass_tint: [1.0, 1.0, 1.0, 0.3], // Default: white with 30% alpha
         }
     }
 }

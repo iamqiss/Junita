@@ -191,6 +191,19 @@ fn sd_ellipse(p: vec2<f32>, center: vec2<f32>, radii: vec2<f32>) -> f32 {
     return (dist - 1.0) * min(radii.x, radii.y);
 }
 
+// Quarter ellipse SDF for inner corners with asymmetric borders (GPUI approach)
+// This handles the case where adjacent border widths differ, creating an elliptical
+// inner corner instead of circular. Returns negative inside, positive outside.
+fn quarter_ellipse_sdf(point: vec2<f32>, radii: vec2<f32>) -> f32 {
+    // Avoid division by zero
+    let safe_radii = max(radii, vec2<f32>(0.001));
+    // Map to unit circle space
+    let circle_vec = point / safe_radii;
+    let unit_circle_sdf = length(circle_vec) - 1.0;
+    // Scale back using average radius for distance approximation
+    return unit_circle_sdf * (safe_radii.x + safe_radii.y) * -0.5;
+}
+
 // Error function approximation for Gaussian blur
 fn erf(x: f32) -> f32 {
     let s = sign(x);
@@ -531,8 +544,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    // Handle border with proper inner corner radii
-    // The border is the ring between the outer shape edge and an inner shape with reduced corner radii
+    // Handle border with proper inner corner radii (GPUI-style approach)
+    // The border is the ring between the outer shape edge and an inner shape
+    // For asymmetric borders, inner corners become elliptical, not circular
     // prim.border = [top, right, bottom, left] for per-side borders, or [uniform, 0, 0, 0] for uniform
     let border_top = prim.border.x;
     let border_right = prim.border.y;
@@ -548,43 +562,79 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let bb = select(border_top, border_bottom, border_right > 0.0 || border_bottom > 0.0 || border_left > 0.0);
         let bl = select(border_top, border_left, border_right > 0.0 || border_bottom > 0.0 || border_left > 0.0);
 
-        // Calculate proper inner corner radii
-        // Each corner radius is reduced by the max of adjacent border widths
-        // to ensure consistent border thickness around curved corners
-        let min_inner_r = 0.25;
-        let inner_radius = vec4<f32>(
-            max(prim.corner_radius.x - max(bt, bl), min_inner_r),  // top_left
-            max(prim.corner_radius.y - max(bt, br), min_inner_r),  // top_right
-            max(prim.corner_radius.z - max(bb, br), min_inner_r),  // bottom_right
-            max(prim.corner_radius.w - max(bb, bl), min_inner_r)   // bottom_left
-        );
+        let half_size = size * 0.5;
+        let rel = p - center;  // Position relative to center (signed)
+        let antialias_threshold = 0.5;
 
-        // Calculate inner shape with asymmetric insets
-        let inner_origin = origin + vec2<f32>(bl, bt);
-        let inner_size = size - vec2<f32>(bl + br, bt + bb);
-
-        // Only calculate inner SDF if inner shape has positive size
-        var inner_d: f32;
-        if inner_size.x > 0.0 && inner_size.y > 0.0 {
-            inner_d = sd_rounded_rect(p, inner_origin, inner_size, inner_radius);
+        // Select corner radius based on quadrant
+        var corner_radius: f32;
+        if rel.y < 0.0 {
+            if rel.x > 0.0 { corner_radius = prim.corner_radius.y; }  // top-right
+            else { corner_radius = prim.corner_radius.x; }           // top-left
         } else {
-            // Border is wider than half the shape - entire shape is border
-            inner_d = 1000.0;  // Always outside inner (full border)
+            if rel.x > 0.0 { corner_radius = prim.corner_radius.z; }  // bottom-right
+            else { corner_radius = prim.corner_radius.w; }           // bottom-left
         }
 
-        // For thin borders, use a fixed aa_width to avoid fwidth instability.
-        // The fwidth approach causes jitter on scroll because screen-space derivatives
-        // change with subpixel position. A fixed 0.5-1.0 pixel aa provides stable edges.
-        let stable_aa = 0.5;
+        // Select border widths for nearest edges based on quadrant (GPUI approach)
+        let border = vec2<f32>(
+            select(br, bl, rel.x < 0.0),  // horizontal: left or right
+            select(bb, bt, rel.y < 0.0)   // vertical: top or bottom
+        );
 
-        // Inner coverage using stable anti-aliasing (0 outside inner, 1 inside inner)
-        let inner_coverage = 1.0 - smoothstep(-stable_aa, stable_aa, inner_d);
+        // Handle zero-width borders (treat as negative for AA purposes)
+        let reduced_border = vec2<f32>(
+            select(border.x, -antialias_threshold, border.x == 0.0),
+            select(border.y, -antialias_threshold, border.y == 0.0)
+        );
 
-        // border_blend = 1 when in the border ring, 0 when inside the inner area
-        let border_blend = 1.0 - inner_coverage;
+        // Calculate position relative to corner
+        let corner_to_point = abs(rel) - half_size;
+        let corner_center_to_point = corner_to_point + corner_radius;
 
-        // Only apply border color where we're actually inside the shape (fill_alpha > 0)
-        fill_color = mix(fill_color, prim.border_color, border_blend * step(0.001, fill_alpha));
+        // Determine if we're near a rounded corner
+        let is_near_rounded_corner = corner_center_to_point.x >= 0.0 && corner_center_to_point.y >= 0.0;
+
+        // Inner straight border edge
+        let straight_border_inner = corner_to_point + reduced_border;
+
+        // Check if we're clearly inside the inner area (not near border)
+        let is_within_inner_straight = straight_border_inner.x < -antialias_threshold &&
+                                       straight_border_inner.y < -antialias_threshold;
+
+        // Fast path: clearly inside inner area, not near rounded corner
+        if is_within_inner_straight && !is_near_rounded_corner {
+            // No border here, keep fill_color as-is
+        } else {
+            // Calculate inner SDF based on context
+            var inner_sdf: f32;
+
+            let is_beyond_inner_straight = straight_border_inner.x > 0.0 || straight_border_inner.y > 0.0;
+
+            if corner_center_to_point.x <= 0.0 || corner_center_to_point.y <= 0.0 {
+                // Not in corner region - use straight edge distance
+                inner_sdf = -max(straight_border_inner.x, straight_border_inner.y);
+            } else if is_beyond_inner_straight {
+                // Beyond inner straight edge - definitely in border
+                inner_sdf = -1.0;
+            } else if abs(reduced_border.x - reduced_border.y) < 0.001 {
+                // Equal border widths - inner corner is circular (simple offset from outer)
+                let outer_sdf = length(max(vec2<f32>(0.0), corner_center_to_point)) +
+                               min(0.0, max(corner_center_to_point.x, corner_center_to_point.y)) - corner_radius;
+                inner_sdf = -(outer_sdf + reduced_border.x);
+            } else {
+                // Asymmetric borders - inner corner is ELLIPTICAL (key insight from GPUI)
+                let ellipse_radii = max(vec2<f32>(0.0), vec2<f32>(corner_radius) - reduced_border);
+                inner_sdf = quarter_ellipse_sdf(corner_center_to_point, ellipse_radii);
+            }
+
+            // Calculate border blend from inner SDF
+            // inner_sdf > 0 means inside inner (no border), < 0 means in border region
+            let border_blend = saturate(antialias_threshold - inner_sdf);
+
+            // Only apply border color where we're inside the shape
+            fill_color = mix(fill_color, prim.border_color, border_blend * step(0.001, fill_alpha));
+        }
     }
 
     // Apply clip alpha to shadow
