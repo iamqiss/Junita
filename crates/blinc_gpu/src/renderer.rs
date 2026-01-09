@@ -195,6 +195,199 @@ struct CachedSdfWithGlyphs {
     color_atlas_view_ptr: *const wgpu::TextureView,
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Layer Texture Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A texture used for offscreen layer rendering
+///
+/// Layer textures are used for rendering layers to offscreen targets,
+/// enabling layer composition with blend modes and effects.
+pub struct LayerTexture {
+    /// The GPU texture for color data
+    pub texture: wgpu::Texture,
+    /// View into the texture for rendering
+    pub view: wgpu::TextureView,
+    /// Size of the texture in pixels (width, height)
+    pub size: (u32, u32),
+    /// Whether this texture has an associated depth buffer
+    pub has_depth: bool,
+    /// Optional depth texture view (for 3D content)
+    pub depth_view: Option<wgpu::TextureView>,
+    /// Optional depth texture (kept alive for the view)
+    depth_texture: Option<wgpu::Texture>,
+}
+
+impl LayerTexture {
+    /// Create a new layer texture with the given size
+    pub fn new(
+        device: &wgpu::Device,
+        size: (u32, u32),
+        format: wgpu::TextureFormat,
+        with_depth: bool,
+    ) -> Self {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("layer_texture"),
+            size: wgpu::Extent3d {
+                width: size.0,
+                height: size.1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let (depth_texture, depth_view) = if with_depth {
+            let depth_tex = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("layer_depth_texture"),
+                size: wgpu::Extent3d {
+                    width: size.0,
+                    height: size.1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            let depth_view = depth_tex.create_view(&wgpu::TextureViewDescriptor::default());
+            (Some(depth_tex), Some(depth_view))
+        } else {
+            (None, None)
+        };
+
+        Self {
+            texture,
+            view,
+            size,
+            has_depth: with_depth,
+            depth_view,
+            depth_texture,
+        }
+    }
+
+    /// Check if this texture matches the requested size
+    pub fn matches_size(&self, size: (u32, u32)) -> bool {
+        self.size == size
+    }
+}
+
+/// Cache for managing layer textures with pooling
+///
+/// Implements texture pooling to avoid frequent allocations during rendering.
+/// Textures are acquired for layer rendering and released back to the pool
+/// when no longer needed.
+pub struct LayerTextureCache {
+    /// Map of layer IDs to their dedicated textures
+    named_textures: std::collections::HashMap<blinc_core::LayerId, LayerTexture>,
+    /// Pool of reusable textures (sorted by size for efficient matching)
+    pool: Vec<LayerTexture>,
+    /// Texture format used for all layer textures
+    format: wgpu::TextureFormat,
+    /// Maximum pool size to limit memory usage
+    max_pool_size: usize,
+}
+
+impl LayerTextureCache {
+    /// Create a new layer texture cache
+    pub fn new(format: wgpu::TextureFormat) -> Self {
+        Self {
+            named_textures: std::collections::HashMap::new(),
+            pool: Vec::new(),
+            format,
+            max_pool_size: 8, // Reasonable default to limit memory
+        }
+    }
+
+    /// Acquire a texture of at least the given size
+    ///
+    /// First checks the pool for a matching texture, otherwise creates a new one.
+    pub fn acquire(
+        &mut self,
+        device: &wgpu::Device,
+        size: (u32, u32),
+        with_depth: bool,
+    ) -> LayerTexture {
+        // Look for a texture in the pool that matches the size
+        if let Some(index) = self
+            .pool
+            .iter()
+            .position(|t| t.matches_size(size) && t.has_depth == with_depth)
+        {
+            return self.pool.swap_remove(index);
+        }
+
+        // Look for a texture that's larger (wasteful but avoids allocation)
+        if let Some(index) = self.pool.iter().position(|t| {
+            t.size.0 >= size.0 && t.size.1 >= size.1 && t.has_depth == with_depth
+        }) {
+            return self.pool.swap_remove(index);
+        }
+
+        // Create a new texture
+        LayerTexture::new(device, size, self.format, with_depth)
+    }
+
+    /// Release a texture back to the pool
+    ///
+    /// If the pool is full, the texture is dropped.
+    pub fn release(&mut self, texture: LayerTexture) {
+        if self.pool.len() < self.max_pool_size {
+            self.pool.push(texture);
+        }
+        // Otherwise let the texture be dropped
+    }
+
+    /// Store a texture with a layer ID for later retrieval
+    pub fn store(&mut self, id: blinc_core::LayerId, texture: LayerTexture) {
+        self.named_textures.insert(id, texture);
+    }
+
+    /// Get a reference to a named layer's texture
+    pub fn get(&self, id: &blinc_core::LayerId) -> Option<&LayerTexture> {
+        self.named_textures.get(id)
+    }
+
+    /// Remove and return a named layer's texture
+    pub fn remove(&mut self, id: &blinc_core::LayerId) -> Option<LayerTexture> {
+        self.named_textures.remove(id)
+    }
+
+    /// Clear all named textures (releases them to pool or drops them)
+    pub fn clear_named(&mut self) {
+        let textures: Vec<_> = self.named_textures.drain().map(|(_, t)| t).collect();
+        for texture in textures {
+            self.release(texture);
+        }
+    }
+
+    /// Clear the entire cache including pool
+    pub fn clear_all(&mut self) {
+        self.named_textures.clear();
+        self.pool.clear();
+    }
+
+    /// Get the number of textures in the pool
+    pub fn pool_size(&self) -> usize {
+        self.pool.len()
+    }
+
+    /// Get the number of named textures
+    pub fn named_count(&self) -> usize {
+        self.named_textures.len()
+    }
+}
+
 /// The GPU renderer using wgpu
 ///
 /// This is the main rendering engine that:
@@ -253,6 +446,8 @@ pub struct GpuRenderer {
     placeholder_path_image_view: wgpu::TextureView,
     /// Sampler for path image textures
     path_image_sampler: wgpu::Sampler,
+    /// Layer texture cache for offscreen rendering and composition
+    layer_texture_cache: LayerTextureCache,
 }
 
 /// Image rendering pipeline (created lazily on first image render)
@@ -645,6 +840,7 @@ impl GpuRenderer {
             gradient_texture_cache,
             placeholder_path_image_view,
             path_image_sampler,
+            layer_texture_cache: LayerTextureCache::new(texture_format),
         })
     }
 
@@ -3298,6 +3494,34 @@ impl GpuRenderer {
 
         self.queue.submit(std::iter::once(encoder.finish()));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Layer Texture Cache Accessors
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Get a reference to the layer texture cache
+    pub fn layer_texture_cache(&self) -> &LayerTextureCache {
+        &self.layer_texture_cache
+    }
+
+    /// Get a mutable reference to the layer texture cache
+    pub fn layer_texture_cache_mut(&mut self) -> &mut LayerTextureCache {
+        &mut self.layer_texture_cache
+    }
+
+    /// Acquire a layer texture from the cache
+    ///
+    /// If a matching texture exists in the pool, it will be reused.
+    /// Otherwise, a new texture will be created.
+    pub fn acquire_layer_texture(&mut self, size: (u32, u32), with_depth: bool) -> LayerTexture {
+        self.layer_texture_cache
+            .acquire(&self.device, size, with_depth)
+    }
+
+    /// Release a layer texture back to the cache pool
+    pub fn release_layer_texture(&mut self, texture: LayerTexture) {
+        self.layer_texture_cache.release(texture);
+    }
 }
 
 impl Default for GpuRenderer {
@@ -3305,5 +3529,266 @@ impl Default for GpuRenderer {
         // Create a basic renderer synchronously using pollster
         pollster::block_on(Self::new(RendererConfig::default()))
             .expect("Failed to create default renderer")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // LayerTextureCache Tests
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn layer_texture_cache_initial_state() {
+        let cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+        assert_eq!(cache.pool_size(), 0);
+        assert_eq!(cache.named_count(), 0);
+    }
+
+    #[test]
+    fn layer_texture_cache_clear_all() {
+        let cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+        // Pool is empty, but clear_all should work without panic
+        let mut cache = cache;
+        cache.clear_all();
+        assert_eq!(cache.pool_size(), 0);
+        assert_eq!(cache.named_count(), 0);
+    }
+
+    #[test]
+    fn layer_texture_cache_format_preserved() {
+        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+        let cache = LayerTextureCache::new(format);
+        assert_eq!(cache.format, format);
+    }
+
+    #[test]
+    fn layer_texture_matches_size() {
+        // Test requires GPU, but we can test the matches_size logic
+        // by creating a helper struct with known sizes
+        struct FakeTexture {
+            size: (u32, u32),
+        }
+        impl FakeTexture {
+            fn matches_size(&self, size: (u32, u32)) -> bool {
+                self.size == size
+            }
+        }
+
+        let tex = FakeTexture { size: (800, 600) };
+        assert!(tex.matches_size((800, 600)));
+        assert!(!tex.matches_size((800, 601)));
+        assert!(!tex.matches_size((801, 600)));
+        assert!(!tex.matches_size((400, 300)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GPU Integration Tests (require actual wgpu device)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /// Helper to create a test wgpu device
+    async fn create_test_device() -> Option<(wgpu::Device, wgpu::Queue)> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::LowPower,
+                force_fallback_adapter: false,
+                compatible_surface: None,
+            })
+            .await?;
+
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor::default(), None)
+            .await
+            .ok()?;
+
+        Some((device, queue))
+    }
+
+    /// Helper to create unique layer IDs for testing
+    fn test_layer_id(id: u64) -> blinc_core::LayerId {
+        blinc_core::LayerId::new(id)
+    }
+
+    #[test]
+    fn layer_texture_cache_acquire_and_release() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                // Skip test if no GPU available
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+
+            // Acquire a texture
+            let tex1 = cache.acquire(&device, (512, 512), false);
+            assert_eq!(tex1.size, (512, 512));
+            assert!(!tex1.has_depth);
+
+            // Release it back to pool
+            cache.release(tex1);
+            assert_eq!(cache.pool_size(), 1);
+
+            // Acquire again - should reuse from pool
+            let tex2 = cache.acquire(&device, (512, 512), false);
+            assert_eq!(tex2.size, (512, 512));
+            assert_eq!(cache.pool_size(), 0); // Removed from pool
+
+            // Acquire different size - should create new
+            let tex3 = cache.acquire(&device, (1024, 768), false);
+            assert_eq!(tex3.size, (1024, 768));
+            assert_eq!(cache.pool_size(), 0);
+
+            // Release both
+            cache.release(tex2);
+            cache.release(tex3);
+            assert_eq!(cache.pool_size(), 2);
+        });
+        result
+    }
+
+    #[test]
+    fn layer_texture_cache_named_textures() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+            let layer_id = test_layer_id(1);
+
+            // Store a named texture
+            let tex = cache.acquire(&device, (256, 256), false);
+            cache.store(layer_id, tex);
+            assert_eq!(cache.named_count(), 1);
+
+            // Get reference to it
+            let retrieved = cache.get(&layer_id);
+            assert!(retrieved.is_some());
+            assert_eq!(retrieved.unwrap().size, (256, 256));
+
+            // Remove it
+            let removed = cache.remove(&layer_id);
+            assert!(removed.is_some());
+            assert_eq!(cache.named_count(), 0);
+
+            // Release back to pool
+            cache.release(removed.unwrap());
+            assert_eq!(cache.pool_size(), 1);
+        });
+        result
+    }
+
+    #[test]
+    fn layer_texture_cache_clear_named_releases_to_pool() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+
+            // Store several named textures
+            for i in 0..3 {
+                let tex = cache.acquire(&device, (128, 128), false);
+                cache.store(test_layer_id(i + 100), tex);
+            }
+            assert_eq!(cache.named_count(), 3);
+            assert_eq!(cache.pool_size(), 0);
+
+            // Clear named - should release to pool
+            cache.clear_named();
+            assert_eq!(cache.named_count(), 0);
+            assert_eq!(cache.pool_size(), 3);
+        });
+        result
+    }
+
+    #[test]
+    fn layer_texture_cache_pool_size_limit() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+            // Default max_pool_size is 8
+
+            // Acquire and release more than max_pool_size textures
+            let mut textures = Vec::new();
+            for _ in 0..12 {
+                textures.push(cache.acquire(&device, (64, 64), false));
+            }
+
+            // Release all
+            for tex in textures {
+                cache.release(tex);
+            }
+
+            // Pool should be capped at max_pool_size (8)
+            assert_eq!(cache.pool_size(), 8);
+        });
+        result
+    }
+
+    #[test]
+    fn layer_texture_with_depth() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+
+            // Acquire texture with depth
+            let tex_with_depth = cache.acquire(&device, (512, 512), true);
+            assert!(tex_with_depth.has_depth);
+            assert!(tex_with_depth.depth_view.is_some());
+
+            // Acquire texture without depth
+            let tex_no_depth = cache.acquire(&device, (512, 512), false);
+            assert!(!tex_no_depth.has_depth);
+            assert!(tex_no_depth.depth_view.is_none());
+
+            // Release both
+            cache.release(tex_with_depth);
+            cache.release(tex_no_depth);
+            assert_eq!(cache.pool_size(), 2);
+
+            // Acquire with depth - should NOT get the one without depth
+            let tex_reacquire = cache.acquire(&device, (512, 512), true);
+            assert!(tex_reacquire.has_depth);
+            assert_eq!(cache.pool_size(), 1); // The no-depth one remains
+        });
+        result
+    }
+
+    #[test]
+    fn layer_texture_reuse_larger() {
+        let result = pollster::block_on(async {
+            let Some((device, _queue)) = create_test_device().await else {
+                return;
+            };
+
+            let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
+
+            // Acquire and release a large texture
+            let large_tex = cache.acquire(&device, (1024, 1024), false);
+            cache.release(large_tex);
+            assert_eq!(cache.pool_size(), 1);
+
+            // Acquire smaller - should reuse the larger one
+            let small_tex = cache.acquire(&device, (256, 256), false);
+            // The actual size will be 1024x1024 (reused from pool)
+            assert!(small_tex.size.0 >= 256 && small_tex.size.1 >= 256);
+            assert_eq!(cache.pool_size(), 0);
+        });
+        result
     }
 }

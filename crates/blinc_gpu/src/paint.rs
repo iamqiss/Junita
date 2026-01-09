@@ -1620,8 +1620,11 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
             self.opacity_stack.push(config.opacity);
         }
 
-        // Note: Actual offscreen rendering will be implemented in Phase 2/3
-        // For now, this tracks the layer hierarchy and applies blend/opacity
+        // Record layer command for GPU renderer to process
+        self.batch
+            .push_layer_command(crate::primitives::LayerCommand::Push {
+                config: config.clone(),
+            });
     }
 
     fn pop_layer(&mut self) {
@@ -1644,15 +1647,20 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
                 self.clip_stack.truncate(clip_idx);
             }
 
-            // Note: Actual layer composition (rendering to texture, blending)
-            // will be implemented in Phase 3. For now, primitives drawn within
-            // the layer are just part of the main batch with applied opacity/blend.
+            // Record layer command for GPU renderer to process
+            self.batch
+                .push_layer_command(crate::primitives::LayerCommand::Pop);
         }
     }
 
-    fn sample_layer(&mut self, _id: LayerId, _source_rect: Rect, _dest_rect: Rect) {
-        // Layer sampling will be implemented in Phase 4
-        // Requires offscreen render targets (Phase 2) and layer textures
+    fn sample_layer(&mut self, id: LayerId, source_rect: Rect, dest_rect: Rect) {
+        // Record sample command for GPU renderer to process
+        self.batch
+            .push_layer_command(crate::primitives::LayerCommand::Sample {
+                id,
+                source: source_rect,
+                dest: dest_rect,
+            });
     }
 
     fn viewport_size(&self) -> Size {

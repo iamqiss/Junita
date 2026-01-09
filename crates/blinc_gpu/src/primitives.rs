@@ -735,6 +735,67 @@ pub struct CompositeUniforms {
     pub _padding: [f32; 2],
 }
 
+/// Uniform buffer for layer composition
+///
+/// Layout matches LAYER_COMPOSITE_SHADER uniforms:
+/// - source_rect: vec4<f32> (16 bytes) - Source rectangle in layer texture (normalized 0-1)
+/// - dest_rect: vec4<f32> (16 bytes) - Destination rectangle in viewport (pixels)
+/// - viewport_size: vec2<f32> (8 bytes)
+/// - opacity: f32 (4 bytes)
+/// - blend_mode: u32 (4 bytes)
+/// Total: 48 bytes
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct LayerCompositeUniforms {
+    /// Source rectangle in layer texture (x, y, width, height) - normalized 0-1
+    pub source_rect: [f32; 4],
+    /// Destination rectangle in viewport (x, y, width, height) - pixels
+    pub dest_rect: [f32; 4],
+    /// Viewport size for coordinate conversion
+    pub viewport_size: [f32; 2],
+    /// Layer opacity (0.0 - 1.0)
+    pub opacity: f32,
+    /// Blend mode (see BlendMode enum)
+    pub blend_mode: u32,
+}
+
+impl LayerCompositeUniforms {
+    /// Create uniforms for full-layer composition at a specific position
+    pub fn new(
+        layer_size: (u32, u32),
+        dest_x: f32,
+        dest_y: f32,
+        viewport_size: (f32, f32),
+        opacity: f32,
+        blend_mode: blinc_core::BlendMode,
+    ) -> Self {
+        Self {
+            source_rect: [0.0, 0.0, 1.0, 1.0], // Full texture
+            dest_rect: [dest_x, dest_y, layer_size.0 as f32, layer_size.1 as f32],
+            viewport_size: [viewport_size.0, viewport_size.1],
+            opacity,
+            blend_mode: blend_mode as u32,
+        }
+    }
+
+    /// Create uniforms for sub-region composition
+    pub fn with_source_rect(
+        source_rect: [f32; 4],
+        dest_rect: [f32; 4],
+        viewport_size: (f32, f32),
+        opacity: f32,
+        blend_mode: blinc_core::BlendMode,
+    ) -> Self {
+        Self {
+            source_rect,
+            dest_rect,
+            viewport_size: [viewport_size.0, viewport_size.1],
+            opacity,
+            blend_mode: blend_mode as u32,
+        }
+    }
+}
+
 /// Uniform buffer for path rendering
 /// Layout matches shader struct exactly:
 /// - viewport_size: `vec2<f32>` (8 bytes)
@@ -839,6 +900,39 @@ pub struct PathBatch {
     pub glass_tint: [f32; 4],
 }
 
+/// Commands for layer operations during rendering
+///
+/// These commands are recorded during painting and executed by the renderer
+/// to manage offscreen render targets and layer composition.
+#[derive(Clone, Debug)]
+pub enum LayerCommand {
+    /// Push a new layer - begins rendering to an offscreen target
+    Push {
+        /// Layer configuration
+        config: blinc_core::LayerConfig,
+    },
+    /// Pop the current layer - composite it back to the parent
+    Pop,
+    /// Sample from a named layer's texture into the current target
+    Sample {
+        /// ID of the layer to sample from
+        id: blinc_core::LayerId,
+        /// Source rectangle in the layer's texture (in pixels)
+        source: blinc_core::Rect,
+        /// Destination rectangle in the current target (in pixels)
+        dest: blinc_core::Rect,
+    },
+}
+
+/// A recorded layer command with its primitive index
+#[derive(Clone, Debug)]
+pub struct LayerCommandEntry {
+    /// The primitive index when this command was recorded
+    pub primitive_index: usize,
+    /// The layer command
+    pub command: LayerCommand,
+}
+
 /// Batch of GPU primitives for efficient rendering
 pub struct PrimitiveBatch {
     /// Background primitives (rendered before glass)
@@ -851,6 +945,8 @@ pub struct PrimitiveBatch {
     pub paths: PathBatch,
     /// Foreground tessellated path geometry
     pub foreground_paths: PathBatch,
+    /// Layer commands for offscreen rendering and composition
+    pub layer_commands: Vec<LayerCommandEntry>,
 }
 
 impl PrimitiveBatch {
@@ -862,6 +958,7 @@ impl PrimitiveBatch {
             glyphs: Vec::new(),
             paths: PathBatch::default(),
             foreground_paths: PathBatch::default(),
+            layer_commands: Vec::new(),
         }
     }
 
@@ -872,6 +969,20 @@ impl PrimitiveBatch {
         self.glyphs.clear();
         self.paths = PathBatch::default();
         self.foreground_paths = PathBatch::default();
+        self.layer_commands.clear();
+    }
+
+    /// Record a layer command at the current primitive index
+    pub fn push_layer_command(&mut self, command: LayerCommand) {
+        self.layer_commands.push(LayerCommandEntry {
+            primitive_index: self.primitives.len(),
+            command,
+        });
+    }
+
+    /// Check if there are any layer commands recorded
+    pub fn has_layer_commands(&self) -> bool {
+        !self.layer_commands.is_empty()
     }
 
     pub fn push(&mut self, primitive: GpuPrimitive) {
@@ -1159,6 +1270,9 @@ impl PrimitiveBatch {
     ///
     /// Useful for combining batches from different paint contexts.
     pub fn merge(&mut self, other: PrimitiveBatch) {
+        // Record the current primitive count for offsetting layer commands
+        let primitive_offset = self.primitives.len();
+
         self.primitives.extend(other.primitives);
         self.foreground_primitives
             .extend(other.foreground_primitives);
@@ -1184,6 +1298,12 @@ impl PrimitiveBatch {
                 .iter()
                 .map(|i| i + fg_base_vertex),
         );
+
+        // Merge layer commands with offset primitive indices
+        for mut entry in other.layer_commands {
+            entry.primitive_index += primitive_offset;
+            self.layer_commands.push(entry);
+        }
     }
 }
 
