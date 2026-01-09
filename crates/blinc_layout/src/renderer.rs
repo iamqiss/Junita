@@ -1128,7 +1128,7 @@ impl RenderTree {
 
         // Register visual animation config for new FLIP-style system
         if let Some(config) = element.visual_animation_config() {
-            eprintln!(
+            tracing::trace!(
                 "[VISUAL_ANIM] collect_render_props: registering config for {:?}, key={:?}",
                 node_id, config.key
             );
@@ -1323,7 +1323,7 @@ impl RenderTree {
 
         // Register visual animation config for new FLIP-style system
         if let Some(config) = element.visual_animation_config() {
-            eprintln!(
+            tracing::trace!(
                 "[VISUAL_ANIM] collect_render_props_boxed: registering config for {:?}, key={:?}",
                 node_id, config.key
             );
@@ -2432,7 +2432,7 @@ impl RenderTree {
             .clone()
             .unwrap_or_else(|| format!("node_{:?}", node_id));
 
-        eprintln!(
+        tracing::trace!(
             "[VISUAL_ANIM] Registering config: node={:?}, key={}",
             node_id, key
         );
@@ -2453,7 +2453,7 @@ impl RenderTree {
     /// Called after layout computation but before rendering.
     fn update_visual_animations(&mut self) {
         if !self.visual_animation_configs.is_empty() {
-            eprintln!(
+            tracing::trace!(
                 "[VISUAL_ANIM] update_visual_animations: {} configs registered",
                 self.visual_animation_configs.len()
             );
