@@ -297,20 +297,93 @@ impl LayerTexture {
     }
 }
 
-/// Cache for managing layer textures with pooling
+/// Size bucket for texture pooling
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TextureSizeBucket {
+    Small,  // <= 128
+    Medium, // <= 256
+    Large,  // <= 512
+    XLarge, // > 512 (not pooled by default)
+}
+
+impl TextureSizeBucket {
+    /// Get the bucket for a given size
+    fn from_size(size: (u32, u32)) -> Self {
+        let max_dim = size.0.max(size.1);
+        if max_dim <= 128 {
+            Self::Small
+        } else if max_dim <= 256 {
+            Self::Medium
+        } else if max_dim <= 512 {
+            Self::Large
+        } else {
+            Self::XLarge
+        }
+    }
+
+    /// Get the maximum size for this bucket (for rounding up)
+    fn max_size(&self) -> u32 {
+        match self {
+            Self::Small => 128,
+            Self::Medium => 256,
+            Self::Large => 512,
+            Self::XLarge => u32::MAX,
+        }
+    }
+}
+
+/// Statistics for texture cache performance monitoring
+#[derive(Debug, Default, Clone)]
+pub struct TextureCacheStats {
+    /// Number of cache hits (texture reused from pool)
+    pub hits: u64,
+    /// Number of cache misses (new texture allocated)
+    pub misses: u64,
+    /// Number of textures currently in pool
+    pub pool_count: usize,
+    /// Estimated memory in pool (bytes)
+    pub pool_memory_bytes: u64,
+    /// Number of named textures
+    pub named_count: usize,
+    /// Estimated memory in named textures (bytes)
+    pub named_memory_bytes: u64,
+}
+
+impl TextureCacheStats {
+    /// Total estimated memory usage
+    pub fn total_memory_bytes(&self) -> u64 {
+        self.pool_memory_bytes + self.named_memory_bytes
+    }
+
+    /// Cache hit rate (0.0 - 1.0)
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
+    }
+}
+
+/// Cache for managing layer textures with size-bucketed pooling
 ///
 /// Implements texture pooling to avoid frequent allocations during rendering.
 /// Textures are acquired for layer rendering and released back to the pool
-/// when no longer needed.
+/// when no longer needed. Uses size buckets for more efficient reuse.
 pub struct LayerTextureCache {
     /// Map of layer IDs to their dedicated textures
     named_textures: std::collections::HashMap<blinc_core::LayerId, LayerTexture>,
-    /// Pool of reusable textures (sorted by size for efficient matching)
-    pool: Vec<LayerTexture>,
+    /// Size-bucketed pools for efficient texture reuse
+    pool_small: Vec<LayerTexture>,  // <= 128
+    pool_medium: Vec<LayerTexture>, // <= 256
+    pool_large: Vec<LayerTexture>,  // <= 512
     /// Texture format used for all layer textures
     format: wgpu::TextureFormat,
-    /// Maximum pool size to limit memory usage
-    max_pool_size: usize,
+    /// Maximum textures per bucket
+    max_per_bucket: usize,
+    /// Cache statistics
+    stats: TextureCacheStats,
 }
 
 impl LayerTextureCache {
@@ -318,75 +391,195 @@ impl LayerTextureCache {
     pub fn new(format: wgpu::TextureFormat) -> Self {
         Self {
             named_textures: std::collections::HashMap::new(),
-            pool: Vec::new(),
+            pool_small: Vec::with_capacity(4),
+            pool_medium: Vec::with_capacity(4),
+            pool_large: Vec::with_capacity(4),
             format,
-            max_pool_size: 8, // Reasonable default to limit memory
+            max_per_bucket: 4, // 4 textures per bucket = 12 total max
+            stats: TextureCacheStats::default(),
+        }
+    }
+
+    /// Estimate memory usage of a texture in bytes (RGBA8 = 4 bytes per pixel)
+    fn estimate_texture_bytes(size: (u32, u32), has_depth: bool) -> u64 {
+        let color_bytes = (size.0 as u64) * (size.1 as u64) * 4;
+        let depth_bytes = if has_depth {
+            (size.0 as u64) * (size.1 as u64) * 4 // Depth32Float = 4 bytes
+        } else {
+            0
+        };
+        color_bytes + depth_bytes
+    }
+
+    /// Get the appropriate pool for a bucket
+    fn get_pool(&self, bucket: TextureSizeBucket) -> &Vec<LayerTexture> {
+        match bucket {
+            TextureSizeBucket::Small => &self.pool_small,
+            TextureSizeBucket::Medium => &self.pool_medium,
+            TextureSizeBucket::Large => &self.pool_large,
+            TextureSizeBucket::XLarge => &self.pool_large, // XLarge uses large pool but rarely cached
+        }
+    }
+
+    /// Get mutable pool for a bucket
+    fn get_pool_mut(&mut self, bucket: TextureSizeBucket) -> &mut Vec<LayerTexture> {
+        match bucket {
+            TextureSizeBucket::Small => &mut self.pool_small,
+            TextureSizeBucket::Medium => &mut self.pool_medium,
+            TextureSizeBucket::Large => &mut self.pool_large,
+            TextureSizeBucket::XLarge => &mut self.pool_large,
         }
     }
 
     /// Acquire a texture of at least the given size
     ///
     /// First checks the pool for a matching texture, otherwise creates a new one.
+    /// Textures may be larger than requested (rounded up to bucket size).
     pub fn acquire(
         &mut self,
         device: &wgpu::Device,
         size: (u32, u32),
         with_depth: bool,
     ) -> LayerTexture {
-        // Look for a texture in the pool that matches the size
-        if let Some(index) = self
-            .pool
-            .iter()
-            .position(|t| t.matches_size(size) && t.has_depth == with_depth)
-        {
-            return self.pool.swap_remove(index);
+        let bucket = TextureSizeBucket::from_size(size);
+
+        // Helper to find a matching texture in a pool
+        fn find_matching(
+            pool: &[LayerTexture],
+            size: (u32, u32),
+            with_depth: bool,
+        ) -> Option<usize> {
+            pool.iter()
+                .position(|t| t.size.0 >= size.0 && t.size.1 >= size.1 && t.has_depth == with_depth)
         }
 
-        // Look for a texture that's larger (wasteful but avoids allocation)
-        if let Some(index) = self
-            .pool
-            .iter()
-            .position(|t| t.size.0 >= size.0 && t.size.1 >= size.1 && t.has_depth == with_depth)
-        {
-            return self.pool.swap_remove(index);
+        // Try to find in primary bucket
+        let found_in_primary = match bucket {
+            TextureSizeBucket::Small => find_matching(&self.pool_small, size, with_depth),
+            TextureSizeBucket::Medium => find_matching(&self.pool_medium, size, with_depth),
+            TextureSizeBucket::Large => find_matching(&self.pool_large, size, with_depth),
+            TextureSizeBucket::XLarge => find_matching(&self.pool_large, size, with_depth),
+        };
+
+        if let Some(index) = found_in_primary {
+            self.stats.hits += 1;
+            let texture = match bucket {
+                TextureSizeBucket::Small => self.pool_small.swap_remove(index),
+                TextureSizeBucket::Medium => self.pool_medium.swap_remove(index),
+                TextureSizeBucket::Large | TextureSizeBucket::XLarge => {
+                    self.pool_large.swap_remove(index)
+                }
+            };
+            self.update_pool_stats();
+            return texture;
         }
 
-        // Create a new texture
-        LayerTexture::new(device, size, self.format, with_depth)
+        // Try larger buckets
+        let found_in_larger = match bucket {
+            TextureSizeBucket::Small => {
+                // Try medium first, then large
+                find_matching(&self.pool_medium, size, with_depth)
+                    .map(|i| (TextureSizeBucket::Medium, i))
+                    .or_else(|| {
+                        find_matching(&self.pool_large, size, with_depth)
+                            .map(|i| (TextureSizeBucket::Large, i))
+                    })
+            }
+            TextureSizeBucket::Medium => find_matching(&self.pool_large, size, with_depth)
+                .map(|i| (TextureSizeBucket::Large, i)),
+            _ => None,
+        };
+
+        if let Some((larger_bucket, index)) = found_in_larger {
+            self.stats.hits += 1;
+            let texture = match larger_bucket {
+                TextureSizeBucket::Medium => self.pool_medium.swap_remove(index),
+                TextureSizeBucket::Large => self.pool_large.swap_remove(index),
+                _ => unreachable!(),
+            };
+            self.update_pool_stats();
+            return texture;
+        }
+
+        // No suitable texture in pool, create a new one
+        self.stats.misses += 1;
+
+        // Round up to bucket size for better future reuse
+        let rounded_size = if bucket != TextureSizeBucket::XLarge {
+            let bucket_max = bucket.max_size();
+            (size.0.max(bucket_max), size.1.max(bucket_max))
+        } else {
+            // For XLarge, use exact size (no rounding)
+            size
+        };
+
+        LayerTexture::new(device, rounded_size, self.format, with_depth)
     }
 
     /// Release a texture back to the pool
     ///
-    /// If the pool is full or the texture is too large, it's dropped.
-    /// This prevents memory bloat from holding onto oversized textures.
+    /// If the pool bucket is full or the texture is too large, it's dropped.
     pub fn release(&mut self, texture: LayerTexture) {
-        // Don't pool textures larger than 512x512 - they're likely viewport-sized
-        // and we want to encourage tight-fit texture reuse
-        const MAX_POOL_TEXTURE_SIZE: u32 = 512;
+        let bucket = TextureSizeBucket::from_size(texture.size);
+        let max = self.max_per_bucket;
 
-        if texture.size.0 > MAX_POOL_TEXTURE_SIZE || texture.size.1 > MAX_POOL_TEXTURE_SIZE {
-            // Drop oversized textures instead of pooling them
+        // Don't pool XLarge textures
+        if bucket == TextureSizeBucket::XLarge {
             return;
         }
 
-        if self.pool.len() < self.max_pool_size {
-            self.pool.push(texture);
+        let pool = match bucket {
+            TextureSizeBucket::Small => &mut self.pool_small,
+            TextureSizeBucket::Medium => &mut self.pool_medium,
+            TextureSizeBucket::Large => &mut self.pool_large,
+            TextureSizeBucket::XLarge => return, // Already handled above
+        };
+
+        if pool.len() < max {
+            pool.push(texture);
+            self.update_pool_stats();
         }
         // Otherwise let the texture be dropped
+    }
+
+    /// Update pool statistics
+    fn update_pool_stats(&mut self) {
+        let mut count = 0;
+        let mut bytes = 0u64;
+
+        for pool in [&self.pool_small, &self.pool_medium, &self.pool_large] {
+            for t in pool {
+                count += 1;
+                bytes += Self::estimate_texture_bytes(t.size, t.has_depth);
+            }
+        }
+
+        self.stats.pool_count = count;
+        self.stats.pool_memory_bytes = bytes;
     }
 
     /// Clear oversized textures from the pool
     ///
     /// Call this at frame start to evict any large textures that accumulated.
     pub fn evict_oversized(&mut self) {
-        const MAX_POOL_TEXTURE_SIZE: u32 = 512;
-        self.pool
-            .retain(|t| t.size.0 <= MAX_POOL_TEXTURE_SIZE && t.size.1 <= MAX_POOL_TEXTURE_SIZE);
+        // With bucketed pools, we don't need to do much here
+        // But we can trim pools that are over capacity
+        while self.pool_small.len() > self.max_per_bucket {
+            self.pool_small.pop();
+        }
+        while self.pool_medium.len() > self.max_per_bucket {
+            self.pool_medium.pop();
+        }
+        while self.pool_large.len() > self.max_per_bucket {
+            self.pool_large.pop();
+        }
+        self.update_pool_stats();
     }
 
     /// Store a texture with a layer ID for later retrieval
     pub fn store(&mut self, id: blinc_core::LayerId, texture: LayerTexture) {
         self.named_textures.insert(id, texture);
+        self.update_named_stats();
     }
 
     /// Get a reference to a named layer's texture
@@ -396,7 +589,19 @@ impl LayerTextureCache {
 
     /// Remove and return a named layer's texture
     pub fn remove(&mut self, id: &blinc_core::LayerId) -> Option<LayerTexture> {
-        self.named_textures.remove(id)
+        let result = self.named_textures.remove(id);
+        self.update_named_stats();
+        result
+    }
+
+    /// Update named texture statistics
+    fn update_named_stats(&mut self) {
+        let mut bytes = 0u64;
+        for t in self.named_textures.values() {
+            bytes += Self::estimate_texture_bytes(t.size, t.has_depth);
+        }
+        self.stats.named_count = self.named_textures.len();
+        self.stats.named_memory_bytes = bytes;
     }
 
     /// Clear all named textures (releases them to pool or drops them)
@@ -405,22 +610,39 @@ impl LayerTextureCache {
         for texture in textures {
             self.release(texture);
         }
+        self.update_named_stats();
     }
 
     /// Clear the entire cache including pool
     pub fn clear_all(&mut self) {
         self.named_textures.clear();
-        self.pool.clear();
+        self.pool_small.clear();
+        self.pool_medium.clear();
+        self.pool_large.clear();
+        self.stats = TextureCacheStats::default();
     }
 
-    /// Get the number of textures in the pool
+    /// Get the total number of textures in all pools
     pub fn pool_size(&self) -> usize {
-        self.pool.len()
+        self.pool_small.len() + self.pool_medium.len() + self.pool_large.len()
     }
 
     /// Get the number of named textures
     pub fn named_count(&self) -> usize {
         self.named_textures.len()
+    }
+
+    /// Get current cache statistics
+    pub fn stats(&self) -> &TextureCacheStats {
+        &self.stats
+    }
+
+    /// Reset cache statistics (call at start of profiling)
+    pub fn reset_stats(&mut self) {
+        self.stats.hits = 0;
+        self.stats.misses = 0;
+        self.update_pool_stats();
+        self.update_named_stats();
     }
 }
 
