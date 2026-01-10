@@ -132,6 +132,8 @@ pub struct GlassMaterial {
     pub border_thickness: f32,
     /// Optional drop shadow
     pub shadow: Option<MaterialShadow>,
+    /// Use simple frosted glass mode (no liquid glass effects)
+    pub simple: bool,
 }
 
 impl Default for GlassMaterial {
@@ -144,6 +146,7 @@ impl Default for GlassMaterial {
             noise: 0.0,
             border_thickness: 0.8,
             shadow: None,
+            simple: false,
         }
     }
 }
@@ -232,6 +235,30 @@ impl GlassMaterial {
     /// Card style with border and shadow
     pub fn card() -> Self {
         Self::new().border(1.0).shadow(MaterialShadow::md())
+    }
+
+    /// Simple frosted glass - pure blur without liquid glass effects
+    ///
+    /// Creates a clean backdrop blur effect without edge refraction,
+    /// light reflections, or bevel effects. More performant and ideal
+    /// for subtle UI backgrounds where you want pure frosted glass.
+    pub fn simple() -> Self {
+        Self {
+            blur: 15.0,
+            tint: Color::rgba(1.0, 1.0, 1.0, 0.15),
+            saturation: 1.1,
+            brightness: 1.0,
+            noise: 0.0,
+            border_thickness: 0.0,
+            shadow: None,
+            simple: true,
+        }
+    }
+
+    /// Enable/disable simple mode (no liquid glass effects)
+    pub fn with_simple(mut self, simple: bool) -> Self {
+        self.simple = simple;
+        self
     }
 }
 

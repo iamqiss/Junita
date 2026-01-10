@@ -5675,9 +5675,9 @@ impl GpuRenderer {
                 let mut op = *p;
                 op.bounds[0] -= offset_x;
                 op.bounds[1] -= offset_y;
-                // Also offset clip bounds if they're valid
-                if op.clip_bounds[2] < 50000.0 {
-                    // Not the "no clip" default
+                // Also offset clip bounds if they're valid (not the "no clip" default)
+                // Default "no clip" is [-10000.0, -10000.0, 100000.0, 100000.0]
+                if op.clip_bounds[0] > -5000.0 {
                     op.clip_bounds[0] -= offset_x;
                     op.clip_bounds[1] -= offset_y;
                 }

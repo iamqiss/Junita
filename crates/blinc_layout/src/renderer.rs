@@ -4342,6 +4342,7 @@ impl RenderTree {
                 noise: glass.noise,
                 border_thickness: glass.border_thickness,
                 shadow: render_node.props.shadow.clone(),
+                simple: glass.simple,
             });
             ctx.fill_rect(rect, radius, glass_brush);
         } else {
@@ -4960,6 +4961,7 @@ impl RenderTree {
                     noise: glass.noise,
                     border_thickness: glass.border_thickness,
                     shadow: render_node.props.shadow.clone(),
+                    simple: glass.simple,
                 });
                 ctx.fill_rect(rect, radius, glass_brush);
             } else {
@@ -5455,6 +5457,7 @@ impl RenderTree {
                     noise: glass.noise,
                     border_thickness: glass.border_thickness,
                     shadow: render_node.props.shadow.clone(),
+                    simple: glass.simple,
                 });
                 ctx.fill_rect(rect, radius, glass_brush);
             } else {
@@ -5816,6 +5819,7 @@ impl RenderTree {
                             noise: glass.noise,
                             border_thickness: glass.border_thickness,
                             shadow: render_node.props.shadow.clone(),
+                            simple: glass.simple,
                         });
                         ctx.fill_rect(rect, radius, glass_brush);
                     } else {

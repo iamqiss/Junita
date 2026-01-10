@@ -40,6 +40,8 @@ pub enum GlassType {
     Regular = 2,
     Thick = 3,
     Chrome = 4,
+    /// Simple frosted glass - pure blur + tint, no liquid glass effects
+    Simple = 5,
 }
 
 /// Clip types for primitives

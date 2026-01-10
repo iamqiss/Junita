@@ -842,6 +842,7 @@ const GLASS_THIN: u32 = 1u;
 const GLASS_REGULAR: u32 = 2u;
 const GLASS_THICK: u32 = 3u;
 const GLASS_CHROME: u32 = 4u;
+const GLASS_SIMPLE: u32 = 5u;  // Simple frosted glass - no liquid effects
 
 struct GlassPrimitive {
     // Bounds (x, y, width, height)
@@ -1217,6 +1218,43 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let saturation = prim.params.y;
     let brightness = prim.params.z;
     let noise_amount = prim.params.w;
+    let glass_type = prim.type_info.x;
+
+    // ========================================================================
+    // SIMPLE FROSTED GLASS (no liquid effects)
+    // ========================================================================
+    // Pure frosted glass: blur + tint + saturation/brightness
+    // No refraction, no edge bevels, no light reflections
+    if glass_type == GLASS_SIMPLE {
+        // Use clipped blur for scroll container support
+        var simple_backdrop = blur_backdrop_clipped(in.screen_uv, blur_radius, prim.clip_bounds);
+        simple_backdrop = vec4<f32>(adjust_saturation(simple_backdrop.rgb, saturation), 1.0);
+        simple_backdrop = vec4<f32>(simple_backdrop.rgb * brightness, 1.0);
+
+        // Apply tint overlay
+        let tint = prim.tint_color;
+        var simple_result = mix(simple_backdrop.rgb, tint.rgb, tint.a);
+
+        // Optional noise for texture
+        if noise_amount > 0.0 {
+            let n = noise(p * 0.3);
+            simple_result = simple_result + vec3<f32>((n - 0.5) * noise_amount * 0.02);
+        }
+
+        simple_result = clamp(simple_result, vec3<f32>(0.0), vec3<f32>(1.0));
+
+        // Blend shadow underneath the glass
+        if has_shadow && shadow_color_premult.a > 0.001 {
+            let shadow_contrib = shadow_color_premult.a * (1.0 - mask);
+            let final_alpha = mask + shadow_contrib;
+            if final_alpha > 0.001 {
+                let final_rgb = (simple_result * mask + shadow_color_premult.rgb * shadow_contrib) / final_alpha;
+                return vec4<f32>(final_rgb, final_alpha);
+            }
+        }
+
+        return vec4<f32>(simple_result, mask);
+    }
 
     // Distance from edge (0 at edge, positive going inward)
     let inner_dist = max(0.0, -d);
@@ -1348,7 +1386,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Glass type variants - adjust edge highlight intensity
-    let glass_type = prim.type_info.x;
     switch glass_type {
         case GLASS_ULTRA_THIN: {
             // Even more transparent

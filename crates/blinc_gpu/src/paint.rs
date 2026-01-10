@@ -50,7 +50,7 @@ use blinc_core::{
 
 use crate::path::{extract_brush_info, tessellate_fill, tessellate_stroke};
 use crate::primitives::{
-    ClipType, FillType, GpuGlassPrimitive, GpuPrimitive, PrimitiveBatch, PrimitiveType,
+    ClipType, FillType, GlassType, GpuGlassPrimitive, GpuPrimitive, PrimitiveBatch, PrimitiveType,
 };
 use crate::text::TextRenderingContext;
 
@@ -1081,6 +1081,11 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
                         clip_bounds[3] * 2.0,
                     );
                 }
+            }
+
+            // Set glass type based on simple flag
+            if style.simple {
+                glass = glass.with_glass_type(GlassType::Simple);
             }
 
             self.batch.push_glass(glass);
