@@ -380,7 +380,8 @@ impl LayerTextureCache {
     /// Call this at frame start to evict any large textures that accumulated.
     pub fn evict_oversized(&mut self) {
         const MAX_POOL_TEXTURE_SIZE: u32 = 512;
-        self.pool.retain(|t| t.size.0 <= MAX_POOL_TEXTURE_SIZE && t.size.1 <= MAX_POOL_TEXTURE_SIZE);
+        self.pool
+            .retain(|t| t.size.0 <= MAX_POOL_TEXTURE_SIZE && t.size.1 <= MAX_POOL_TEXTURE_SIZE);
     }
 
     /// Store a texture with a layer ID for later retrieval
@@ -2595,7 +2596,9 @@ impl GpuRenderer {
             let (layer_pos, layer_size, layer_clip) = if primitives.is_empty() {
                 // Fallback to config values if no primitives
                 let pos = config.position.map(|p| (p.x, p.y)).unwrap_or((0.0, 0.0));
-                let size = config.size.map(|s| (s.width, s.height))
+                let size = config
+                    .size
+                    .map(|s| (s.width, s.height))
                     .unwrap_or((self.viewport_size.0 as f32, self.viewport_size.1 as f32));
                 (pos, size, None)
             } else {
@@ -2615,10 +2618,7 @@ impl GpuRenderer {
                     max_y = max_y.max(py + ph);
                     // Check for valid clip bounds (not the default "no clip" values)
                     // Default is [-10000, -10000, 100000, 100000]
-                    if clip.is_none()
-                        && p.clip_bounds[0] > -5000.0
-                        && p.clip_bounds[2] < 90000.0
-                    {
+                    if clip.is_none() && p.clip_bounds[0] > -5000.0 && p.clip_bounds[2] < 90000.0 {
                         clip = Some((p.clip_bounds, p.clip_radius));
                     }
                 }
@@ -2630,7 +2630,8 @@ impl GpuRenderer {
             // Skip layers that are entirely outside the viewport
             let vp_w = self.viewport_size.0 as f32;
             let vp_h = self.viewport_size.1 as f32;
-            let is_visible = layer_pos.0 < vp_w && layer_pos.1 < vp_h
+            let is_visible = layer_pos.0 < vp_w
+                && layer_pos.1 < vp_h
                 && layer_pos.0 + layer_size.0 > 0.0
                 && layer_pos.1 + layer_size.1 > 0.0
                 && layer_size.0 > 0.0
@@ -3151,7 +3152,10 @@ impl GpuRenderer {
             if liquid_count > 0 {
                 render_pass.set_pipeline(&self.pipelines.glass);
                 render_pass.set_bind_group(0, glass_bind_group, &[]);
-                render_pass.draw(0..6, simple_count as u32..(simple_count + liquid_count) as u32);
+                render_pass.draw(
+                    0..6,
+                    simple_count as u32..(simple_count + liquid_count) as u32,
+                );
             }
         }
 
@@ -3457,7 +3461,10 @@ impl GpuRenderer {
             if liquid_count > 0 {
                 render_pass.set_pipeline(&self.pipelines.glass);
                 render_pass.set_bind_group(0, glass_bind_group, &[]);
-                render_pass.draw(0..6, simple_count as u32..(simple_count + liquid_count) as u32);
+                render_pass.draw(
+                    0..6,
+                    simple_count as u32..(simple_count + liquid_count) as u32,
+                );
             }
         }
 
@@ -3681,9 +3688,9 @@ impl GpuRenderer {
                             .unwrap_or(self.viewport_size);
 
                         // Render layer content to offscreen texture
-                        let layer_texture = self
-                            .layer_texture_cache
-                            .acquire(&self.device, layer_size, false);
+                        let layer_texture =
+                            self.layer_texture_cache
+                                .acquire(&self.device, layer_size, false);
 
                         // Render the primitives for this layer
                         let end_idx = entry.primitive_index;
@@ -4967,7 +4974,9 @@ impl GpuRenderer {
     ) -> LayerTexture {
         if passes == 0 {
             // No blur needed, return a copy
-            let output = self.layer_texture_cache.acquire(&self.device, input.size, false);
+            let output = self
+                .layer_texture_cache
+                .acquire(&self.device, input.size, false);
             // Copy input to output
             let mut encoder = self
                 .device
@@ -5033,12 +5042,7 @@ impl GpuRenderer {
     /// Apply multi-pass Kawase blur (element blur - preserves alpha)
     ///
     /// Convenience wrapper that preserves alpha for element blur effects.
-    pub fn apply_blur(
-        &mut self,
-        input: &LayerTexture,
-        radius: f32,
-        passes: u32,
-    ) -> LayerTexture {
+    pub fn apply_blur(&mut self, input: &LayerTexture, radius: f32, passes: u32) -> LayerTexture {
         self.apply_blur_with_alpha(input, radius, passes, false)
     }
 
@@ -5303,20 +5307,15 @@ impl GpuRenderer {
         let g = 0.7152;
         let b = 0.0722;
         [
-            r, g, b, 0.0, 0.0,
-            r, g, b, 0.0, 0.0,
-            r, g, b, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            r, g, b, 0.0, 0.0, r, g, b, 0.0, 0.0, r, g, b, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
         ]
     }
 
     /// Create sepia tone color matrix
     pub fn sepia_matrix() -> [f32; 20] {
         [
-            0.393, 0.769, 0.189, 0.0, 0.0,
-            0.349, 0.686, 0.168, 0.0, 0.0,
-            0.272, 0.534, 0.131, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            0.393, 0.769, 0.189, 0.0, 0.0, 0.349, 0.686, 0.168, 0.0, 0.0, 0.272, 0.534, 0.131, 0.0,
+            0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
         ]
     }
 
@@ -5330,10 +5329,26 @@ impl GpuRenderer {
         let sg = (1.0 - s) * g;
         let sb = (1.0 - s) * b;
         [
-            sr + s, sg, sb, 0.0, 0.0,
-            sr, sg + s, sb, 0.0, 0.0,
-            sr, sg, sb + s, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            sr + s,
+            sg,
+            sb,
+            0.0,
+            0.0,
+            sr,
+            sg + s,
+            sb,
+            0.0,
+            0.0,
+            sr,
+            sg,
+            sb + s,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
         ]
     }
 
@@ -5341,10 +5356,8 @@ impl GpuRenderer {
     pub fn brightness_matrix(brightness: f32) -> [f32; 20] {
         let b = brightness - 1.0; // 0 = no change, positive = brighter
         [
-            1.0, 0.0, 0.0, 0.0, b,
-            0.0, 1.0, 0.0, 0.0, b,
-            0.0, 0.0, 1.0, 0.0, b,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            1.0, 0.0, 0.0, 0.0, b, 0.0, 1.0, 0.0, 0.0, b, 0.0, 0.0, 1.0, 0.0, b, 0.0, 0.0, 0.0,
+            1.0, 0.0,
         ]
     }
 
@@ -5353,20 +5366,15 @@ impl GpuRenderer {
         let c = contrast;
         let t = (1.0 - c) / 2.0;
         [
-            c, 0.0, 0.0, 0.0, t,
-            0.0, c, 0.0, 0.0, t,
-            0.0, 0.0, c, 0.0, t,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            c, 0.0, 0.0, 0.0, t, 0.0, c, 0.0, 0.0, t, 0.0, 0.0, c, 0.0, t, 0.0, 0.0, 0.0, 1.0, 0.0,
         ]
     }
 
     /// Create invert color matrix
     pub fn invert_matrix() -> [f32; 20] {
         [
-            -1.0, 0.0, 0.0, 0.0, 1.0,
-            0.0, -1.0, 0.0, 0.0, 1.0,
-            0.0, 0.0, -1.0, 0.0, 1.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
+            -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
         ]
     }
 
@@ -5442,7 +5450,9 @@ impl GpuRenderer {
 
         if effects.is_empty() {
             // No effects, just return a copy
-            let output = self.layer_texture_cache.acquire(&self.device, input.size, false);
+            let output = self
+                .layer_texture_cache
+                .acquire(&self.device, input.size, false);
             let mut encoder = self
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -5843,8 +5853,11 @@ impl GpuRenderer {
             viewport_size: [self.viewport_size.0 as f32, self.viewport_size.1 as f32],
             _padding: [0.0; 2],
         };
-        self.queue
-            .write_buffer(&self.buffers.uniforms, 0, bytemuck::bytes_of(&restore_uniforms));
+        self.queue.write_buffer(
+            &self.buffers.uniforms,
+            0,
+            bytemuck::bytes_of(&restore_uniforms),
+        );
 
         layer_texture
     }
@@ -5914,7 +5927,12 @@ impl GpuRenderer {
         let src_w = (vis_w / dest_size.0) * src_total_w;
         let src_h = (vis_h / dest_size.1) * src_total_h;
 
-        let source_rect = [src_x0.min(1.0), src_y0.min(1.0), src_w.min(1.0), src_h.min(1.0)];
+        let source_rect = [
+            src_x0.min(1.0),
+            src_y0.min(1.0),
+            src_w.min(1.0),
+            src_h.min(1.0),
+        ];
 
         // Dest rect is now the visible region
         let dest_rect = [vis_x0, vis_y0, vis_w, vis_h];
@@ -6091,7 +6109,9 @@ impl GpuRenderer {
         opacity: f32,
         blend_mode: blinc_core::BlendMode,
     ) {
-        self.blit_region_to_target_with_clip(source, target, position, size, opacity, blend_mode, None)
+        self.blit_region_to_target_with_clip(
+            source, target, position, size, opacity, blend_mode, None,
+        )
     }
 
     /// Blit a specific region with optional clip

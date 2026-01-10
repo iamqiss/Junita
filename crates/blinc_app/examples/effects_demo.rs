@@ -909,7 +909,7 @@ fn combined_effects_section() -> Div {
                                 .rounded(12.0)
                                 .bg(Color::from_hex(0x10b981))
                                 .sepia()
-                                .glow_effect(Color::from_hex(0xa3852f),4.0, 5.0,  0.6)
+                                .glow_effect(Color::from_hex(0xa3852f), 4.0, 5.0, 0.6)
                                 .flex()
                                 .items_center()
                                 .justify_center()

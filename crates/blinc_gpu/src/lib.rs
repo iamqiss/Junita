@@ -34,9 +34,9 @@ pub use path::{
 };
 pub use primitives::{
     BlurUniforms, ClipType, ColorMatrixUniforms, CompositeUniforms, DropShadowUniforms, FillType,
-    GlassType, GlassUniforms, GlowUniforms, GpuGlassPrimitive, GpuGlyph, GpuPrimitive, LayerCommand,
-    LayerCommandEntry, LayerCompositeUniforms, PathBatch, PathUniforms, PrimitiveBatch,
-    PrimitiveType, Uniforms,
+    GlassType, GlassUniforms, GlowUniforms, GpuGlassPrimitive, GpuGlyph, GpuPrimitive,
+    LayerCommand, LayerCommandEntry, LayerCompositeUniforms, PathBatch, PathUniforms,
+    PrimitiveBatch, PrimitiveType, Uniforms,
 };
 pub use renderer::{GpuRenderer, LayerTexture, LayerTextureCache, RendererConfig};
 pub use shaders::{

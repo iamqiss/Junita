@@ -818,11 +818,7 @@ impl LayerCompositeUniforms {
     }
 
     /// Set clip region with optional rounded corners
-    pub fn with_clip(
-        mut self,
-        bounds: [f32; 4],
-        radius: [f32; 4],
-    ) -> Self {
+    pub fn with_clip(mut self, bounds: [f32; 4], radius: [f32; 4]) -> Self {
         self.clip_bounds = bounds;
         self.clip_radius = radius;
         self.clip_type = 1;

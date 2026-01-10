@@ -1816,15 +1816,12 @@ impl RenderContext {
                 );
 
                 // Then use render_with_clear which handles layer effects
-                self.renderer.render_with_clear(target, &batch, [0.0, 0.0, 0.0, 1.0]);
+                self.renderer
+                    .render_with_clear(target, &batch, [0.0, 0.0, 0.0, 1.0]);
 
                 // Finally render glass primitives on top
                 if batch.glass_count() > 0 {
-                    self.renderer.render_glass(
-                        target,
-                        &backdrop.view,
-                        &batch,
-                    );
+                    self.renderer.render_glass(target, &backdrop.view, &batch);
                 }
             } else {
                 // No layer effects, use optimized glass frame rendering

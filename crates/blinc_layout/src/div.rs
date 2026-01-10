@@ -18,7 +18,9 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use blinc_core::{BlurQuality, BlurStyle, Brush, Color, CornerRadius, LayerEffect, Shadow, Transform};
+use blinc_core::{
+    BlurQuality, BlurStyle, Brush, Color, CornerRadius, LayerEffect, Shadow, Transform,
+};
 use blinc_theme::ThemeState;
 use taffy::prelude::*;
 use taffy::Overflow;
@@ -2438,13 +2440,7 @@ impl Div {
     ///     .bg(Color::WHITE)
     ///     .drop_shadow_effect(4.0, 4.0, 8.0, Color::rgba(0, 0, 0, 128))
     /// ```
-    pub fn drop_shadow_effect(
-        self,
-        offset_x: f32,
-        offset_y: f32,
-        blur: f32,
-        color: Color,
-    ) -> Self {
+    pub fn drop_shadow_effect(self, offset_x: f32, offset_y: f32, blur: f32, color: Color) -> Self {
         self.layer_effect(LayerEffect::drop_shadow(offset_x, offset_y, blur, color))
     }
 

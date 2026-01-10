@@ -1112,12 +1112,7 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
 
             // Apply tint if specified
             if let Some(ref tint) = style.tint {
-                glass = glass.with_tint(
-                    tint.r,
-                    tint.g,
-                    tint.b,
-                    tint.a * style.opacity,
-                );
+                glass = glass.with_tint(tint.r, tint.g, tint.b, tint.a * style.opacity);
             } else {
                 // Default to slight white tint for visibility
                 glass = glass.with_tint(1.0, 1.0, 1.0, 0.1 * style.opacity);
