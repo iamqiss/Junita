@@ -267,9 +267,7 @@ impl GradientTextureCache {
             view,
             sampler,
             has_gradient: false,
-            rasterized_cache: LruCache::new(
-                NonZeroUsize::new(GRADIENT_CACHE_CAPACITY).unwrap(),
-            ),
+            rasterized_cache: LruCache::new(NonZeroUsize::new(GRADIENT_CACHE_CAPACITY).unwrap()),
             current_hash: None,
         }
     }
@@ -297,8 +295,7 @@ impl GradientTextureCache {
             } else {
                 // Rasterize and cache
                 let rasterized = RasterizedGradient::from_stops(stops, spread);
-                self.rasterized_cache
-                    .put(hash, Box::new(rasterized.pixels));
+                self.rasterized_cache.put(hash, Box::new(rasterized.pixels));
                 self.rasterized_cache.get(&hash).unwrap().as_ref()
             };
 

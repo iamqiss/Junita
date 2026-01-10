@@ -383,7 +383,7 @@ pub struct LayerTextureCache {
     /// Map of layer IDs to their dedicated textures
     named_textures: std::collections::HashMap<blinc_core::LayerId, LayerTexture>,
     /// Size-bucketed pools for efficient texture reuse
-    pool_small: Vec<LayerTexture>,  // <= 128
+    pool_small: Vec<LayerTexture>, // <= 128
     pool_medium: Vec<LayerTexture>, // <= 256
     pool_large: Vec<LayerTexture>,  // <= 512
     /// Texture format used for all layer textures
@@ -6631,12 +6631,13 @@ mod tests {
             assert_eq!(tex2.size, (512, 512));
             assert_eq!(cache.pool_size(), 0); // Removed from pool
 
-            // Acquire different size - should create new
-            let tex3 = cache.acquire(&device, (1024, 768), false);
-            assert_eq!(tex3.size, (1024, 768));
+            // Acquire different size in different bucket - should create new
+            // Note: Using 256x256 (Medium bucket) since XLarge (>512) is not pooled
+            let tex3 = cache.acquire(&device, (256, 256), false);
+            assert_eq!(tex3.size, (256, 256));
             assert_eq!(cache.pool_size(), 0);
 
-            // Release both
+            // Release both - tex2 goes to Large bucket, tex3 goes to Medium bucket
             cache.release(tex2);
             cache.release(tex3);
             assert_eq!(cache.pool_size(), 2);
@@ -6709,11 +6710,11 @@ mod tests {
             };
 
             let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
-            // Default max_pool_size is 8
+            // Default max_per_bucket is 4 (bucketed by size: Small/Medium/Large)
 
-            // Acquire and release more than max_pool_size textures
+            // Acquire and release more than max_per_bucket textures in Small bucket (64x64)
             let mut textures = Vec::new();
-            for _ in 0..12 {
+            for _ in 0..8 {
                 textures.push(cache.acquire(&device, (64, 64), false));
             }
 
@@ -6722,8 +6723,8 @@ mod tests {
                 cache.release(tex);
             }
 
-            // Pool should be capped at max_pool_size (8)
-            assert_eq!(cache.pool_size(), 8);
+            // Pool should be capped at max_per_bucket (4) for the Small bucket
+            assert_eq!(cache.pool_size(), 4);
         });
         result
     }
@@ -6769,14 +6770,15 @@ mod tests {
 
             let mut cache = LayerTextureCache::new(wgpu::TextureFormat::Bgra8Unorm);
 
-            // Acquire and release a large texture
-            let large_tex = cache.acquire(&device, (1024, 1024), false);
+            // Acquire and release a Large bucket texture (512x512)
+            // Note: XLarge (>512) is not pooled, so we use 512x512
+            let large_tex = cache.acquire(&device, (512, 512), false);
             cache.release(large_tex);
             assert_eq!(cache.pool_size(), 1);
 
-            // Acquire smaller - should reuse the larger one
+            // Acquire smaller from Medium bucket - should still reuse from Large bucket
             let small_tex = cache.acquire(&device, (256, 256), false);
-            // The actual size will be 1024x1024 (reused from pool)
+            // The actual size will be 512x512 (reused from Large pool)
             assert!(small_tex.size.0 >= 256 && small_tex.size.1 >= 256);
             assert_eq!(cache.pool_size(), 0);
         });
