@@ -1087,9 +1087,12 @@ impl RenderContext {
                     RasterizedSvg::from_str(&svg.source, raster_width, raster_height)
                 };
 
-                let Ok(rasterized) = rasterized else {
-                    tracing::warn!("Failed to rasterize SVG");
-                    continue;
+                let rasterized = match rasterized {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::warn!("Failed to rasterize SVG: {}", e);
+                        continue;
+                    }
                 };
 
                 // Upload to GPU
