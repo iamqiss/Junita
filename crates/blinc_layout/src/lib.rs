@@ -33,6 +33,7 @@ pub mod canvas;
 pub mod diff;
 pub mod div;
 pub mod element;
+pub mod notch;
 
 // Layout animation systems
 pub mod element_style;
@@ -321,6 +322,9 @@ pub mod prelude {
 
     // Canvas element
     pub use crate::canvas::{canvas, Canvas, CanvasBounds};
+
+    // Notch element (shapes with concave curves or sharp steps)
+    pub use crate::notch::{notch, CornerConfig, CornerStyle, CornersConfig, Notch};
 
     // Re-export Shadow, Transform, and layer effect types from blinc_core for convenience
     pub use blinc_core::{BlurQuality, BlurStyle, LayerEffect, Shadow, Transform};

@@ -931,6 +931,41 @@ impl Stack {
     pub fn cursor_not_allowed(self) -> Self {
         self.cursor(crate::element::CursorStyle::NotAllowed)
     }
+
+    // =========================================================================
+    // Conditional Builders
+    // =========================================================================
+
+    /// Conditionally apply a transformation to self.
+    ///
+    /// This is useful for conditionally adding children or modifying properties
+    /// without breaking the builder chain.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Instead of:
+    /// let mut container = stack().w_full();
+    /// if show_dropdown {
+    ///     container = container.child(dropdown());
+    /// }
+    ///
+    /// // Write:
+    /// stack()
+    ///     .w_full()
+    ///     .when(show_dropdown, |s| s.child(dropdown()))
+    /// ```
+    #[inline]
+    pub fn when<F>(self, condition: bool, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        if condition {
+            f(self)
+        } else {
+            self
+        }
+    }
 }
 
 impl ElementBuilder for Stack {
