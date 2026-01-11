@@ -1151,6 +1151,12 @@ impl RenderTree {
         let child_node_ids = self.layout_tree.children(node_id);
         let child_builders = element.children_builders();
 
+        // Debug: see what's happening with children
+        // eprintln!(
+        //     "collect_render_props<E>: node={:?}, type_id={:?}, layout_children={}, builder_children={}",
+        //     node_id, element.element_type_id(), child_node_ids.len(), child_builders.len()
+        // );
+
         // Log mismatch to help debug stateful/motion issues (in collect_render_props)
         if child_node_ids.len() != child_builders.len() && !child_node_ids.is_empty() {
             tracing::warn!(
@@ -1167,6 +1173,10 @@ impl RenderTree {
 
     /// Collect render props from a boxed element builder
     fn collect_render_props_boxed(&mut self, element: &dyn ElementBuilder, node_id: LayoutNodeId) {
+        // Debug: See all element types being collected
+        let eid = element.element_type_id();
+        // eprintln!("collect_render_props_boxed: node={:?}, type_id={:?}", node_id, eid);
+
         let mut props = element.render_props();
         props.node_id = Some(node_id);
 
@@ -1188,7 +1198,15 @@ impl RenderTree {
         }
 
         // Use the element_type_id to determine type
-        let element_type = match element.element_type_id() {
+        let type_id_boxed = element.element_type_id();
+        if matches!(type_id_boxed, ElementTypeId::Canvas) {
+            let render_fn = element.canvas_render_info();
+            // eprintln!(
+            //     "collect_render_props_boxed: ElementTypeId::Canvas detected! has_render_fn={}",
+            //     render_fn.is_some()
+            // );
+        }
+        let element_type = match type_id_boxed {
             ElementTypeId::Text => {
                 if let Some(info) = element.text_render_info() {
                     ElementType::Text(TextData {
@@ -1630,7 +1648,11 @@ impl RenderTree {
 
     /// Determine element type from an element builder
     fn determine_element_type<E: ElementBuilder>(element: &E) -> ElementType {
-        match element.element_type_id() {
+        let type_id = element.element_type_id();
+        if matches!(type_id, ElementTypeId::Canvas) {
+            eprintln!("determine_element_type: ElementTypeId::Canvas detected!");
+        }
+        match type_id {
             ElementTypeId::Text => {
                 if let Some(info) = element.text_render_info() {
                     ElementType::Text(TextData {
@@ -1724,7 +1746,11 @@ impl RenderTree {
 
     /// Determine element type from a boxed element builder
     fn determine_element_type_boxed(element: &dyn ElementBuilder) -> ElementType {
-        match element.element_type_id() {
+        let type_id = element.element_type_id();
+        if matches!(type_id, ElementTypeId::Canvas) {
+            eprintln!("determine_element_type_boxed: ElementTypeId::Canvas detected!");
+        }
+        match type_id {
             ElementTypeId::Text => {
                 if let Some(info) = element.text_render_info() {
                     ElementType::Text(TextData {
@@ -4732,6 +4758,9 @@ impl RenderTree {
         render_state: &crate::render_state::RenderState,
         inherited_opacity: f32,
     ) {
+        // Debug: uncomment to trace all nodes
+        // eprintln!("render_layer_with_motion: visiting node {:?}, target_layer={:?}", node, target_layer);
+
         // Use animated bounds if a layout animation is active, otherwise use layout bounds
         let Some(bounds) = self.get_render_bounds(node, parent_offset) else {
             return;
@@ -4746,6 +4775,7 @@ impl RenderTree {
                 "render_layer_with_motion: no render_node for {:?}, skipping",
                 node
             );
+            // eprintln!("render_layer_with_motion: no render_node for {:?}", node);
             return;
         };
 
@@ -4948,6 +4978,18 @@ impl RenderTree {
         }
 
         // Render if this node matches target layer
+        // Debug: see what layers we're checking
+        let is_canvas = matches!(&render_node.element_type, ElementType::Canvas(_));
+        if is_canvas {
+            let matches = effective_layer == target_layer;
+            // eprintln!(
+            //     "render_layer_with_motion: Canvas node {:?}, effective_layer={:?}, target_layer={:?}, matches={}",
+            //     node, effective_layer, target_layer, matches
+            // );
+            // if matches {
+            //     eprintln!("  >>> Canvas layer MATCHES - will invoke callback");
+            // }
+        }
         if effective_layer == target_layer {
             // Motion opacity is now handled via push_layer when has_opacity_layer=true
             // The opacity layer applies opacity to all content via GPU composition
@@ -5078,16 +5120,25 @@ impl RenderTree {
             }
 
             // Handle canvas elements
+            // Note: No clip applied - canvas elements like notch() may draw outside bounds
             if let ElementType::Canvas(canvas_data) = &render_node.element_type {
+                // eprintln!(
+                //     "render_layer_with_motion: Canvas element {:?} at position ({}, {}), size {}x{}",
+                //     node,
+                //     bounds.x, bounds.y,
+                //     bounds.width, bounds.height
+                // );
                 if let Some(render_fn) = &canvas_data.render_fn {
-                    let canvas_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-                    ctx.push_clip(ClipShape::rect(canvas_rect));
+                    // eprintln!(
+                    //     "  >>> INVOKING canvas render_fn (transform already pushed for position)"
+                    // );
                     let canvas_bounds = crate::canvas::CanvasBounds {
                         width: bounds.width,
                         height: bounds.height,
                     };
                     render_fn(ctx, canvas_bounds);
-                    ctx.pop_clip();
+                } else {
+                    // eprintln!("  >>> WARNING: render_fn is None!");
                 }
             }
         }
@@ -5546,20 +5597,14 @@ impl RenderTree {
             }
 
             // Handle canvas element rendering
+            // Note: No clip applied - canvas elements like notch() may draw outside bounds
             if let ElementType::Canvas(canvas_data) = &render_node.element_type {
                 if let Some(render_fn) = &canvas_data.render_fn {
-                    // Push clip for canvas bounds - canvas drawing should not overflow
-                    let canvas_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-                    ctx.push_clip(ClipShape::rect(canvas_rect));
-
                     let canvas_bounds = crate::canvas::CanvasBounds {
                         width: bounds.width,
                         height: bounds.height,
                     };
                     render_fn(ctx, canvas_bounds);
-
-                    // Pop canvas clip
-                    ctx.pop_clip();
                 }
             }
         }
@@ -5909,19 +5954,14 @@ impl RenderTree {
                 }
                 ElementType::Canvas(canvas_data) => {
                     // Canvas element: invoke the render callback with DrawContext
+                    // Note: No clip is applied - canvas elements like notch() may need to
+                    // draw outside their bounds (e.g., concave curves extend outward)
                     if let Some(render_fn) = &canvas_data.render_fn {
-                        // Push clip for canvas bounds - canvas drawing should not overflow
-                        let canvas_rect = Rect::new(0.0, 0.0, bounds.width, bounds.height);
-                        ctx.push_clip(ClipShape::rect(canvas_rect));
-
                         let canvas_bounds = crate::canvas::CanvasBounds {
                             width: bounds.width,
                             height: bounds.height,
                         };
                         render_fn(ctx, canvas_bounds);
-
-                        // Pop canvas clip
-                        ctx.pop_clip();
                     }
                 }
                 // Text, SVG, Image are handled in separate passes

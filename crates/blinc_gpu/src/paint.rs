@@ -950,7 +950,19 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
         let brush_info = extract_brush_info(&brush);
 
         // Tessellate the path using lyon
-        let tessellated = tessellate_fill(path, &brush);
+        let mut tessellated = tessellate_fill(path, &brush);
+
+        // Transform vertices by current transform stack
+        let affine = self.current_affine();
+        for vertex in &mut tessellated.vertices {
+            let x = vertex.position[0];
+            let y = vertex.position[1];
+            vertex.position[0] =
+                affine.elements[0] * x + affine.elements[2] * y + affine.elements[4];
+            vertex.position[1] =
+                affine.elements[1] * x + affine.elements[3] * y + affine.elements[5];
+        }
+
         if !tessellated.is_empty() {
             // Capture current clip state for paths
             let (clip_bounds, clip_radius, clip_type) = self.get_clip_data();
@@ -984,7 +996,19 @@ impl<'a> DrawContext for GpuPaintContext<'a> {
         let brush_info = extract_brush_info(&brush);
 
         // Tessellate the stroke using lyon
-        let tessellated = tessellate_stroke(path, stroke, &brush);
+        let mut tessellated = tessellate_stroke(path, stroke, &brush);
+
+        // Transform vertices by current transform stack
+        let affine = self.current_affine();
+        for vertex in &mut tessellated.vertices {
+            let x = vertex.position[0];
+            let y = vertex.position[1];
+            vertex.position[0] =
+                affine.elements[0] * x + affine.elements[2] * y + affine.elements[4];
+            vertex.position[1] =
+                affine.elements[1] * x + affine.elements[3] * y + affine.elements[5];
+        }
+
         if !tessellated.is_empty() {
             // Capture current clip state for paths
             let (clip_bounds, clip_radius, clip_type) = self.get_clip_data();

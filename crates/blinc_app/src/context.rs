@@ -2068,18 +2068,12 @@ impl RenderContext {
                 // Interleaved z-layer rendering for proper Stack z-ordering
                 // First pass: render z_layer=0 primitives with clear
                 let z0_primitives = batch.primitives_for_layer(0);
-                if !z0_primitives.is_empty() {
-                    // Create a temporary batch for z=0
-                    let mut z0_batch = PrimitiveBatch::new();
-                    z0_batch.primitives = z0_primitives;
-                    self.renderer
-                        .render_with_clear(target, &z0_batch, [0.0, 0.0, 0.0, 1.0]);
-                } else {
-                    // Still need to clear even if no z=0 primitives
-                    let empty_batch = PrimitiveBatch::new();
-                    self.renderer
-                        .render_with_clear(target, &empty_batch, [0.0, 0.0, 0.0, 1.0]);
-                }
+                // Create a temporary batch for z=0 (include paths - they don't have z-layer support)
+                let mut z0_batch = PrimitiveBatch::new();
+                z0_batch.primitives = z0_primitives;
+                z0_batch.paths = batch.paths.clone();
+                self.renderer
+                    .render_with_clear(target, &z0_batch, [0.0, 0.0, 0.0, 1.0]);
 
                 // Render z=0 text and decorations
                 if let Some(glyphs) = glyphs_by_layer.get(&0) {
