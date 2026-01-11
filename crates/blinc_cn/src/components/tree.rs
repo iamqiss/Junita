@@ -261,7 +261,14 @@ impl TreeViewBuilder {
             states.push((node.key.clone(), is_expanded, anim));
 
             for child in &node.children {
-                collect_states(child, instance_key, scheduler, signal_ids, states, spring_config);
+                collect_states(
+                    child,
+                    instance_key,
+                    scheduler,
+                    signal_ids,
+                    states,
+                    spring_config,
+                );
             }
         }
 
@@ -337,10 +344,7 @@ impl TreeViewBuilder {
                         .find(|(k, _, _)| k == &node.key)
                         .map(|(_, s, a)| (s.clone(), a.clone()));
 
-                    let is_expanded = expand_state
-                        .as_ref()
-                        .map(|(s, _)| s.get())
-                        .unwrap_or(false);
+                    let is_expanded = expand_state.as_ref().map(|(s, _)| s.get()).unwrap_or(false);
 
                     let is_selected = selected.get().as_ref() == Some(&node.key);
 
@@ -449,11 +453,8 @@ impl TreeViewBuilder {
                     if has_children && is_expanded {
                         let anim_key = format!("tree-children-{}", node.key);
 
-                        let mut children_container = div()
-                            .flex_col()
-                            .w_full()
-                            .overflow_clip()
-                            .animate_bounds(
+                        let mut children_container =
+                            div().flex_col().w_full().overflow_clip().animate_bounds(
                                 blinc_layout::visual_animation::VisualAnimationConfig::height()
                                     .with_key(&anim_key)
                                     .clip_to_animated()

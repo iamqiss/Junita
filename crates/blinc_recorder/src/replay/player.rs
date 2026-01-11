@@ -349,11 +349,7 @@ impl ReplayPlayer {
     }
 
     /// Collect events in a specific time range.
-    fn collect_events_in_range(
-        &mut self,
-        start: Timestamp,
-        end: Timestamp,
-    ) -> Vec<SimulatedInput> {
+    fn collect_events_in_range(&mut self, start: Timestamp, end: Timestamp) -> Vec<SimulatedInput> {
         let mut events = Vec::new();
 
         // Make sure we start from the right index
@@ -434,7 +430,7 @@ impl FrameUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MouseButton, MouseEvent, Modifiers, Point, RecordedEvent, RecordingConfig};
+    use crate::{Modifiers, MouseButton, MouseEvent, Point, RecordedEvent, RecordingConfig};
 
     fn create_test_export() -> RecordingExport {
         let mut events = Vec::new();

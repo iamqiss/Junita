@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_event_recording() {
-        use crate::capture::{MouseButton, MouseEvent, Modifiers, Point};
+        use crate::capture::{Modifiers, MouseButton, MouseEvent, Point};
 
         let mut session = RecordingSession::new(RecordingConfig::minimal().with_max_events(5));
         session.start();

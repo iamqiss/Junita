@@ -79,9 +79,7 @@ impl CapturedFrame {
 
     /// Check if two frames are identical.
     pub fn is_identical_to(&self, other: &CapturedFrame) -> bool {
-        self.width == other.width
-            && self.height == other.height
-            && self.data == other.data
+        self.width == other.width && self.height == other.height && self.data == other.data
     }
 
     /// Calculate the percentage of pixels that differ.

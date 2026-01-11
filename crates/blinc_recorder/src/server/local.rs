@@ -171,10 +171,7 @@ impl DebugServer {
         let listener = UnixListener::bind(socket_path)?;
         listener.set_nonblocking(true)?;
 
-        tracing::info!(
-            "Debug server listening on {}",
-            socket_path.display()
-        );
+        tracing::info!("Debug server listening on {}", socket_path.display());
 
         while !shutdown.load(Ordering::SeqCst) {
             match listener.accept() {
@@ -322,10 +319,7 @@ pub enum ServerMessage {
     /// Full recording export.
     Export(RecordingExport),
     /// Session state changed.
-    StateChange {
-        is_recording: bool,
-        is_paused: bool,
-    },
+    StateChange { is_recording: bool, is_paused: bool },
     /// Session statistics.
     Stats {
         total_events: u64,

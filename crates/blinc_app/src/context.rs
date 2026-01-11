@@ -2578,7 +2578,11 @@ impl DebugMode {
         let layout = all || debug_value == "layout";
         let motion = all || debug_value == "motion";
 
-        Self { text, layout, motion }
+        Self {
+            text,
+            layout,
+            motion,
+        }
     }
 
     /// Check if any debug mode is enabled

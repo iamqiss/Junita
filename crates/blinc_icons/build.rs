@@ -173,10 +173,7 @@ fn parse_svg(content: &str, file_name: &str) -> Option<(String, String)> {
     }
 
     // Convert filename to SCREAMING_SNAKE_CASE const name
-    let const_name = file_name
-        .to_uppercase()
-        .replace('-', "_")
-        .replace('.', "_");
+    let const_name = file_name.to_uppercase().replace('-', "_").replace('.', "_");
 
     Some((const_name, elements.join("")))
 }

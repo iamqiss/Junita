@@ -33,13 +33,13 @@ pub mod testing;
 
 pub use capture::{
     ChangeCategory, CustomEvent, ElementDiff, ElementSnapshot, FocusChangeEvent, HoverEvent, Key,
-    KeyEvent, Modifiers, MouseButton, MouseEvent, MouseMoveEvent, Point, PropertyChange, Rect,
-    RecordedEvent, RecordingClock, ScrollEvent, TextInputEvent, Timestamp, TimestampedEvent,
+    KeyEvent, Modifiers, MouseButton, MouseEvent, MouseMoveEvent, Point, PropertyChange,
+    RecordedEvent, RecordingClock, Rect, ScrollEvent, TextInputEvent, Timestamp, TimestampedEvent,
     TreeDiff, TreeSnapshot, VisualProps, WindowResizeEvent,
 };
-pub use testing::{
-    compare_frames, CapturedFrame, FrameSequence, HeadlessConfig, HeadlessContext,
-    RegressionResult, ScreenshotExporter, TestConfig, TestRunner,
+pub use replay::{
+    EventSimulator, FrameUpdate, ReplayConfig, ReplayPlayer, ReplayState, SimulatedInput,
+    VirtualClock,
 };
 pub use server::{
     start_local_server, start_local_server_named, ClientCommand, DebugServer, DebugServerConfig,
@@ -49,9 +49,9 @@ pub use session::{
     RecordingConfig, RecordingExport, RecordingSession, SessionState, SessionStats,
     SharedRecordingSession,
 };
-pub use replay::{
-    EventSimulator, FrameUpdate, ReplayConfig, ReplayPlayer, ReplayState, SimulatedInput,
-    VirtualClock,
+pub use testing::{
+    compare_frames, CapturedFrame, FrameSequence, HeadlessConfig, HeadlessContext,
+    RegressionResult, ScreenshotExporter, TestConfig, TestRunner,
 };
 
 use parking_lot::RwLock;
@@ -285,8 +285,8 @@ macro_rules! enable_debug_server {
             $crate::install_recorder(session.clone());
             $crate::install_hooks();
 
-            let server_handle = $crate::start_local_server(session.clone())
-                .expect("Failed to start debug server");
+            let server_handle =
+                $crate::start_local_server(session.clone()).expect("Failed to start debug server");
 
             session.start();
             (session, Some(server_handle))

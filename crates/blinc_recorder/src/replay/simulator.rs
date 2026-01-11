@@ -152,9 +152,9 @@ impl EventSimulator {
                 height: e.height,
                 scale_factor: e.scale_factor,
             },
-            RecordedEvent::WindowFocus(focused) => SimulatedInput::WindowFocus {
-                focused: *focused,
-            },
+            RecordedEvent::WindowFocus(focused) => {
+                SimulatedInput::WindowFocus { focused: *focused }
+            }
             RecordedEvent::Custom(e) => SimulatedInput::Custom {
                 name: e.name.clone(),
                 payload: e.payload.clone(),
@@ -243,15 +243,9 @@ pub enum SimulatedInput {
         to: Option<String>,
     },
     /// Mouse entered element.
-    HoverEnter {
-        element_id: String,
-        position: Point,
-    },
+    HoverEnter { element_id: String, position: Point },
     /// Mouse left element.
-    HoverLeave {
-        element_id: String,
-        position: Point,
-    },
+    HoverLeave { element_id: String, position: Point },
     /// Window resized.
     WindowResize {
         width: u32,

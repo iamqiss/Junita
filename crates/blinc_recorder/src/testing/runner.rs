@@ -104,8 +104,7 @@ impl TestRunner {
     {
         // Set up recording if enabled
         if self.config.record_events {
-            let session =
-                Arc::new(SharedRecordingSession::new(self.config.recording.clone()));
+            let session = Arc::new(SharedRecordingSession::new(self.config.recording.clone()));
             install_recorder(session.clone());
             session.start();
             self.session = Some(session);
@@ -179,7 +178,7 @@ impl TestContext {
 
     /// Simulate a mouse click at the given position.
     pub fn click_at(&self, x: f32, y: f32) {
-        use crate::{MouseButton, MouseEvent, Modifiers, Point};
+        use crate::{Modifiers, MouseButton, MouseEvent, Point};
 
         let event = RecordedEvent::Click(MouseEvent {
             position: Point::new(x, y),

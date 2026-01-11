@@ -53,11 +53,7 @@ pub struct DataPoint {
 
 impl DataPoint {
     pub fn new(x: f64, y: f64) -> Self {
-        Self {
-            x,
-            y,
-            label: None,
-        }
+        Self { x, y, label: None }
     }
 
     pub fn labeled(x: f64, y: f64, label: impl Into<String>) -> Self {
@@ -195,12 +191,7 @@ impl LineChartBuilder {
     }
 
     /// Add a data series with custom color
-    pub fn series_colored(
-        mut self,
-        name: impl Into<String>,
-        data: &[f64],
-        color: Color,
-    ) -> Self {
+    pub fn series_colored(mut self, name: impl Into<String>, data: &[f64], color: Color) -> Self {
         self.series.push(DataSeries {
             name: name.into(),
             data: data.to_vec(),
@@ -293,8 +284,7 @@ impl LineChartBuilder {
                         } else {
                             chart_width / 2.0
                         };
-                    let y = self.padding
-                        + ((max_val - val) / range) as f32 * chart_height;
+                    let y = self.padding + ((max_val - val) / range) as f32 * chart_height;
                     (x, y)
                 })
                 .collect();
@@ -308,10 +298,7 @@ impl LineChartBuilder {
 
                 let svg_str = format!(
                     r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}"><path d="{}" fill="none" stroke="currentColor" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></svg>"#,
-                    self.width,
-                    self.height,
-                    path_data,
-                    self.stroke_width
+                    self.width, self.height, path_data, self.stroke_width
                 );
 
                 container = container.child(
@@ -321,7 +308,11 @@ impl LineChartBuilder {
                         .top(0.0)
                         .w(self.width)
                         .h(self.height)
-                        .child(svg(&svg_str).size(self.width, self.height).color(series.color)),
+                        .child(
+                            svg(&svg_str)
+                                .size(self.width, self.height)
+                                .color(series.color),
+                        ),
                 );
             }
 
@@ -480,7 +471,9 @@ impl BarChartBuilder {
         let theme = ThemeState::get();
         let bg = theme.color(ColorToken::Surface);
         let border = theme.color(ColorToken::Border);
-        let bar_color = self.color.unwrap_or_else(|| theme.color(ColorToken::Primary));
+        let bar_color = self
+            .color
+            .unwrap_or_else(|| theme.color(ColorToken::Primary));
         let text_color = theme.color(ColorToken::TextSecondary);
 
         let max_val = self
@@ -686,7 +679,9 @@ impl SparkLineBuilder {
     /// Build the sparkline
     pub fn build(self) -> SparkLine {
         let theme = ThemeState::get();
-        let line_color = self.color.unwrap_or_else(|| theme.color(ColorToken::Primary));
+        let line_color = self
+            .color
+            .unwrap_or_else(|| theme.color(ColorToken::Primary));
 
         if self.data.is_empty() {
             return SparkLine {
@@ -726,11 +721,7 @@ impl SparkLineBuilder {
             // Close path for fill
             let fill_path = format!(
                 "{} L {} {} L {} {} Z",
-                path_data,
-                self.width,
-                self.height,
-                0.0,
-                self.height
+                path_data, self.width, self.height, 0.0, self.height
             );
             format!(
                 r#"<path d="{}" fill="currentColor" fill-opacity="0.2"/>"#,
@@ -742,17 +733,14 @@ impl SparkLineBuilder {
 
         let svg_str = format!(
             r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}">{}<path d="{}" fill="none" stroke="currentColor" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></svg>"#,
-            self.width,
-            self.height,
-            fill_attr,
-            path_data,
-            self.stroke_width
+            self.width, self.height, fill_attr, path_data, self.stroke_width
         );
 
-        let inner = div()
-            .w(self.width)
-            .h(self.height)
-            .child(svg(&svg_str).size(self.width, self.height).color(line_color));
+        let inner = div().w(self.width).h(self.height).child(
+            svg(&svg_str)
+                .size(self.width, self.height)
+                .color(line_color),
+        );
 
         SparkLine { inner }
     }
@@ -882,7 +870,8 @@ impl ThresholdLineChartBuilder {
         color: Color,
         label: impl Into<String>,
     ) -> Self {
-        self.bands.push(ThresholdBand::labeled(min, max, color, label));
+        self.bands
+            .push(ThresholdBand::labeled(min, max, color, label));
         self
     }
 
@@ -893,9 +882,20 @@ impl ThresholdLineChartBuilder {
         let warning = Color::from_hex(0xFBBF24).with_alpha(0.15); // yellow
         let critical = Color::from_hex(0xEF4444).with_alpha(0.15); // red
 
-        self.bands.push(ThresholdBand::labeled(0.0, good_max, good, "Good"));
-        self.bands.push(ThresholdBand::labeled(good_max, warning_max, warning, "Warning"));
-        self.bands.push(ThresholdBand::labeled(warning_max, f64::MAX, critical, "Critical"));
+        self.bands
+            .push(ThresholdBand::labeled(0.0, good_max, good, "Good"));
+        self.bands.push(ThresholdBand::labeled(
+            good_max,
+            warning_max,
+            warning,
+            "Warning",
+        ));
+        self.bands.push(ThresholdBand::labeled(
+            warning_max,
+            f64::MAX,
+            critical,
+            "Critical",
+        ));
         self
     }
 
@@ -928,7 +928,9 @@ impl ThresholdLineChartBuilder {
         let theme = ThemeState::get();
         let bg = theme.color(ColorToken::Surface);
         let border = theme.color(ColorToken::Border);
-        let line_color = self.line_color.unwrap_or_else(|| theme.color(ColorToken::TextPrimary));
+        let line_color = self
+            .line_color
+            .unwrap_or_else(|| theme.color(ColorToken::TextPrimary));
         let text_color = theme.color(ColorToken::TextSecondary);
 
         let chart_width = self.width - self.padding * 2.0;
@@ -995,11 +997,7 @@ impl ThresholdLineChartBuilder {
                             .absolute()
                             .right(self.padding + 4.0)
                             .top(y_top + 2.0)
-                            .child(
-                                text(label)
-                                    .size(9.0)
-                                    .color(band.color.with_alpha(0.8)),
-                            ),
+                            .child(text(label).size(9.0).color(band.color.with_alpha(0.8))),
                     );
                 }
             }
@@ -1053,10 +1051,7 @@ impl ThresholdLineChartBuilder {
 
                 let svg_str = format!(
                     r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}"><path d="{}" fill="none" stroke="currentColor" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round"/></svg>"#,
-                    self.width,
-                    self.height,
-                    path_data,
-                    self.stroke_width
+                    self.width, self.height, path_data, self.stroke_width
                 );
 
                 container = container.child(
@@ -1066,7 +1061,11 @@ impl ThresholdLineChartBuilder {
                         .top(0.0)
                         .w(self.width)
                         .h(self.height)
-                        .child(svg(&svg_str).size(self.width, self.height).color(line_color)),
+                        .child(
+                            svg(&svg_str)
+                                .size(self.width, self.height)
+                                .color(line_color),
+                        ),
                 );
 
                 // Current value marker (last point)
@@ -1244,7 +1243,9 @@ impl HistogramBuilder {
         let theme = ThemeState::get();
         let bg = theme.color(ColorToken::Surface);
         let border = theme.color(ColorToken::Border);
-        let bar_color = self.color.unwrap_or_else(|| theme.color(ColorToken::Primary));
+        let bar_color = self
+            .color
+            .unwrap_or_else(|| theme.color(ColorToken::Primary));
         let text_color = theme.color(ColorToken::TextSecondary);
 
         let padding = 8.0;
@@ -1353,7 +1354,11 @@ impl HistogramBuilder {
                     .absolute()
                     .left(padding)
                     .top(self.height - padding - axis_height + 2.0)
-                    .child(text(&format!("{:.1}", data_min)).size(9.0).color(text_color)),
+                    .child(
+                        text(&format!("{:.1}", data_min))
+                            .size(9.0)
+                            .color(text_color),
+                    ),
             );
             // Max value
             container = container.child(
@@ -1361,7 +1366,11 @@ impl HistogramBuilder {
                     .absolute()
                     .right(padding)
                     .top(self.height - padding - axis_height + 2.0)
-                    .child(text(&format!("{:.1}", data_max)).size(9.0).color(text_color)),
+                    .child(
+                        text(&format!("{:.1}", data_max))
+                            .size(9.0)
+                            .color(text_color),
+                    ),
             );
         }
 
@@ -1616,7 +1625,9 @@ impl ComparisonBarChartBuilder {
                             div()
                                 .w(12.0)
                                 .h(12.0)
-                                .bg(self.current_color.unwrap_or_else(|| theme.color(ColorToken::Primary)))
+                                .bg(self
+                                    .current_color
+                                    .unwrap_or_else(|| theme.color(ColorToken::Primary)))
                                 .rounded(2.0),
                         )
                         .child(text("Current").size(10.0).color(text_color)),

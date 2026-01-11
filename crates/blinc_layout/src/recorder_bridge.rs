@@ -133,7 +133,9 @@ pub fn record_update(element_id: &str, category: blinc_core::UpdateCategory) {
 }
 
 /// Convert ChangeCategory from diff module to UpdateCategory for recording.
-pub fn change_category_to_update(change: &crate::diff::ChangeCategory) -> blinc_core::UpdateCategory {
+pub fn change_category_to_update(
+    change: &crate::diff::ChangeCategory,
+) -> blinc_core::UpdateCategory {
     if change.children {
         blinc_core::UpdateCategory::Structural
     } else if change.layout {
@@ -245,14 +247,7 @@ pub fn capture_tree_snapshot(
 
     if let Some(root) = tree.root() {
         snapshot.root_id = Some(format!("{:?}", root));
-        capture_node_recursive(
-            tree,
-            root,
-            None,
-            focused_node,
-            hovered_nodes,
-            &mut snapshot,
-        );
+        capture_node_recursive(tree, root, None, focused_node, hovered_nodes, &mut snapshot);
     }
 
     snapshot.focused_element = focused_node.map(|n| format!("{:?}", n));
@@ -349,6 +344,13 @@ fn capture_node_recursive(
 
     // Recurse into children
     for child in children {
-        capture_node_recursive(tree, child, Some(node), focused_node, hovered_nodes, snapshot);
+        capture_node_recursive(
+            tree,
+            child,
+            Some(node),
+            focused_node,
+            hovered_nodes,
+            snapshot,
+        );
     }
 }
