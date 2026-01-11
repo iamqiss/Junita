@@ -28,12 +28,17 @@
 pub mod capture;
 pub mod server;
 pub mod session;
+pub mod testing;
 
 pub use capture::{
     ChangeCategory, CustomEvent, ElementDiff, ElementSnapshot, FocusChangeEvent, HoverEvent, Key,
-    Modifiers, MouseButton, MouseEvent, MouseMoveEvent, Point, PropertyChange, Rect,
+    KeyEvent, Modifiers, MouseButton, MouseEvent, MouseMoveEvent, Point, PropertyChange, Rect,
     RecordedEvent, RecordingClock, ScrollEvent, TextInputEvent, Timestamp, TimestampedEvent,
     TreeDiff, TreeSnapshot, VisualProps, WindowResizeEvent,
+};
+pub use testing::{
+    compare_frames, CapturedFrame, FrameSequence, HeadlessConfig, HeadlessContext,
+    RegressionResult, ScreenshotExporter, TestConfig, TestRunner,
 };
 pub use server::{
     start_local_server, start_local_server_named, ClientCommand, DebugServer, DebugServerConfig,
