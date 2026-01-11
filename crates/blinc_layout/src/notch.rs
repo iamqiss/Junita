@@ -53,7 +53,7 @@
 
 use std::rc::Rc;
 
-use blinc_core::{Brush, Color, CornerRadius, DrawContext, Gradient, Path, Rect, Shadow};
+use blinc_core::{Brush, Color, CornerRadius, DrawContext, Gradient, Path, Rect, Shadow, Transform};
 use taffy::{prelude::*, Overflow};
 
 use crate::canvas::{CanvasBounds, CanvasRenderFn};
@@ -214,6 +214,8 @@ pub struct CenterScoop {
     pub width: f32,
     /// Depth of the scoop (how far it curves inward)
     pub depth: f32,
+    /// Corner radius at scoop entry/exit points for smoother transitions
+    pub corner_radius: f32,
 }
 
 // =============================================================================
@@ -540,7 +542,30 @@ impl Notch {
     ///     ╰─────────╯
     /// ```
     pub fn center_scoop_top(mut self, width: f32, depth: f32) -> Self {
-        self.top_center_scoop = Some(CenterScoop { width, depth });
+        self.top_center_scoop = Some(CenterScoop {
+            width,
+            depth,
+            corner_radius: 0.0,
+        });
+        self
+    }
+
+    /// Add a center scoop on the top edge with rounded corners
+    ///
+    /// Like `center_scoop_top`, but with smooth corner transitions at scoop entry/exit.
+    ///
+    /// ```text
+    ///     ╭─────────╮
+    ///     │╭╲_____╱╮│  ← rounded corners at scoop edges
+    ///     │         │
+    ///     ╰─────────╯
+    /// ```
+    pub fn center_scoop_top_rounded(mut self, width: f32, depth: f32, corner_radius: f32) -> Self {
+        self.top_center_scoop = Some(CenterScoop {
+            width,
+            depth,
+            corner_radius,
+        });
         self
     }
 
@@ -556,7 +581,28 @@ impl Notch {
     ///     ╰─────────╯
     /// ```
     pub fn center_scoop_bottom(mut self, width: f32, depth: f32) -> Self {
-        self.bottom_center_scoop = Some(CenterScoop { width, depth });
+        self.bottom_center_scoop = Some(CenterScoop {
+            width,
+            depth,
+            corner_radius: 0.0,
+        });
+        self
+    }
+
+    /// Add a center scoop on the bottom edge with rounded corners
+    ///
+    /// Like `center_scoop_bottom`, but with smooth corner transitions at scoop entry/exit.
+    pub fn center_scoop_bottom_rounded(
+        mut self,
+        width: f32,
+        depth: f32,
+        corner_radius: f32,
+    ) -> Self {
+        self.bottom_center_scoop = Some(CenterScoop {
+            width,
+            depth,
+            corner_radius,
+        });
         self
     }
 
@@ -1242,37 +1288,94 @@ fn build_shape_path(
         let scoop_end_x = center_x + scoop.width / 2.0;
         let scoop_bottom_y = y + scoop.depth;
 
+        // Corner radius for smooth entry/exit transitions (clamped to 1/4 of scoop width)
+        let cr = scoop.corner_radius.min(scoop.width / 4.0).max(0.0);
+
         // Cubic bezier control point factor for circular arc approximation
         // k = 4 * (sqrt(2) - 1) / 3 ≈ 0.5522847498
         const K: f32 = 0.5522847498;
-        let rx = scoop.width / 2.0; // horizontal radius
-        let ry = scoop.depth; // vertical radius
 
-        // Line to scoop start
-        path = path.line_to(scoop_start_x, y);
+        if cr > 0.0 {
+            // With corner radius: concave (outward-bowing) entry/exit transitions
+            // Creates "ear" shapes like macOS Dynamic Island
+            let effective_start_x = scoop_start_x + cr;
+            let effective_end_x = scoop_end_x - cr;
+            let effective_start_y = y + cr;
+            let effective_rx = (effective_end_x - effective_start_x) / 2.0;
+            let effective_ry = scoop.depth - cr;
 
-        // First quarter arc: from left edge to bottom center
-        path = path.cubic_to(
-            scoop_start_x,
-            y + K * ry, // control 1
-            center_x - K * rx,
-            scoop_bottom_y, // control 2
-            center_x,
-            scoop_bottom_y, // end at bottom center
-        );
+            // Line to entry corner point
+            path = path.line_to(scoop_start_x, y);
 
-        // Second quarter arc: from bottom center to right edge
-        path = path.cubic_to(
-            center_x + K * rx,
-            scoop_bottom_y, // control 1
-            scoop_end_x,
-            y + K * ry, // control 2
-            scoop_end_x,
-            y, // end at right edge
-        );
+            // Entry corner: CONCAVE ear - control toward CENTER makes fill bulge outward
+            path = path.quad_to(
+                scoop_start_x + cr * 0.55,
+                y, // control: toward center (right)
+                effective_start_x,
+                effective_start_y, // end at main scoop start
+            );
 
-        // Line to top edge end
-        path = path.line_to(top_end_x, y);
+            // Main scoop curve: from effective start to bottom center
+            path = path.cubic_to(
+                effective_start_x,
+                effective_start_y + K * effective_ry, // control 1
+                center_x - K * effective_rx,
+                scoop_bottom_y, // control 2
+                center_x,
+                scoop_bottom_y, // end at bottom center
+            );
+
+            // Main scoop curve: from bottom center to effective end
+            path = path.cubic_to(
+                center_x + K * effective_rx,
+                scoop_bottom_y, // control 1
+                effective_end_x,
+                effective_start_y + K * effective_ry, // control 2
+                effective_end_x,
+                effective_start_y, // end at effective end
+            );
+
+            // Exit corner: CONCAVE ear - control toward CENTER makes fill bulge outward
+            path = path.quad_to(
+                scoop_end_x - cr * 0.55,
+                y, // control: toward center (left)
+                scoop_end_x,
+                y, // end at top edge
+            );
+
+            // Line to top edge end
+            path = path.line_to(top_end_x, y);
+        } else {
+            // Without corner radius: sharp transitions (original behavior)
+            let rx = scoop.width / 2.0;
+            let ry = scoop.depth;
+
+            // Line to scoop start
+            path = path.line_to(scoop_start_x, y);
+
+            // First quarter arc: from left edge to bottom center
+            path = path.cubic_to(
+                scoop_start_x,
+                y + K * ry, // control 1
+                center_x - K * rx,
+                scoop_bottom_y, // control 2
+                center_x,
+                scoop_bottom_y, // end at bottom center
+            );
+
+            // Second quarter arc: from bottom center to right edge
+            path = path.cubic_to(
+                center_x + K * rx,
+                scoop_bottom_y, // control 1
+                scoop_end_x,
+                y + K * ry, // control 2
+                scoop_end_x,
+                y, // end at right edge
+            );
+
+            // Line to top edge end
+            path = path.line_to(top_end_x, y);
+        }
     } else {
         path = path.line_to(top_end_x, y);
     }
@@ -1334,40 +1437,98 @@ fn build_shape_path(
     // The scoop curves UP into the shape, creating a visible indent
     if let Some(scoop) = bottom_center_scoop {
         let center_x = x + w / 2.0;
-        let scoop_start_x = center_x + scoop.width / 2.0; // Start from right side
+        let scoop_start_x = center_x + scoop.width / 2.0; // Start from right side (path goes right to left)
         let scoop_end_x = center_x - scoop.width / 2.0; // End at left side
         let scoop_top_y = y + h - scoop.depth;
 
+        // Corner radius for smooth entry/exit transitions (clamped to 1/4 of scoop width)
+        let cr = scoop.corner_radius.min(scoop.width / 4.0).max(0.0);
+
         // Cubic bezier control point factor for circular arc approximation
         const K: f32 = 0.5522847498;
-        let rx = scoop.width / 2.0;
-        let ry = scoop.depth;
 
-        // Line to scoop start (from right)
-        path = path.line_to(scoop_start_x, y + h);
+        if cr > 0.0 {
+            // With corner radius: concave (outward-bowing) entry/exit transitions
+            // Note: path goes right to left on bottom edge
+            let effective_start_x = scoop_start_x - cr; // Inset from right
+            let effective_end_x = scoop_end_x + cr; // Inset from left
+            let effective_start_y = y + h - cr;
+            let effective_rx = (effective_start_x - effective_end_x) / 2.0;
+            let effective_ry = scoop.depth - cr;
 
-        // First quarter arc: from right edge to top center (going right to left)
-        path = path.cubic_to(
-            scoop_start_x,
-            y + h - K * ry, // control 1
-            center_x + K * rx,
-            scoop_top_y, // control 2
-            center_x,
-            scoop_top_y, // end at top center
-        );
+            // Line to entry corner point (from right)
+            path = path.line_to(scoop_start_x, y + h);
 
-        // Second quarter arc: from top center to left edge
-        path = path.cubic_to(
-            center_x - K * rx,
-            scoop_top_y, // control 1
-            scoop_end_x,
-            y + h - K * ry, // control 2
-            scoop_end_x,
-            y + h, // end at left edge
-        );
+            // Entry corner: CONCAVE ear - control toward CENTER makes fill bulge outward
+            // (path goes right to left on bottom edge)
+            path = path.quad_to(
+                scoop_start_x - cr * 0.55,
+                y + h, // control: toward center (left)
+                effective_start_x,
+                effective_start_y, // end at main scoop start
+            );
 
-        // Line to bottom edge end
-        path = path.line_to(bottom_end_x, y + h);
+            // Main scoop curve: from effective start to top center
+            path = path.cubic_to(
+                effective_start_x,
+                effective_start_y - K * effective_ry, // control 1
+                center_x + K * effective_rx,
+                scoop_top_y, // control 2
+                center_x,
+                scoop_top_y, // end at top center
+            );
+
+            // Main scoop curve: from top center to effective end
+            path = path.cubic_to(
+                center_x - K * effective_rx,
+                scoop_top_y, // control 1
+                effective_end_x,
+                effective_start_y - K * effective_ry, // control 2
+                effective_end_x,
+                effective_start_y, // end at effective end
+            );
+
+            // Exit corner: CONCAVE ear - control toward CENTER makes fill bulge outward
+            path = path.quad_to(
+                scoop_end_x + cr * 0.55,
+                y + h, // control: toward center (right)
+                scoop_end_x,
+                y + h, // end at bottom edge
+            );
+
+            // Line to bottom edge end
+            path = path.line_to(bottom_end_x, y + h);
+        } else {
+            // Without corner radius: sharp transitions (original behavior)
+            let rx = scoop.width / 2.0;
+            let ry = scoop.depth;
+
+            // Line to scoop start (from right)
+            path = path.line_to(scoop_start_x, y + h);
+
+            // First quarter arc: from right edge to top center (going right to left)
+            path = path.cubic_to(
+                scoop_start_x,
+                y + h - K * ry, // control 1
+                center_x + K * rx,
+                scoop_top_y, // control 2
+                center_x,
+                scoop_top_y, // end at top center
+            );
+
+            // Second quarter arc: from top center to left edge
+            path = path.cubic_to(
+                center_x - K * rx,
+                scoop_top_y, // control 1
+                scoop_end_x,
+                y + h - K * ry, // control 2
+                scoop_end_x,
+                y + h, // end at left edge
+            );
+
+            // Line to bottom edge end
+            path = path.line_to(bottom_end_x, y + h);
+        }
     } else {
         path = path.line_to(bottom_end_x, y + h);
     }
@@ -1418,6 +1579,136 @@ fn build_shape_path(
     }
 
     path.close()
+}
+
+// =============================================================================
+// Path Shadow Utilities
+// =============================================================================
+
+/// Offset a path outward by a given amount.
+///
+/// This creates an expanded version of the path for shadow rendering.
+/// The offset is applied by scaling the path from its center.
+fn offset_path_by(path: &Path, amount: f32, bounds: Rect) -> Path {
+    use blinc_core::PathCommand;
+
+    if amount <= 0.0 {
+        return path.clone();
+    }
+
+    // Calculate the center of the bounds
+    let cx = bounds.x() + bounds.width() / 2.0;
+    let cy = bounds.y() + bounds.height() / 2.0;
+
+    // Calculate scale factor based on offset amount
+    let scale_x = if bounds.width() > 0.0 {
+        (bounds.width() + amount * 2.0) / bounds.width()
+    } else {
+        1.0
+    };
+    let scale_y = if bounds.height() > 0.0 {
+        (bounds.height() + amount * 2.0) / bounds.height()
+    } else {
+        1.0
+    };
+
+    // Transform each point by scaling from center
+    let transform_point = |x: f32, y: f32| -> (f32, f32) {
+        let new_x = cx + (x - cx) * scale_x;
+        let new_y = cy + (y - cy) * scale_y;
+        (new_x, new_y)
+    };
+
+    // Build new path with transformed commands
+    let mut new_path = Path::new();
+    for cmd in path.commands() {
+        match cmd {
+            PathCommand::MoveTo(p) => {
+                let (x, y) = transform_point(p.x, p.y);
+                new_path = new_path.move_to(x, y);
+            }
+            PathCommand::LineTo(p) => {
+                let (x, y) = transform_point(p.x, p.y);
+                new_path = new_path.line_to(x, y);
+            }
+            PathCommand::QuadTo { control, end } => {
+                let (cx, cy) = transform_point(control.x, control.y);
+                let (ex, ey) = transform_point(end.x, end.y);
+                new_path = new_path.quad_to(cx, cy, ex, ey);
+            }
+            PathCommand::CubicTo {
+                control1,
+                control2,
+                end,
+            } => {
+                let (c1x, c1y) = transform_point(control1.x, control1.y);
+                let (c2x, c2y) = transform_point(control2.x, control2.y);
+                let (ex, ey) = transform_point(end.x, end.y);
+                new_path = new_path.cubic_to(c1x, c1y, c2x, c2y, ex, ey);
+            }
+            PathCommand::ArcTo {
+                radii,
+                rotation,
+                large_arc,
+                sweep,
+                end,
+            } => {
+                let (ex, ey) = transform_point(end.x, end.y);
+                // Scale radii proportionally
+                let new_radii = blinc_core::Vec2::new(radii.x * scale_x, radii.y * scale_y);
+                new_path = new_path.arc_to(new_radii, *rotation, *large_arc, *sweep, ex, ey);
+            }
+            PathCommand::Close => {
+                new_path = new_path.close();
+            }
+        }
+    }
+
+    new_path
+}
+
+/// Draw a path-based shadow using multi-layer blur approximation.
+///
+/// This renders multiple offset versions of the path with decreasing opacity
+/// to simulate a soft shadow effect.
+fn draw_path_shadow(ctx: &mut dyn DrawContext, path: &Path, bounds: Rect, shadow: &Shadow) {
+    let blur = shadow.blur;
+    if blur <= 0.0 {
+        return;
+    }
+
+    // More layers = smoother shadow (aim for ~2px per layer)
+    let layers = ((blur / 1.5).ceil() as usize).max(8).min(24);
+
+    // Apply shadow offset by translating
+    let offset_x = shadow.offset_x;
+    let offset_y = shadow.offset_y;
+
+    // Draw layers from outermost to innermost
+    for i in (0..layers).rev() {
+        let t = (i as f32 + 0.5) / layers as f32;
+        let layer_offset = (blur + shadow.spread) * t;
+
+        // Gaussian-like alpha falloff: exp(-t^2 * k)
+        // This creates a smoother, more natural shadow gradient
+        let gaussian = (-t * t * 3.0).exp();
+        let alpha = shadow.color.a * gaussian * 0.15;
+        if alpha < 0.005 {
+            continue;
+        }
+
+        // Create offset path
+        let offset_path = offset_path_by(path, layer_offset, bounds);
+
+        // Apply shadow offset via transform
+        ctx.push_transform(Transform::translate(offset_x, offset_y));
+
+        // Draw the shadow layer
+        let shadow_color = Color::rgba(shadow.color.r, shadow.color.g, shadow.color.b, alpha);
+        ctx.fill_path(&offset_path, Brush::Solid(shadow_color));
+
+        ctx.pop_transform();
+    }
 }
 
 // =============================================================================
@@ -1615,24 +1906,10 @@ impl ElementBuilder for Notch {
                     bottom_center_scoop.as_ref(),
                 );
 
-                // Find a reasonable radius for shadow approximation
-                let shadow_radius = [
-                    corners.bottom_left.radius,
-                    corners.bottom_right.radius,
-                    corners.top_left.radius,
-                    corners.top_right.radius,
-                ]
-                .iter()
-                .filter(|&&r| r > 0.0)
-                .copied()
-                .next()
-                .unwrap_or(0.0);
-
                 // Draw shadow first (behind the fill)
                 if let Some(shadow) = shadow {
-                    // For now, use bounding box shadow
-                    // TODO: Path-based shadow
-                    ctx.draw_shadow(rect, shadow_radius.into(), shadow);
+                    // Use path-based shadow for accurate curved shadow rendering
+                    draw_path_shadow(ctx, &path, rect, &shadow);
                 }
 
                 // Fill the path (with opacity applied)

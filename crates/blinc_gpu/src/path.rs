@@ -766,7 +766,8 @@ pub fn tessellate_fill(path: &Path, brush: &Brush) -> TessellatedPath {
     let bounds_height = (max_y - min_y).max(1.0);
 
     // Build edge segments for anti-aliasing edge distance computation
-    let edges = PathEdges::from_path(path, 0.1);
+    // Use same tolerance as tessellation for accurate edge distances
+    let edges = PathEdges::from_path(path, 0.025);
 
     let mut geometry: VertexBuffers<PathVertex, u32> = VertexBuffers::new();
     let mut tessellator = FillTessellator::new();

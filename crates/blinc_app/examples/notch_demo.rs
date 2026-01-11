@@ -40,6 +40,8 @@ const WEATHER_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" 
 
 const MUSIC_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>"#;
 
+const PLUS_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>"#;
+
 /// Menu item data
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum MenuItem {
@@ -70,16 +72,6 @@ impl MenuItem {
             MenuItem::Music => MUSIC_SVG,
         }
     }
-
-    fn dropdown_width(&self) -> f32 {
-        match self {
-            MenuItem::Clock => 220.0,
-            MenuItem::Battery => 200.0,
-            MenuItem::Wifi => 220.0,
-            MenuItem::Weather => 280.0,
-            MenuItem::Music => 260.0,
-        }
-    }
 }
 
 fn main() -> Result<()> {
@@ -95,7 +87,7 @@ fn main() -> Result<()> {
         width: 800,
         height: 600,
         resizable: true,
-        fullscreen: true,
+        fullscreen: false,
         ..Default::default()
     };
 
@@ -268,9 +260,7 @@ fn stateful_icon_button(
 
             // Background based on state
             let icon_color = match (ctx.state(), is_active) {
-                (ButtonState::Hovered, _) | (ButtonState::Pressed, _) | (_, true) => {
-                    Color::WHITE
-                }
+                (ButtonState::Hovered, _) | (ButtonState::Pressed, _) | (_, true) => Color::WHITE,
                 _ => Color::WHITE.with_alpha(0.8),
             };
 
@@ -456,20 +446,32 @@ fn dropdown_content(item: Option<MenuItem>) -> Div {
 }
 
 /// Bottom dock bar with Dynamic Island-style center scoop
-fn bottom_dock_bar(width: f32) -> impl ElementBuilder {
+fn bottom_dock_bar(_width: f32) -> impl ElementBuilder {
     let dock_bg = Color::rgba(0.1, 0.1, 0.1, 0.95);
     let icon_color = Color::rgba(1.0, 1.0, 1.0, 0.8);
-    let scoop_depth = 30.0;
+    let scoop_depth = 44.0;
+    let scoop_corner_radius = 6.0; // Smooth corner transitions at scoop edges
+
+    let circle_gap = 6.0;
+    let diameter = (scoop_depth * 2.0) - circle_gap;
 
     // Container with bottom margin
     div().w_full().flex_row().justify_center().child(
         notch()
-            .center_scoop_top(scoop_depth * 2.0, scoop_depth)
+            // Use rounded scoop for smoother aesthetic transitions
+            .center_scoop_top_rounded(90.0, scoop_depth, scoop_corner_radius)
             .rounded_top(24.0)
             .bg(dock_bg)
             .w_fit()
             .h(50.0 + scoop_depth)
-            // .shadow(Shadow { offset_x: 0.0, offset_y: 1.0, blur:3.0, spread: 3.0, color:Color::BLACK.with_alpha(0.5) }) // Needs shadow support
+            // Path-based shadow that follows the curved shape
+            .shadow(blinc_core::Shadow {
+                offset_x: 0.0,
+                offset_y: -2.0,
+                blur: 1.0,
+                spread: 4.0,
+                color: Color::GRAY.with_alpha(0.4),
+            })
             // Padding for scoop is automatically applied by the notch implementation
             .child(
                 div()
@@ -484,6 +486,22 @@ fn bottom_dock_bar(width: f32) -> impl ElementBuilder {
                     .child(svg(WIFI_SVG).square(ICON_SIZE).color(icon_color))
                     .child(svg(WEATHER_SVG).square(ICON_SIZE).color(icon_color))
                     .child(svg(MUSIC_SVG).square(ICON_SIZE).color(icon_color)),
+            )
+            .child(
+                // Floating button in the scoop
+                div()
+                    .absolute()
+                    .top(-28.0)
+                    .left(180.0)
+                    .rounded_full()
+                    .w(64.0)
+                    .h(64.0)
+                    .bg(Color::from_hex(0x39FF14)) // Neon green
+                    .shadow_lg()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(svg(PLUS_SVG).square(28.0).color(Color::BLACK)),
             ),
     )
 }
