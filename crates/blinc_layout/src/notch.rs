@@ -53,7 +53,9 @@
 
 use std::rc::Rc;
 
-use blinc_core::{Brush, Color, CornerRadius, DrawContext, Gradient, Path, Rect, Shadow, Transform};
+use blinc_core::{
+    Brush, Color, CornerRadius, DrawContext, Gradient, Path, Rect, Shadow, Transform,
+};
 use taffy::{prelude::*, Overflow};
 
 use crate::canvas::{CanvasBounds, CanvasRenderFn};
@@ -1875,12 +1877,12 @@ impl ElementBuilder for Notch {
                     } else {
                         0.0
                     };
-                let top_offset =
-                    if corners.top_left.is_concave() || corners.top_right.is_concave() {
-                        tl_r.max(tr_r)
-                    } else {
-                        0.0
-                    };
+                let top_offset = if corners.top_left.is_concave() || corners.top_right.is_concave()
+                {
+                    tl_r.max(tr_r)
+                } else {
+                    0.0
+                };
                 let bottom_offset =
                     if corners.bottom_left.is_concave() || corners.bottom_right.is_concave() {
                         bl_r.max(br_r)
