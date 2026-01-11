@@ -1,0 +1,15 @@
+[package]
+name = "blinc_icons"
+version = "0.1.0"
+edition = "2021"
+description = "Lucide icon library for Blinc UI framework"
+license = "MIT"
+build = "build.rs"
+
+[build-dependencies]
+walkdir = "2"
+roxmltree = "0.20"
+
+[dependencies]
+# No runtime dependencies - pure static data
+# DCE handles binary size optimization automatically

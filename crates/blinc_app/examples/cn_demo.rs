@@ -93,6 +93,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(kbd_section())
+                        .child(icon_gallery_section())
                         .child(misc_section())
                         .child(tree_view_section())
                         .child(charts_section()),
@@ -3130,4 +3131,166 @@ fn generate_diff_data() -> Vec<f64> {
         data.push(val);
     }
     data
+}
+
+fn icon_gallery_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    section_container()
+        .child(section_title("Icons (Lucide)"))
+        .child(
+            div()
+                .flex_col()
+                .gap(24.0)
+                // Size variants
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Size Variants").size(12.0).color(text_secondary))
+                        .child(
+                            div()
+                                .flex_row()
+                                .items_center()
+                                .gap(16.0)
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(4.0)
+                                        .child(cn::icon(icons::CHECK).size(IconSize::ExtraSmall))
+                                        .child(text("XS").size(10.0).color(text_secondary)),
+                                )
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(4.0)
+                                        .child(cn::icon(icons::CHECK).size(IconSize::Small))
+                                        .child(text("SM").size(10.0).color(text_secondary)),
+                                )
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(4.0)
+                                        .child(cn::icon(icons::CHECK).size(IconSize::Medium))
+                                        .child(text("MD").size(10.0).color(text_secondary)),
+                                )
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(4.0)
+                                        .child(cn::icon(icons::CHECK).size(IconSize::Large))
+                                        .child(text("LG").size(10.0).color(text_secondary)),
+                                )
+                                .child(
+                                    div()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(4.0)
+                                        .child(cn::icon(icons::CHECK).size(IconSize::ExtraLarge))
+                                        .child(text("XL").size(10.0).color(text_secondary)),
+                                ),
+                        ),
+                )
+                // Color variants
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Color Variants").size(12.0).color(text_secondary))
+                        .child(
+                            div()
+                                .flex_row()
+                                .items_center()
+                                .gap(12.0)
+                                .child(cn::icon(icons::HEART).size(IconSize::Large))
+                                .child(
+                                    cn::icon(icons::HEART)
+                                        .size(IconSize::Large)
+                                        .color(ColorToken::Primary),
+                                )
+                                .child(
+                                    cn::icon(icons::HEART)
+                                        .size(IconSize::Large)
+                                        .color(ColorToken::Success),
+                                )
+                                .child(
+                                    cn::icon(icons::HEART)
+                                        .size(IconSize::Large)
+                                        .color(ColorToken::Warning),
+                                )
+                                .child(
+                                    cn::icon(icons::HEART)
+                                        .size(IconSize::Large)
+                                        .color(ColorToken::Error),
+                                ),
+                        ),
+                )
+                // Common icons grid
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(text("Common Icons").size(12.0).color(text_secondary))
+                        .child(
+                            div()
+                                .flex_row()
+                                .flex_wrap()
+                                .gap(8.0)
+                                .child(icon_tile(icons::ARROW_RIGHT, "arrow-right"))
+                                .child(icon_tile(icons::ARROW_LEFT, "arrow-left"))
+                                .child(icon_tile(icons::ARROW_UP, "arrow-up"))
+                                .child(icon_tile(icons::ARROW_DOWN, "arrow-down"))
+                                .child(icon_tile(icons::CHECK, "check"))
+                                .child(icon_tile(icons::X, "x"))
+                                .child(icon_tile(icons::PLUS, "plus"))
+                                .child(icon_tile(icons::MINUS, "minus"))
+                                .child(icon_tile(icons::SEARCH, "search"))
+                                .child(icon_tile(icons::SETTINGS, "settings"))
+                                .child(icon_tile(icons::USER, "user"))
+                                .child(icon_tile(icons::USERS, "users"))
+                                .child(icon_tile(icons::HOUSE, "house"))
+                                .child(icon_tile(icons::MENU, "menu"))
+                                .child(icon_tile(icons::BELL, "bell"))
+                                .child(icon_tile(icons::MAIL, "mail"))
+                                .child(icon_tile(icons::CALENDAR, "calendar"))
+                                .child(icon_tile(icons::CLOCK, "clock"))
+                                .child(icon_tile(icons::STAR, "star"))
+                                .child(icon_tile(icons::HEART, "heart"))
+                                .child(icon_tile(icons::TRASH_2, "trash-2"))
+                                .child(icon_tile(icons::PENCIL, "pencil"))
+                                .child(icon_tile(icons::COPY, "copy"))
+                                .child(icon_tile(icons::DOWNLOAD, "download"))
+                                .child(icon_tile(icons::UPLOAD, "upload"))
+                                .child(icon_tile(icons::FILE, "file"))
+                                .child(icon_tile(icons::FOLDER, "folder"))
+                                .child(icon_tile(icons::IMAGE, "image"))
+                                .child(icon_tile(icons::VIDEO, "video"))
+                                .child(icon_tile(icons::MUSIC, "music"))
+                                .child(icon_tile(icons::PLAY, "play"))
+                                .child(icon_tile(icons::PAUSE, "pause")),
+                        ),
+                ),
+        )
+}
+
+fn icon_tile(icon_data: &'static str, name: &str) -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_tertiary = theme.color(ColorToken::TextTertiary);
+    let border = theme.color(ColorToken::Border);
+
+    div()
+        .flex_col()
+        .items_center()
+        .gap(4.0)
+        .p(8.0)
+        .w(72.0)
+        .border(1.0, border)
+        .rounded(6.0)
+        .child(cn::icon(icon_data).size(IconSize::Large))
+        .child(text(name).size(9.0).color(text_tertiary))
 }

@@ -65,6 +65,7 @@ pub mod cn {
     pub use crate::components::drawer::{drawer, drawer_left, drawer_right};
     pub use crate::components::dropdown_menu::{dropdown_menu, dropdown_menu_custom};
     pub use crate::components::hover_card::hover_card;
+    pub use crate::components::icon::{icon, IconSize};
     pub use crate::components::input::input;
     pub use crate::components::kbd::{kbd, KbdSize};
     pub use crate::components::label::label;
@@ -134,6 +135,7 @@ pub mod prelude {
     pub use crate::components::hover_card::{
         hover_card, HoverCard, HoverCardAlign, HoverCardBuilder, HoverCardSide,
     };
+    pub use crate::components::icon::{icon, Icon, IconBuilder, IconSize};
     pub use crate::components::input::{input, Input, InputBgColors, InputBorderColors, InputSize};
     pub use crate::components::kbd::{kbd, Kbd, KbdBuilder, KbdSize};
     pub use crate::components::label::{label, Label, LabelBuilder, LabelSize};
@@ -191,4 +193,6 @@ pub mod prelude {
     pub use blinc_layout::widgets::text_area::{text_area_state, SharedTextAreaState};
     // Re-export commonly needed theme types
     pub use blinc_theme::{ColorToken, RadiusToken, ShadowToken, SpacingToken, ThemeState};
+    // Re-export icons module for easy access
+    pub use blinc_icons::icons;
 }

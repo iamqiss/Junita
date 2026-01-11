@@ -22,6 +22,7 @@ pub mod dialog;
 pub mod drawer;
 pub mod dropdown_menu;
 pub mod hover_card;
+pub mod icon;
 pub mod input;
 pub mod kbd;
 pub mod label;
@@ -76,6 +77,7 @@ pub use dropdown_menu::{
     dropdown_menu, dropdown_menu_custom, DropdownAlign, DropdownMenuBuilder, DropdownPosition,
 };
 pub use hover_card::{hover_card, HoverCard, HoverCardAlign, HoverCardBuilder, HoverCardSide};
+pub use icon::{icon, Icon, IconBuilder, IconSize};
 pub use input::{input, Input, InputBgColors, InputBorderColors, InputSize};
 pub use kbd::{kbd, Kbd, KbdBuilder, KbdSize};
 pub use label::{label, Label, LabelBuilder, LabelSize};
