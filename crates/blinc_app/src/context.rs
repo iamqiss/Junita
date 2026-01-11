@@ -370,6 +370,12 @@ impl RenderContext {
                     self.render_unified(target, &unified_primitives);
                 }
 
+                // Render paths with MSAA for smooth edges (paths are not included in unified primitives)
+                if use_msaa_overlay && fg_batch.has_paths() {
+                    self.renderer
+                        .render_paths_overlay_msaa(target, &fg_batch, self.sample_count);
+                }
+
                 // Render SVGs as rasterized images for high-quality anti-aliasing
                 if !svgs.is_empty() {
                     self.render_rasterized_svgs(target, &svgs, scale_factor);
@@ -439,6 +445,12 @@ impl RenderContext {
                 let unified_primitives = fg_batch.get_unified_foreground_primitives();
                 if !unified_primitives.is_empty() {
                     self.render_unified(target, &unified_primitives);
+                }
+
+                // Render paths with MSAA for smooth edges (paths are not included in unified primitives)
+                if use_msaa_overlay && fg_batch.has_paths() {
+                    self.renderer
+                        .render_paths_overlay_msaa(target, &fg_batch, self.sample_count);
                 }
 
                 // Render SVGs as rasterized images for high-quality anti-aliasing
