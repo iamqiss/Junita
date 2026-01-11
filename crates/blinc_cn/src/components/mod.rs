@@ -13,6 +13,7 @@ pub mod badge;
 pub mod breadcrumb;
 pub mod button;
 pub mod card;
+pub mod chart;
 pub mod checkbox;
 pub mod collapsible;
 pub mod combobox;
@@ -42,6 +43,7 @@ pub mod tabs;
 pub mod textarea;
 pub mod toast;
 pub mod tooltip;
+pub mod tree;
 
 // Re-export all components
 pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
@@ -58,6 +60,12 @@ pub use collapsible::{
 pub use blinc_layout::stateful::ButtonState;
 pub use card::{
     card, card_content, card_footer, card_header, Card, CardContent, CardFooter, CardHeader,
+};
+pub use chart::{
+    bar_chart, comparison_bar_chart, histogram, line_chart, spark_line, threshold_line_chart,
+    BarChart, BarChartBuilder, ChartGrid, ComparisonBarChart, ComparisonBarChartBuilder, DataPoint,
+    DataSeries, Histogram, HistogramBuilder, LineChart, LineChartBuilder, SparkLine,
+    SparkLineBuilder, ThresholdBand, ThresholdLineChart, ThresholdLineChartBuilder,
 };
 pub use checkbox::{checkbox, Checkbox, CheckboxSize};
 pub use combobox::{combobox, Combobox, ComboboxBuilder, ComboboxOption, ComboboxSize};
@@ -99,3 +107,4 @@ pub use toast::{
     toast, toast_custom, toast_error, toast_success, toast_warning, ToastBuilder, ToastVariant,
 };
 pub use tooltip::{tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide};
+pub use tree::{tree_view, TreeNodeConfig, TreeNodeDiff, TreeView, TreeViewBuilder};

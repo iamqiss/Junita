@@ -93,7 +93,9 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(kbd_section())
-                        .child(misc_section()),
+                        .child(misc_section())
+                        .child(tree_view_section())
+                        .child(charts_section()),
                 ),
         )
 }
@@ -2798,4 +2800,334 @@ fn misc_section() -> impl ElementBuilder {
                         .child(cn::label("Large Label").size(LabelSize::Large)),
                 ),
         )
+}
+
+// ============================================================================
+// Tree View Section
+// ============================================================================
+
+fn tree_view_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    section_container()
+        .child(section_title("Tree View"))
+        .child(
+            div()
+                .flex_row()
+                .gap(24.0)
+                .child(
+                    // File explorer style tree
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("File Explorer")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            div()
+                                .w(250.0)
+                                .p(8.0)
+                                .bg(theme.color(ColorToken::Surface))
+                                .border(1.0, theme.color(ColorToken::Border))
+                                .rounded(8.0)
+                                .child(
+                                    cn::tree_view()
+                                        .node("project", "my-project", |n| {
+                                            n.expanded()
+                                                .child("src", "src/", |n| {
+                                                    n.expanded()
+                                                        .child("main", "main.rs", |n| n)
+                                                        .child("lib", "lib.rs", |n| n)
+                                                        .child("utils", "utils/", |n| {
+                                                            n.child("helpers", "helpers.rs", |n| n)
+                                                        })
+                                                })
+                                                .child("tests", "tests/", |n| {
+                                                    n.child("integration", "integration.rs", |n| n)
+                                                })
+                                                .child("cargo", "Cargo.toml", |n| n)
+                                                .child("readme", "README.md", |n| n)
+                                        }),
+                                ),
+                        ),
+                )
+                .child(
+                    // Diff tree (for debugger)
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Element Tree with Diff")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            div()
+                                .w(250.0)
+                                .p(8.0)
+                                .bg(theme.color(ColorToken::Surface))
+                                .border(1.0, theme.color(ColorToken::Border))
+                                .rounded(8.0)
+                                .child(
+                                    cn::tree_view()
+                                        .node("root", "Window", |n| {
+                                            n.expanded()
+                                                .child("container", "Container", |n| {
+                                                    n.expanded()
+                                                        .child("header", "Header", |n| n)
+                                                        .child("content", "Content", |n| {
+                                                            n.expanded()
+                                                                .child("button", "Button", |n| {
+                                                                    n.diff(TreeNodeDiff::Modified)
+                                                                })
+                                                                .child("new_div", "NewDiv", |n| {
+                                                                    n.diff(TreeNodeDiff::Added)
+                                                                })
+                                                        })
+                                                        .child("old_footer", "OldFooter", |n| {
+                                                            n.diff(TreeNodeDiff::Removed)
+                                                        })
+                                                })
+                                        })
+                                        .with_guides(),
+                                ),
+                        ),
+                ),
+        )
+}
+
+// ============================================================================
+// Charts Section
+// ============================================================================
+
+fn charts_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+
+    section_container()
+        .child(section_title("Charts"))
+        .child(
+            div()
+                .flex_col()
+                .gap(24.0)
+                // Line charts row
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Line Chart - Multi-series")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::line_chart()
+                                .width(400.0)
+                                .height(180.0)
+                                .series("CPU", &[0.3, 0.45, 0.4, 0.6, 0.55, 0.7, 0.65, 0.8, 0.75, 0.9])
+                                .series("Memory", &[0.2, 0.25, 0.3, 0.35, 0.4, 0.42, 0.45, 0.48, 0.5, 0.52])
+                                .with_dots()
+                                .build(),
+                        ),
+                )
+                // Bar charts row
+                .child(
+                    div()
+                        .flex_row()
+                        .gap(24.0)
+                        .child(
+                            div()
+                                .flex_col()
+                                .gap(8.0)
+                                .child(
+                                    text("Bar Chart - Vertical")
+                                        .size(12.0)
+                                        .color(text_secondary),
+                                )
+                                .child(
+                                    cn::bar_chart()
+                                        .width(200.0)
+                                        .height(150.0)
+                                        .data(&[
+                                            ("Jan", 120.0),
+                                            ("Feb", 180.0),
+                                            ("Mar", 150.0),
+                                            ("Apr", 210.0),
+                                            ("May", 190.0),
+                                        ])
+                                        .build(),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex_col()
+                                .gap(8.0)
+                                .child(
+                                    text("Bar Chart - Horizontal")
+                                        .size(12.0)
+                                        .color(text_secondary),
+                                )
+                                .child(
+                                    cn::bar_chart()
+                                        .width(250.0)
+                                        .height(150.0)
+                                        .data(&[
+                                            ("React", 85.0),
+                                            ("Vue", 65.0),
+                                            ("Svelte", 45.0),
+                                            ("Angular", 40.0),
+                                        ])
+                                        .horizontal()
+                                        .color(theme.color(ColorToken::Secondary))
+                                        .build(),
+                                ),
+                        ),
+                )
+                // Sparklines row
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Sparklines - Inline trends")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            div()
+                                .flex_row()
+                                .items_center()
+                                .gap(24.0)
+                                .child(
+                                    div()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap(8.0)
+                                        .child(text("Sales").size(13.0).color(text_secondary))
+                                        .child(
+                                            cn::spark_line(&[1.0, 2.5, 2.0, 3.5, 3.0, 4.5, 4.0, 5.0])
+                                                .width(100.0)
+                                                .height(24.0)
+                                                .color(theme.color(ColorToken::Success))
+                                                .build(),
+                                        )
+                                        .child(text("+25%").size(12.0).color(theme.color(ColorToken::Success))),
+                                )
+                                .child(
+                                    div()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap(8.0)
+                                        .child(text("Errors").size(13.0).color(text_secondary))
+                                        .child(
+                                            cn::spark_line(&[5.0, 4.0, 4.5, 3.0, 3.5, 2.0, 2.5, 1.0])
+                                                .width(100.0)
+                                                .height(24.0)
+                                                .color(theme.color(ColorToken::Error))
+                                                .filled()
+                                                .build(),
+                                        )
+                                        .child(text("-60%").size(12.0).color(theme.color(ColorToken::Error))),
+                                )
+                                .child(
+                                    div()
+                                        .flex_row()
+                                        .items_center()
+                                        .gap(8.0)
+                                        .child(text("Latency").size(13.0).color(text_secondary))
+                                        .child(
+                                            cn::spark_line(&[45.0, 48.0, 42.0, 50.0, 47.0, 45.0, 43.0, 46.0])
+                                                .width(100.0)
+                                                .height(24.0)
+                                                .build(),
+                                        )
+                                        .child(text("46ms").size(12.0).color(text_secondary)),
+                                ),
+                        ),
+                )
+                // Regression Detection Charts
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Threshold Line Chart - Regression Detection")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::threshold_line_chart()
+                                .width(450.0)
+                                .height(160.0)
+                                .data(&[
+                                    12.5, 13.2, 14.8, 15.1, 14.5, 16.2, 15.8, 17.4, 18.2, 19.5,
+                                    18.8, 20.1, 22.5, 24.8, 28.2, 25.5,
+                                ])
+                                .regression_bands(16.67, 33.33) // 60fps and 30fps budgets
+                                .baseline(16.67)
+                                .build(),
+                        ),
+                )
+                // Histogram
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Histogram - Pixel Diff Distribution")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::histogram(&generate_diff_data())
+                                .width(400.0)
+                                .height(120.0)
+                                .bins(40)
+                                .threshold_line(5.0, "noise floor")
+                                .build(),
+                        ),
+                )
+                // Comparison Bar Chart
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(
+                            text("Comparison Bar Chart - Baseline vs Current")
+                                .size(12.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            cn::comparison_bar_chart()
+                                .width(450.0)
+                                .height(180.0)
+                                .item("Render time", 12.5, 14.2)
+                                .item("Layout time", 3.2, 3.0)
+                                .item("Paint time", 8.4, 11.8)
+                                .item("Composite", 2.1, 2.3)
+                                .threshold(10.0)
+                                .build(),
+                        ),
+                ),
+        )
+}
+
+/// Generate sample diff data for histogram demo
+fn generate_diff_data() -> Vec<f64> {
+    // Simulate pixel differences - most near 0, long tail
+    let mut data = Vec::with_capacity(500);
+    for i in 0..500 {
+        let val = if i < 350 {
+            (i as f64 * 0.01).sin().abs() * 3.0 // Low values
+        } else if i < 450 {
+            3.0 + (i as f64 * 0.05).cos().abs() * 8.0 // Medium values
+        } else {
+            10.0 + (i as f64 * 0.1).sin().abs() * 20.0 // High values (regressions)
+        };
+        data.push(val);
+    }
+    data
 }

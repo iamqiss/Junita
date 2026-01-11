@@ -54,6 +54,9 @@ pub mod cn {
     pub use crate::components::breadcrumb::breadcrumb;
     pub use crate::components::button::button;
     pub use crate::components::card::{card, card_content, card_footer, card_header};
+    pub use crate::components::chart::{
+        bar_chart, comparison_bar_chart, histogram, line_chart, spark_line, threshold_line_chart,
+    };
     pub use crate::components::checkbox::checkbox;
     pub use crate::components::collapsible::{collapsible, collapsible_section};
     pub use crate::components::combobox::combobox;
@@ -85,6 +88,7 @@ pub mod cn {
         toast, toast_custom, toast_error, toast_success, toast_warning,
     };
     pub use crate::components::tooltip::tooltip;
+    pub use crate::components::tree::tree_view;
 }
 
 /// Prelude for convenient imports
@@ -104,6 +108,12 @@ pub mod prelude {
     // Re-export ButtonState for use with buttons
     pub use crate::components::card::{
         card, card_content, card_footer, card_header, Card, CardContent, CardFooter, CardHeader,
+    };
+    pub use crate::components::chart::{
+        bar_chart, comparison_bar_chart, histogram, line_chart, spark_line, threshold_line_chart,
+        BarChart, BarChartBuilder, ChartGrid, ComparisonBarChart, ComparisonBarChartBuilder,
+        DataPoint, DataSeries, Histogram, HistogramBuilder, LineChart, LineChartBuilder, SparkLine,
+        SparkLineBuilder, ThresholdBand, ThresholdLineChart, ThresholdLineChartBuilder,
     };
     pub use crate::components::checkbox::{checkbox, Checkbox, CheckboxSize};
     pub use crate::components::collapsible::{
@@ -168,6 +178,9 @@ pub mod prelude {
     };
     pub use crate::components::tooltip::{
         tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide,
+    };
+    pub use crate::components::tree::{
+        tree_view, TreeNodeConfig, TreeNodeDiff, TreeView, TreeViewBuilder,
     };
     pub use blinc_layout::stateful::ButtonState;
     // Re-export State for checkbox/switch/radio usage
