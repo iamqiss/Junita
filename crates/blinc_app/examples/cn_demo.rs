@@ -2997,7 +2997,7 @@ fn charts_section() -> impl ElementBuilder {
                     )
                     .child(
                         div()
-                            .flex_row()
+                            .flex_col()
                             .items_center()
                             .gap(24.0)
                             .child(
