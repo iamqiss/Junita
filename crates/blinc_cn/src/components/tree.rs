@@ -415,8 +415,8 @@ impl TreeViewBuilder {
 
                         row = row.child(
                             div()
-                                .w(16.0)
-                                .h(16.0)
+                                .w(4.0)
+                                .h(4.0)
                                 .flex()
                                 .items_center()
                                 .justify_center()
@@ -425,16 +425,45 @@ impl TreeViewBuilder {
                                 .child(svg(chevron).size(12.0, 12.0).color(text_secondary)),
                         );
                     } else {
-                        // Spacer for alignment
-                        row = row.child(div().w(20.0).h(16.0).flex_shrink_0());
+                        // Spacer for alignment (matches chevron container width)
+                        row = row.child(div().w(5.0).h(4.0).flex_shrink_0());
+                    }
+
+                    // Diff indicator icon (+/-/~)
+                    match node.diff {
+                        TreeNodeDiff::Added => {
+                            row = row.child(
+                                div()
+                                    .mr(1.0)
+                                    .flex_shrink_0()
+                                    .child(text("+").size(13.0).color(diff_added).no_wrap()),
+                            );
+                        }
+                        TreeNodeDiff::Removed => {
+                            row = row.child(
+                                div()
+                                    .mr(1.0)
+                                    .flex_shrink_0()
+                                    .child(text("−").size(13.0).color(diff_removed).no_wrap()),
+                            );
+                        }
+                        TreeNodeDiff::Modified => {
+                            row = row.child(
+                                div()
+                                    .mr(1.0)
+                                    .flex_shrink_0()
+                                    .child(text("~").size(13.0).color(diff_modified).no_wrap()),
+                            );
+                        }
+                        TreeNodeDiff::None => {}
                     }
 
                     // Optional custom icon
                     if let Some(icon_svg) = &node.icon {
                         row = row.child(
                             div()
-                                .w(14.0)
-                                .h(14.0)
+                                .w(3.5)
+                                .h(3.5)
                                 .mr(1.5)
                                 .flex_shrink_0()
                                 .child(svg(icon_svg).size(14.0, 14.0).color(text_secondary)),
@@ -465,15 +494,16 @@ impl TreeViewBuilder {
                                     .gentle(),
                             );
 
-                        // Optional guide line
+                        // Optional guide line - positioned at center of parent's chevron
+                        // Chevron starts at pl(indent + 1.0) and is 4 units wide (16px), center at +2
                         if show_guides {
                             children_container = children_container.child(
                                 div()
                                     .absolute()
-                                    .left(indent + indent_size / 2.0)
+                                    .left(indent + 3.0)
                                     .top(0.0)
                                     .bottom(0.0)
-                                    .w(1.0)
+                                    .w(0.25)
                                     .bg(text_tertiary.with_alpha(0.3)),
                             );
                         }
