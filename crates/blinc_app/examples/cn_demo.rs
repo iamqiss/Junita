@@ -90,6 +90,7 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
                         .child(pagination_section(ctx))
                         .child(navigation_menu_section())
                         .child(sidebar_section(ctx))
+                        .child(resizable_section())
                         .child(toast_section(ctx))
                         .child(loading_section(ctx))
                         .child(kbd_section())
@@ -2031,6 +2032,206 @@ fn sidebar_section(ctx: &WindowedContext) -> impl ElementBuilder {
                     ),
             ),
     )
+}
+
+// ============================================================================
+// RESIZABLE SECTION
+// ============================================================================
+
+fn resizable_section() -> impl ElementBuilder {
+    let theme = ThemeState::get();
+    let text_secondary = theme.color(ColorToken::TextSecondary);
+    let border = theme.color(ColorToken::Border);
+    let surface = theme.color(ColorToken::Surface);
+    let surface_elevated = theme.color(ColorToken::SurfaceElevated);
+
+    section_container()
+        .child(section_title("Resizable Panels"))
+        .child(
+            div()
+                .flex_col()
+                .gap(24.0)
+                // Horizontal resizable example
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(cn::label("Horizontal Resizable"))
+                        .child(
+                            text("Drag the handles between panels to resize them")
+                                .size(14.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            div()
+                                .h(300.0)
+                                .border(1.0, border)
+                                .rounded(8.0)
+                                .overflow_clip()
+                                .child(
+                                    cn::resizable_group()
+                                        .horizontal()
+                                        .key("demo_horizontal")
+                                        .panel(
+                                            cn::resizable_panel()
+                                                .id("left")
+                                                .default_size(200.0)
+                                                .min_size(100.0)
+                                                .max_size(400.0)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(surface)
+                                                        .p(16.0)
+                                                        .flex_col()
+                                                        .gap(8.0)
+                                                        .child(
+                                                            text("Left Panel")
+                                                                .size(14.0)
+                                                                .weight(FontWeight::SemiBold)
+                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                        )
+                                                        .child(
+                                                            text("Min: 100px, Max: 400px")
+                                                                .size(12.0)
+                                                                .color(text_secondary),
+                                                        ),
+                                                ),
+                                        )
+                                        .panel(
+                                            cn::resizable_panel()
+                                                .id("center")
+                                                .flex_grow()
+                                                .min_size(150.0)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(surface_elevated)
+                                                        .p(16.0)
+                                                        .flex_col()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .gap(8.0)
+                                                        .child(
+                                                            text("Center Panel (Flex)")
+                                                                .size(14.0)
+                                                                .weight(FontWeight::SemiBold)
+                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                        )
+                                                        .child(
+                                                            text("Grows to fill available space")
+                                                                .size(12.0)
+                                                                .color(text_secondary),
+                                                        ),
+                                                ),
+                                        )
+                                        .panel(
+                                            cn::resizable_panel()
+                                                .id("right")
+                                                .default_size(180.0)
+                                                .min_size(100.0)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(surface)
+                                                        .p(16.0)
+                                                        .flex_col()
+                                                        .gap(8.0)
+                                                        .child(
+                                                            text("Right Panel")
+                                                                .size(14.0)
+                                                                .weight(FontWeight::SemiBold)
+                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                        )
+                                                        .child(
+                                                            text("Min: 100px")
+                                                                .size(12.0)
+                                                                .color(text_secondary),
+                                                        ),
+                                                ),
+                                        )
+                                        .build(),
+                                ),
+                        ),
+                )
+                // Vertical resizable example
+                .child(
+                    div()
+                        .flex_col()
+                        .gap(8.0)
+                        .child(cn::label("Vertical Resizable"))
+                        .child(
+                            text("Panels can also resize vertically")
+                                .size(14.0)
+                                .color(text_secondary),
+                        )
+                        .child(
+                            div()
+                                .h(350.0)
+                                .border(1.0, border)
+                                .rounded(8.0)
+                                .overflow_clip()
+                                .child(
+                                    cn::resizable_group()
+                                        .vertical()
+                                        .key("demo_vertical")
+                                        .panel(
+                                            cn::resizable_panel()
+                                                .id("top")
+                                                .flex_grow()
+                                                .min_size(80.0)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(surface_elevated)
+                                                        .p(16.0)
+                                                        .flex_col()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .child(
+                                                            text("Main Content Area")
+                                                                .size(14.0)
+                                                                .weight(FontWeight::SemiBold)
+                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                        ),
+                                                ),
+                                        )
+                                        .panel(
+                                            cn::resizable_panel()
+                                                .id("bottom")
+                                                .default_size(120.0)
+                                                .min_size(60.0)
+                                                .max_size(200.0)
+                                                .child(
+                                                    div()
+                                                        .w_full()
+                                                        .h_full()
+                                                        .bg(surface)
+                                                        .p(16.0)
+                                                        .flex_col()
+                                                        .gap(4.0)
+                                                        .child(
+                                                            text("Bottom Panel")
+                                                                .size(14.0)
+                                                                .weight(FontWeight::SemiBold)
+                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                        )
+                                                        .child(
+                                                            text("Min: 60px, Max: 200px")
+                                                                .size(12.0)
+                                                                .color(text_secondary),
+                                                        ),
+                                                ),
+                                        )
+                                        .build(),
+                                ),
+                        ),
+                ),
+        )
 }
 
 // ============================================================================

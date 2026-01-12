@@ -45,6 +45,7 @@ pub mod textarea;
 pub mod toast;
 pub mod tooltip;
 pub mod tree;
+pub mod resizable;
 
 // Re-export all components
 pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
@@ -110,3 +111,7 @@ pub use toast::{
 };
 pub use tooltip::{tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide};
 pub use tree::{tree_view, TreeNodeConfig, TreeNodeDiff, TreeView, TreeViewBuilder};
+pub use resizable::{
+    resizable_group, resizable_panel, ResizableGroup, ResizableGroupBuilder, ResizablePanelBuilder,
+    ResizeDirection,
+};
