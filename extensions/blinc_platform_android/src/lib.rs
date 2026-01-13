@@ -32,6 +32,7 @@ pub mod activity;
 pub mod assets;
 pub mod event_loop;
 pub mod input;
+pub mod jni_bridge;
 pub mod jni_utils;
 pub mod window;
 
