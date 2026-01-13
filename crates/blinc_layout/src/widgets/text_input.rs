@@ -1334,14 +1334,17 @@ impl TextInput {
                     .collect();
                 if !selected.is_empty() {
                     text_container = text_container.child(
-                        div().bg(selection_color).rounded(config.corner_radius).child(
-                            text(&selected)
-                                .size(config.font_size)
-                                .color(text_color)
-                                .text_left()
-                                .no_wrap()
-                                .v_center(),
-                        ),
+                        div()
+                            .bg(selection_color)
+                            .rounded(config.corner_radius)
+                            .child(
+                                text(&selected)
+                                    .size(config.font_size)
+                                    .color(text_color)
+                                    .text_left()
+                                    .no_wrap()
+                                    .v_center(),
+                            ),
                     );
                 }
 

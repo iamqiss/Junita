@@ -9,6 +9,8 @@
 
 pub mod accordion;
 pub mod alert;
+pub mod aspect_ratio;
+pub mod avatar;
 pub mod badge;
 pub mod breadcrumb;
 pub mod button;
@@ -32,6 +34,8 @@ pub mod pagination;
 pub mod popover;
 pub mod progress;
 pub mod radio;
+pub mod resizable;
+pub mod scroll_area;
 pub mod select;
 pub mod separator;
 pub mod sheet;
@@ -46,9 +50,6 @@ pub mod toast;
 pub mod tooltip;
 pub mod tree;
 pub mod typography;
-pub mod resizable;
-pub mod scroll_area;
-pub mod aspect_ratio;
 
 // Re-export all components
 pub use accordion::{accordion, Accordion, AccordionBuilder, AccordionMode};
@@ -97,6 +98,10 @@ pub use pagination::{pagination, Pagination, PaginationBuilder, PaginationSize};
 pub use popover::{popover, Popover, PopoverAlign, PopoverBuilder, PopoverSide};
 pub use progress::{progress, progress_animated, AnimatedProgress, Progress, ProgressSize};
 pub use radio::{radio_group, RadioGroup, RadioGroupBuilder, RadioLayout, RadioSize};
+pub use resizable::{
+    resizable_group, resizable_panel, ResizableGroup, ResizableGroupBuilder, ResizablePanelBuilder,
+    ResizeDirection,
+};
 pub use select::{select, Select, SelectBuilder, SelectOption, SelectSize};
 pub use separator::{separator, Separator, SeparatorOrientation};
 pub use sheet::{
@@ -114,19 +119,15 @@ pub use toast::{
 };
 pub use tooltip::{tooltip, Tooltip, TooltipAlign, TooltipBuilder, TooltipSide};
 pub use tree::{tree_view, TreeNodeConfig, TreeNodeDiff, TreeView, TreeViewBuilder};
-pub use resizable::{
-    resizable_group, resizable_panel, ResizableGroup, ResizableGroupBuilder, ResizablePanelBuilder,
-    ResizeDirection,
-};
 // Typography helpers (label excluded - use Label component instead)
-pub use typography::{
-    b, caption, chained_text, h1, h2, h3, h4, h5, h6, heading, inline_code, muted, p, small, span,
-    strong,
+pub use aspect_ratio::{
+    aspect_ratio, aspect_ratio_16_9, aspect_ratio_21_9, aspect_ratio_4_3, aspect_ratio_9_16,
+    aspect_ratio_square, AspectRatio, AspectRatioBuilder, AspectRatioPreset,
 };
 pub use scroll_area::{
     scroll_area, ScrollArea, ScrollAreaBuilder, ScrollAreaSize, ScrollbarVisibility,
 };
-pub use aspect_ratio::{
-    aspect_ratio, aspect_ratio_16_9, aspect_ratio_21_9, aspect_ratio_4_3, aspect_ratio_9_16,
-    aspect_ratio_square, AspectRatio, AspectRatioBuilder, AspectRatioPreset,
+pub use typography::{
+    b, caption, chained_text, h1, h2, h3, h4, h5, h6, heading, inline_code, muted, p, small, span,
+    strong,
 };

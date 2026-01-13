@@ -75,10 +75,10 @@ pub mod cn {
     pub use crate::components::popover::{popover, PopoverAlign, PopoverSide};
     pub use crate::components::progress::{progress, progress_animated};
     pub use crate::components::radio::radio_group;
+    pub use crate::components::resizable::{resizable_group, resizable_panel};
     pub use crate::components::select::select;
     pub use crate::components::separator::separator;
     pub use crate::components::sheet::{sheet, sheet_bottom, sheet_left, sheet_right, sheet_top};
-    pub use crate::components::resizable::{resizable_group, resizable_panel};
     pub use crate::components::sidebar::sidebar;
     pub use crate::components::skeleton::{skeleton, skeleton_circle};
     pub use crate::components::slider::slider;
@@ -172,14 +172,14 @@ pub mod prelude {
     pub use crate::components::radio::{
         radio_group, RadioGroup, RadioGroupBuilder, RadioLayout, RadioSize,
     };
+    pub use crate::components::resizable::{
+        resizable_group, resizable_panel, ResizableGroup, ResizableGroupBuilder,
+        ResizablePanelBuilder, ResizeDirection,
+    };
     pub use crate::components::select::{select, Select, SelectBuilder, SelectOption, SelectSize};
     pub use crate::components::separator::{separator, Separator, SeparatorOrientation};
     pub use crate::components::sheet::{
         sheet, sheet_bottom, sheet_left, sheet_right, sheet_top, SheetBuilder, SheetSide, SheetSize,
-    };
-    pub use crate::components::resizable::{
-        resizable_group, resizable_panel, ResizableGroup, ResizableGroupBuilder,
-        ResizablePanelBuilder, ResizeDirection,
     };
     pub use crate::components::sidebar::{
         sidebar, Sidebar, SidebarBuilder, SidebarItem, SidebarSection,

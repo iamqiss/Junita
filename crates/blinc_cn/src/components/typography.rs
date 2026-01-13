@@ -62,8 +62,23 @@
 
 // Re-export all typography helpers from blinc_layout
 pub use blinc_layout::typography::{
-    // Headings
-    h1, h2, h3, h4, h5, h6, heading,
     // Inline text helpers
-    b, caption, chained_text, inline_code, label, muted, p, small, span, strong,
+    b,
+    caption,
+    chained_text,
+    // Headings
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    heading,
+    inline_code,
+    label,
+    muted,
+    p,
+    small,
+    span,
+    strong,
 };

@@ -681,32 +681,32 @@ fn select_section(ctx: &WindowedContext) -> impl ElementBuilder {
             .gap(4.0)
             // Basic select with placeholder
             .child(
-              cn::select(&fruit)
-                        .label("Favorite Fruit")
-                        .placeholder("Choose a fruit...")
-                        .option("apple", "Apple")
-                        .option("banana", "Banana")
-                        .option("cherry", "Cherry")
-                        .option("date", "Date")
-                        .option("elderberry", "Elderberry")
-                        .on_change(|v| tracing::info!("Selected fruit: {}", v))
+                cn::select(&fruit)
+                    .label("Favorite Fruit")
+                    .placeholder("Choose a fruit...")
+                    .option("apple", "Apple")
+                    .option("banana", "Banana")
+                    .option("cherry", "Cherry")
+                    .option("date", "Date")
+                    .option("elderberry", "Elderberry")
+                    .on_change(|v| tracing::info!("Selected fruit: {}", v)),
             )
             // Select with pre-selected value
             .child(
-               cn::select(&size)
-                        .label("Size")
-                        .option("small", "Small")
-                        .option("medium", "Medium")
-                        .option("large", "Large")
-                        .option("xl", "Extra Large")
+                cn::select(&size)
+                    .label("Size")
+                    .option("small", "Small")
+                    .option("medium", "Medium")
+                    .option("large", "Large")
+                    .option("xl", "Extra Large"),
             )
             // Disabled select
             .child(
                 cn::select(&disabled_select)
-                        .label("Disabled")
-                        .option("option1", "Option 1")
-                        .option("option2", "Option 2")
-                        .disabled(true)
+                    .label("Disabled")
+                    .option("option1", "Option 1")
+                    .option("option2", "Option 2")
+                    .disabled(true),
             ),
     )
 }
@@ -731,42 +731,42 @@ fn combobox_section(ctx: &WindowedContext) -> impl ElementBuilder {
             // Basic searchable combobox
             .child(
                 cn::combobox(&country)
-                        .label("Country")
-                        .placeholder("Search countries...")
-                        .option("us", "United States")
-                        .option("uk", "United Kingdom")
-                        .option("de", "Germany")
-                        .option("fr", "France")
-                        .option("jp", "Japan")
-                        .option("au", "Australia")
-                        .option("ca", "Canada")
-                        .option("br", "Brazil")
-                        .on_change(|v| tracing::info!("Selected country: {}", v))
+                    .label("Country")
+                    .placeholder("Search countries...")
+                    .option("us", "United States")
+                    .option("uk", "United Kingdom")
+                    .option("de", "Germany")
+                    .option("fr", "France")
+                    .option("jp", "Japan")
+                    .option("au", "Australia")
+                    .option("ca", "Canada")
+                    .option("br", "Brazil")
+                    .on_change(|v| tracing::info!("Selected country: {}", v)),
             )
             // Combobox with more options
             .child(
-               cn::combobox(&framework)
-                        .label("Framework")
-                        .placeholder("Search frameworks...")
-                        .option("react", "React")
-                        .option("vue", "Vue.js")
-                        .option("angular", "Angular")
-                        .option("svelte", "Svelte")
-                        .option("solid", "SolidJS")
-                        .option("qwik", "Qwik")
-                        .option("astro", "Astro")
-                        .on_change(|v| tracing::info!("Selected framework: {}", v))
+                cn::combobox(&framework)
+                    .label("Framework")
+                    .placeholder("Search frameworks...")
+                    .option("react", "React")
+                    .option("vue", "Vue.js")
+                    .option("angular", "Angular")
+                    .option("svelte", "Svelte")
+                    .option("solid", "SolidJS")
+                    .option("qwik", "Qwik")
+                    .option("astro", "Astro")
+                    .on_change(|v| tracing::info!("Selected framework: {}", v)),
             )
             // Combobox with custom values allowed
             .child(
                 cn::combobox(&custom_value)
-                        .label("Custom Allowed")
-                        .placeholder("Type anything...")
-                        .option("preset1", "Preset Option 1")
-                        .option("preset2", "Preset Option 2")
-                        .option("preset3", "Preset Option 3")
-                        .allow_custom(true)
-                        .on_change(|v| tracing::info!("Custom value: {}", v))
+                    .label("Custom Allowed")
+                    .placeholder("Type anything...")
+                    .option("preset1", "Preset Option 1")
+                    .option("preset2", "Preset Option 2")
+                    .option("preset3", "Preset Option 3")
+                    .allow_custom(true)
+                    .on_change(|v| tracing::info!("Custom value: {}", v)),
             ),
     )
 }
@@ -2082,7 +2082,9 @@ fn resizable_section() -> impl ElementBuilder {
                                                             text("Left Panel")
                                                                 .size(14.0)
                                                                 .weight(FontWeight::SemiBold)
-                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                                .color(theme.color(
+                                                                    ColorToken::TextPrimary,
+                                                                )),
                                                         )
                                                         .child(
                                                             text("Min: 100px, Max: 400px")
@@ -2110,7 +2112,9 @@ fn resizable_section() -> impl ElementBuilder {
                                                             text("Center Panel (Flex)")
                                                                 .size(14.0)
                                                                 .weight(FontWeight::SemiBold)
-                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                                .color(theme.color(
+                                                                    ColorToken::TextPrimary,
+                                                                )),
                                                         )
                                                         .child(
                                                             text("Grows to fill available space")
@@ -2136,7 +2140,9 @@ fn resizable_section() -> impl ElementBuilder {
                                                             text("Right Panel")
                                                                 .size(14.0)
                                                                 .weight(FontWeight::SemiBold)
-                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                                .color(theme.color(
+                                                                    ColorToken::TextPrimary,
+                                                                )),
                                                         )
                                                         .child(
                                                             text("Min: 100px")
@@ -2188,7 +2194,9 @@ fn resizable_section() -> impl ElementBuilder {
                                                             text("Main Content Area")
                                                                 .size(14.0)
                                                                 .weight(FontWeight::SemiBold)
-                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                                .color(theme.color(
+                                                                    ColorToken::TextPrimary,
+                                                                )),
                                                         ),
                                                 ),
                                         )
@@ -2210,7 +2218,9 @@ fn resizable_section() -> impl ElementBuilder {
                                                             text("Bottom Panel")
                                                                 .size(14.0)
                                                                 .weight(FontWeight::SemiBold)
-                                                                .color(theme.color(ColorToken::TextPrimary)),
+                                                                .color(theme.color(
+                                                                    ColorToken::TextPrimary,
+                                                                )),
                                                         )
                                                         .child(
                                                             text("Min: 60px, Max: 200px")
@@ -3517,11 +3527,7 @@ fn scroll_area_section() -> impl ElementBuilder {
                     div()
                         .flex_col()
                         .gap_px(8.0)
-                        .child(
-                            text("Auto (default)")
-                                .size(12.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("Auto (default)").size(12.0).color(text_secondary))
                         .child(
                             cn::scroll_area()
                                 .scrollbar(cn::ScrollbarVisibility::Auto)
@@ -3550,11 +3556,7 @@ fn scroll_area_section() -> impl ElementBuilder {
                     div()
                         .flex_col()
                         .gap_px(8.0)
-                        .child(
-                            text("Always visible")
-                                .size(12.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("Always visible").size(12.0).color(text_secondary))
                         .child(
                             cn::scroll_area()
                                 .scrollbar(cn::ScrollbarVisibility::Always)
@@ -3582,11 +3584,7 @@ fn scroll_area_section() -> impl ElementBuilder {
                     div()
                         .flex_col()
                         .gap_px(8.0)
-                        .child(
-                            text("Show on hover")
-                                .size(12.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("Show on hover").size(12.0).color(text_secondary))
                         .child(
                             cn::scroll_area()
                                 .scrollbar(cn::ScrollbarVisibility::Hover)
@@ -3613,11 +3611,7 @@ fn scroll_area_section() -> impl ElementBuilder {
                     div()
                         .flex_col()
                         .gap_px(8.0)
-                        .child(
-                            text("Hidden scrollbar")
-                                .size(12.0)
-                                .color(text_secondary),
-                        )
+                        .child(text("Hidden scrollbar").size(12.0).color(text_secondary))
                         .child(
                             cn::scroll_area()
                                 .scrollbar(cn::ScrollbarVisibility::Never)

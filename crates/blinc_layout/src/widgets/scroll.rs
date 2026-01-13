@@ -1092,9 +1092,7 @@ impl ScrollPhysics {
             }
 
             // Transition to Idle when fully faded
-            if self.scrollbar_state == ScrollbarState::FadingOut
-                && self.scrollbar_opacity < 0.01
-            {
+            if self.scrollbar_state == ScrollbarState::FadingOut && self.scrollbar_opacity < 0.01 {
                 self.scrollbar_state = ScrollbarState::Idle;
                 self.scrollbar_opacity = 0.0;
             }
@@ -1289,8 +1287,7 @@ impl ScrollPhysics {
             ScrollbarHitResult::VerticalTrack => {
                 // Click on track - jump to that position
                 let (thumb_height, _) = self.thumb_dimensions_y();
-                let track_height =
-                    self.viewport_height - self.config.scrollbar.edge_padding * 2.0;
+                let track_height = self.viewport_height - self.config.scrollbar.edge_padding * 2.0;
                 let click_ratio =
                     (local_y - self.config.scrollbar.edge_padding - thumb_height / 2.0)
                         / (track_height - thumb_height);
@@ -1783,7 +1780,12 @@ impl Scroll {
 
     /// Set scrollbar auto-dismiss delay in seconds
     pub fn scrollbar_dismiss_delay(self, seconds: f32) -> Self {
-        self.physics.lock().unwrap().config.scrollbar.auto_dismiss_delay = seconds;
+        self.physics
+            .lock()
+            .unwrap()
+            .config
+            .scrollbar
+            .auto_dismiss_delay = seconds;
         self
     }
 
