@@ -1290,3 +1290,661 @@ fn template_counter(name: &str) -> String {
 "#
     )
 }
+
+/// Create a new Rust-first Blinc project
+///
+/// This creates a native Rust project with Cargo.toml instead of .blinc DSL files.
+/// Ideal for testing mobile platforms with full control over the Rust code.
+pub fn create_rust_project(path: &Path, name: &str, org: &str) -> Result<()> {
+    let package_name = name.replace('-', "_").replace(' ', "_").to_lowercase();
+
+    // Get blinc workspace path (relative to the generated project)
+    let blinc_path = std::env::var("BLINC_PATH").unwrap_or_else(|_| {
+        // Try to find the blinc workspace relative to the CLI binary
+        let exe_path = std::env::current_exe().unwrap_or_default();
+        exe_path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "../../..".to_string())
+    });
+
+    // Create directory structure
+    fs::create_dir_all(path.join("src"))?;
+    fs::create_dir_all(path.join("platforms/android/app/src/main/kotlin/com/blinc"))?;
+    fs::create_dir_all(path.join("platforms/ios/BlincApp"))?;
+
+    // Create Cargo.toml
+    fs::write(
+        path.join("Cargo.toml"),
+        format!(
+            r#"[package]
+name = "{package_name}"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "{package_name}"
+path = "src/main.rs"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[[bin]]
+name = "{package_name}_desktop"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[dependencies]
+blinc_app = {{ path = "{blinc_path}/crates/blinc_app" }}
+blinc_core = {{ path = "{blinc_path}/crates/blinc_core" }}
+blinc_layout = {{ path = "{blinc_path}/crates/blinc_layout" }}
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[target.'cfg(target_os = "android")'.dependencies]
+blinc_platform_android = {{ path = "{blinc_path}/extensions/blinc_platform_android" }}
+android-activity = {{ version = "0.6", features = ["native-activity"] }}
+log = "0.4"
+android_logger = "0.14"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+blinc_platform_ios = {{ path = "{blinc_path}/extensions/blinc_platform_ios" }}
+
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+blinc_platform_desktop = {{ path = "{blinc_path}/extensions/blinc_platform_desktop" }}
+
+[features]
+default = ["desktop"]
+desktop = []
+android = []
+ios = []
+
+[profile.release]
+lto = "thin"
+opt-level = "z"
+strip = true
+
+[profile.dev]
+opt-level = 1
+
+[package.metadata.android]
+package = "{org}.{package_name}"
+apk_label = "{name}"
+target_sdk_version = 34
+min_sdk_version = 24
+
+[package.metadata.android.application]
+theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+"#
+        ),
+    )?;
+
+    // Create src/main.rs
+    fs::write(
+        path.join("src/main.rs"),
+        format!(
+            r#"//! {name}
+//!
+//! A Blinc UI application with desktop, Android, and iOS support.
+
+use blinc_app::prelude::*;
+use blinc_app::windowed::{{WindowedApp, WindowedContext}};
+use blinc_core::reactive::State;
+
+/// Counter button with stateful hover/press states
+fn counter_button(label: &str, count: State<i32>, delta: i32) -> impl ElementBuilder {{
+    let label = label.to_string();
+
+    let count = count.clone();
+    stateful::<ButtonState>()
+        .on_state(move |ctx| {{
+            let bg = match ctx.state() {{
+                ButtonState::Idle => Color::rgba(0.3, 0.3, 0.4, 1.0),
+                ButtonState::Hovered => Color::rgba(0.4, 0.4, 0.5, 1.0),
+                ButtonState::Pressed => Color::rgba(0.2, 0.2, 0.3, 1.0),
+                ButtonState::Disabled => Color::rgba(0.2, 0.2, 0.2, 0.5),
+            }};
+
+            div()
+                .w(80.0)
+                .h(50.0)
+                .rounded(8.0)
+                .bg(bg)
+                .items_center()
+                .justify_center()
+                .cursor(CursorStyle::Pointer)
+                .child(text(&label).size(24.0).color(Color::WHITE))
+        }})
+        .on_click(move |_| {{
+            count.set(count.get() + delta);
+        }})
+}}
+
+/// Counter display that reacts to count changes
+fn counter_display(count: State<i32>) -> impl ElementBuilder {{
+    stateful::<NoState>()
+        .deps([count.signal_id()])
+        .on_state(move |_ctx| {{
+            div().child(
+                text(format!("Count: {{}}", count.get()))
+                    .size(48.0)
+                    .color(Color::rgba(0.4, 0.8, 1.0, 1.0)),
+            )
+        }})
+}}
+
+/// Main application UI
+fn app_ui(ctx: &mut WindowedContext) -> impl ElementBuilder {{
+    let count = ctx.use_state_keyed("count", || 0i32);
+
+    div()
+        .w(ctx.width)
+        .h(ctx.height)
+        .bg(Color::rgba(0.1, 0.1, 0.15, 1.0))
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap(20.0)
+        .child(
+            text("{name}")
+                .size(32.0)
+                .color(Color::WHITE),
+        )
+        .child(counter_display(count.clone()))
+        .child(
+            div()
+                .flex_row()
+                .gap(16.0)
+                .child(counter_button("-", count.clone(), -1))
+                .child(counter_button("+", count.clone(), 1)),
+        )
+}}
+
+// =============================================================================
+// Desktop Entry Point
+// =============================================================================
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn main() -> Result<()> {{
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
+
+    let config = WindowConfig {{
+        title: "{name}".to_string(),
+        width: 400,
+        height: 600,
+        ..Default::default()
+    }};
+
+    WindowedApp::run(config, |ctx| app_ui(ctx))
+}}
+
+// =============================================================================
+// Android Entry Point
+// =============================================================================
+
+#[cfg(target_os = "android")]
+use android_activity::AndroidApp;
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+fn android_main(app: AndroidApp) {{
+    use android_logger::Config;
+    use log::LevelFilter;
+
+    android_logger::init_once(
+        Config::default()
+            .with_max_level(LevelFilter::Info)
+            .with_tag("{package_name}"),
+    );
+
+    log::info!("Starting {name} on Android");
+
+    blinc_app::AndroidApp::run(app, |ctx| app_ui(ctx)).expect("Failed to run Android app");
+}}
+
+#[cfg(target_os = "android")]
+fn main() {{}}
+
+// =============================================================================
+// iOS Entry Point
+// =============================================================================
+
+#[cfg(target_os = "ios")]
+fn main() {{}}
+"#
+        ),
+    )?;
+
+    // Create blinc.toml
+    fs::write(
+        path.join("blinc.toml"),
+        format!(
+            r#"# Blinc Project Configuration (Rust)
+# Generated by: blinc new --rust
+
+[project]
+name = "{name}"
+version = "0.1.0"
+template = "rust"
+entry = "Cargo.toml"
+
+[targets]
+default = "desktop"
+supported = ["desktop", "android", "ios"]
+
+[targets.desktop]
+enabled = true
+command = "cargo run --features desktop"
+
+[targets.android]
+enabled = true
+platform_dir = "platforms/android"
+
+[targets.ios]
+enabled = true
+platform_dir = "platforms/ios"
+
+[build]
+blinc_path = "{blinc_path}"
+"#
+        ),
+    )?;
+
+    // Create Android platform files
+    create_rust_android_files(path, name, &package_name, org)?;
+
+    // Create iOS platform files
+    create_rust_ios_files(path, name, &package_name, org)?;
+
+    // Create README
+    fs::write(
+        path.join("README.md"),
+        format!(
+            r#"# {name}
+
+A Blinc UI application with cross-platform support for desktop, Android, and iOS.
+
+## Quick Start
+
+### Desktop
+
+```bash
+cargo run --features desktop
+```
+
+### Android
+
+```bash
+# Build Rust library
+cargo ndk -t arm64-v8a build --lib
+
+# Build and install APK
+cd platforms/android
+./gradlew installDebug
+```
+
+### iOS
+
+```bash
+# Build Rust library
+cargo lipo --release
+
+# Open Xcode project and run
+```
+
+## Project Structure
+
+```
+{name}/
+├── Cargo.toml           # Rust project configuration
+├── blinc.toml           # Blinc toolchain configuration
+├── src/
+│   └── main.rs          # Application code
+└── platforms/
+    ├── android/         # Android Gradle project
+    └── ios/             # iOS Swift files
+```
+"#
+        ),
+    )?;
+
+    // Create .gitignore
+    fs::write(
+        path.join(".gitignore"),
+        r#"# Rust
+/target/
+Cargo.lock
+
+# Android
+/platforms/android/.gradle/
+/platforms/android/build/
+/platforms/android/app/build/
+/platforms/android/app/src/main/jniLibs/
+*.apk
+
+# iOS
+/platforms/ios/build/
+*.xcworkspace
+*.xcuserdata
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+"#,
+    )?;
+
+    Ok(())
+}
+
+fn create_rust_android_files(path: &Path, name: &str, package_name: &str, org: &str) -> Result<()> {
+    let android_path = path.join("platforms/android");
+
+    // settings.gradle.kts
+    fs::write(
+        android_path.join("settings.gradle.kts"),
+        format!(
+            r#"pluginManagement {{
+    repositories {{
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }}
+}}
+
+dependencyResolutionManagement {{
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {{
+        google()
+        mavenCentral()
+    }}
+}}
+
+rootProject.name = "{name}"
+include(":app")
+"#
+        ),
+    )?;
+
+    // build.gradle.kts (root)
+    fs::write(
+        android_path.join("build.gradle.kts"),
+        r#"plugins {
+    id("com.android.application") version "8.2.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+}
+
+tasks.register("buildRust") {
+    description = "Build Rust library for Android"
+    group = "rust"
+
+    doLast {
+        exec {
+            workingDir = file("../..")
+            commandLine("cargo", "ndk", "-t", "arm64-v8a", "build", "--lib")
+        }
+    }
+}
+"#,
+    )?;
+
+    // app/build.gradle.kts
+    fs::write(
+        android_path.join("app/build.gradle.kts"),
+        format!(
+            r#"plugins {{
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}}
+
+android {{
+    namespace = "{org}.{package_name}"
+    compileSdk = 34
+
+    defaultConfig {{
+        applicationId = "{org}.{package_name}"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        ndk {{
+            abiFilters += listOf("arm64-v8a")
+        }}
+    }}
+
+    buildTypes {{
+        release {{
+            isMinifyEnabled = false
+        }}
+    }}
+
+    compileOptions {{
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }}
+
+    kotlinOptions {{
+        jvmTarget = "1.8"
+    }}
+
+    sourceSets {{
+        getByName("main") {{
+            jniLibs.srcDirs("src/main/jniLibs")
+        }}
+    }}
+}}
+
+dependencies {{
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+}}
+
+tasks.register<Copy>("copyRustLibs") {{
+    val rustTargetDir = file("../../../../target")
+    val jniLibsDir = file("src/main/jniLibs")
+
+    from("$rustTargetDir/aarch64-linux-android/debug") {{
+        include("lib{package_name}.so")
+        into("arm64-v8a")
+    }}
+
+    into(jniLibsDir)
+}}
+
+tasks.named("preBuild") {{
+    dependsOn("copyRustLibs")
+}}
+"#
+        ),
+    )?;
+
+    // AndroidManifest.xml
+    fs::create_dir_all(android_path.join("app/src/main"))?;
+    fs::write(
+        android_path.join("app/src/main/AndroidManifest.xml"),
+        format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:glEsVersion="0x00030000" android:required="true" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:label="{name}"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+        android:hardwareAccelerated="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true">
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="{package_name}" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+"#
+        ),
+    )?;
+
+    // MainActivity.kt
+    let kotlin_path = android_path.join("app/src/main/kotlin/com/blinc");
+    fs::create_dir_all(&kotlin_path)?;
+    fs::write(
+        kotlin_path.join("MainActivity.kt"),
+        format!(
+            r#"package {org}.{package_name}
+
+import android.app.NativeActivity
+import android.os.Bundle
+
+class MainActivity : NativeActivity() {{
+    companion object {{
+        init {{
+            System.loadLibrary("{package_name}")
+        }}
+    }}
+
+    override fun onCreate(savedInstanceState: Bundle?) {{
+        super.onCreate(savedInstanceState)
+    }}
+}}
+"#
+        ),
+    )?;
+
+    // gradle.properties
+    fs::write(
+        android_path.join("gradle.properties"),
+        r#"org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+kotlin.code.style=official
+"#,
+    )?;
+
+    Ok(())
+}
+
+fn create_rust_ios_files(path: &Path, name: &str, package_name: &str, org: &str) -> Result<()> {
+    let ios_path = path.join("platforms/ios/BlincApp");
+
+    // AppDelegate.swift
+    fs::write(
+        ios_path.join("AppDelegate.swift"),
+        r#"import UIKit
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        window = UIWindow(frame: UIScreen.main.bounds)
+        window?.rootViewController = BlincViewController()
+        window?.makeKeyAndVisible()
+        return true
+    }
+}
+"#,
+    )?;
+
+    // BlincViewController.swift
+    fs::write(
+        ios_path.join("BlincViewController.swift"),
+        r#"import UIKit
+import MetalKit
+
+class BlincViewController: UIViewController {
+    private var displayLink: CADisplayLink?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        // TODO: Initialize Blinc render context
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // TODO: Route to Blinc
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // TODO: Route to Blinc
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // TODO: Route to Blinc
+    }
+}
+"#,
+    )?;
+
+    // Info.plist
+    fs::write(
+        ios_path.join("Info.plist"),
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>{name}</string>
+    <key>CFBundleIdentifier</key>
+    <string>{org}.{package_name}</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>metal</string>
+    </array>
+</dict>
+</plist>
+"#
+        ),
+    )?;
+
+    // README
+    fs::write(
+        path.join("platforms/ios/README.md"),
+        format!(
+            r#"# {name} - iOS
+
+## Building
+
+```bash
+# Build Rust static library
+cargo lipo --release
+
+# Then open Xcode and add the library
+```
+
+## Requirements
+
+- Xcode 15+
+- Rust iOS targets: `rustup target add aarch64-apple-ios`
+- cargo-lipo: `cargo install cargo-lipo`
+"#
+        ),
+    )?;
+
+    Ok(())
+}

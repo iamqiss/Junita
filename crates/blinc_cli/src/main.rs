@@ -93,6 +93,10 @@ enum Commands {
         /// Organization/package prefix (e.g., "com.mycompany" results in "com.mycompany.appname")
         #[arg(short, long, default_value = "com.example")]
         org: String,
+
+        /// Create a Rust-first project (native code instead of .blinc DSL)
+        #[arg(long)]
+        rust: bool,
     },
 
     /// Initialize a Blinc project in the current directory
@@ -181,7 +185,8 @@ fn main() -> Result<()> {
             name,
             template,
             org,
-        } => cmd_new(&name, &template, &org),
+            rust,
+        } => cmd_new(&name, &template, &org, rust),
 
         Commands::Init { template, org } => cmd_init(&template, &org),
 
@@ -291,22 +296,41 @@ fn cmd_plugin_new(name: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_new(name: &str, template: &str, org: &str) -> Result<()> {
-    info!("Creating new project: {} (template: {})", name, template);
+fn cmd_new(name: &str, template: &str, org: &str, rust: bool) -> Result<()> {
+    let path = PathBuf::from(name);
+
+    // Extract the actual project name from the path (last component)
+    let project_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(name);
+
+    if rust {
+        info!("Creating new Rust project: {}", project_name);
+    } else {
+        info!("Creating new project: {} (template: {})", project_name, template);
+    }
     info!("Organization prefix: {}", org);
 
-    let path = PathBuf::from(name);
     if path.exists() {
         anyhow::bail!("Directory '{}' already exists", name);
     }
 
     fs::create_dir_all(&path)?;
-    project::create_project(&path, name, template, org)?;
 
-    info!("Project created at {}/", name);
-    info!("To get started:");
-    info!("  cd {}", name);
-    info!("  blinc dev");
+    if rust {
+        project::create_rust_project(&path, project_name, org)?;
+        info!("Rust project created at {}/", name);
+        info!("To get started:");
+        info!("  cd {}", name);
+        info!("  cargo run --features desktop");
+    } else {
+        project::create_project(&path, name, template, org)?;
+        info!("Project created at {}/", name);
+        info!("To get started:");
+        info!("  cd {}", name);
+        info!("  blinc dev");
+    }
 
     Ok(())
 }

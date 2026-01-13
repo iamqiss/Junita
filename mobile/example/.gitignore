@@ -1,0 +1,23 @@
+# Rust
+/target/
+Cargo.lock
+
+# Android
+/platforms/android/.gradle/
+/platforms/android/build/
+/platforms/android/app/build/
+/platforms/android/app/src/main/jniLibs/
+*.apk
+
+# iOS
+/platforms/ios/build/
+*.xcworkspace
+*.xcuserdata
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
