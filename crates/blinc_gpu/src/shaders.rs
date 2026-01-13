@@ -107,18 +107,21 @@ fn vs_main(
         prim.bounds.w + blur_expand * 2.0
     );
 
-    // Generate quad vertices (two triangles)
+    // Generate quad vertices (two triangles split along / diagonal)
     // 0--1
     // |\ |
     // | \|
     // 3--2
+    // Triangle 1: 0 → 1 → 3 (TL → TR → BL) - upper-left triangle
+    // Triangle 2: 1 → 2 → 3 (TR → BR → BL) - lower-right triangle
+    // Shared edge: 1-3 (top-right to bottom-left = / diagonal)
     let quad_verts = array<vec2<f32>, 6>(
-        vec2<f32>(0.0, 0.0), // 0
-        vec2<f32>(1.0, 0.0), // 1
-        vec2<f32>(1.0, 1.0), // 2
-        vec2<f32>(0.0, 0.0), // 0
-        vec2<f32>(1.0, 1.0), // 2
-        vec2<f32>(0.0, 1.0), // 3
+        vec2<f32>(0.0, 0.0), // 0 - top-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(1.0, 1.0), // 2 - bottom-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
     );
 
     let uv = quad_verts[vertex_index];
@@ -297,7 +300,8 @@ fn calculate_clip_alpha(p: vec2<f32>, clip_bounds: vec4<f32>, clip_radius: vec4<
     }
 
     // Anti-aliased clip edge
-    let aa_width = fwidth(clip_d) * 0.5;
+    // Use constant AA width to avoid discontinuities at triangle seams on Vulkan
+    let aa_width = 0.75;
     return 1.0 - smoothstep(-aa_width, aa_width, clip_d);
 }
 
@@ -362,9 +366,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         case PRIM_SHADOW: {
             // Shadow-only primitive - mask out the shape interior
             // Shadow should be visible starting from the shape boundary (d >= 0)
-            // Use fwidth-based AA to match fill rendering and prevent gaps at corners
+            // Use constant AA width to avoid discontinuities at triangle seams on Vulkan
             let shape_d = sd_rounded_rect(p, origin, size, prim.corner_radius);
-            let aa_width = fwidth(shape_d) * 0.5;
+            let aa_width = 0.75;
             let shape_mask = smoothstep(-aa_width, aa_width, shape_d); // 0 inside, 1 outside, AA at edge
             result.a *= shape_mask;
             result.a *= clip_alpha;
@@ -416,9 +420,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             let shadow_alpha = shadow_circle(p, shadow_center, shadow_radius, blur);
 
             // Mask out the circle area so shadow doesn't render under it
-            // Use fwidth-based AA to match fill rendering and prevent gaps at edges
+            // Use constant AA width to avoid discontinuities at triangle seams on Vulkan
             let circle_d = sd_circle(p, center, radius);
-            let aa_width = fwidth(circle_d) * 0.5;
+            let aa_width = 0.75;
             let shape_mask = smoothstep(-aa_width, aa_width, circle_d); // 0 inside, 1 outside, AA at edge
 
             var circle_result = prim.shadow_color * shadow_alpha;
@@ -500,7 +504,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Anti-aliasing: smooth transition at edge
-    let aa_width = fwidth(d) * 0.5;
+    // Use constant AA width to avoid discontinuities at triangle seams on Vulkan
+    let aa_width = 0.75;
     let fill_alpha = 1.0 - smoothstep(-aa_width, aa_width, d);
 
     if fill_alpha < 0.001 {
@@ -717,13 +722,14 @@ fn vs_main(
     let glyph = glyphs[instance_index];
 
     // Generate quad vertices
+    // Quad vertices split along / diagonal (1-3 shared edge)
     let quad_verts = array<vec2<f32>, 6>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 0.0), // 0 - top-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(1.0, 1.0), // 2 - bottom-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
     );
 
     let local_uv = quad_verts[vertex_index];
@@ -894,14 +900,14 @@ fn vs_main(
         prim.bounds.w + shadow_expand * 2.0
     );
 
-    // Generate quad vertices
+    // Generate quad vertices split along / diagonal (1-3 shared edge)
     let quad_verts = array<vec2<f32>, 6>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 0.0), // 0 - top-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(1.0, 1.0), // 2 - bottom-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
     );
 
     let local_uv = quad_verts[vertex_index];
@@ -1181,7 +1187,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Calculate SDF with smooth anti-aliasing
     let d = sd_rounded_rect(p, origin, size, prim.corner_radius);
-    let aa = fwidth(d) * 2.0; // Wide AA for smooth edges
+    let aa = 1.5; // Wide AA for smooth edges (constant to avoid Vulkan triangle seam artifacts)
 
     // Smooth mask - combine with clip alpha
     let mask = (1.0 - smoothstep(-aa, aa, d)) * clip_alpha;
@@ -1509,14 +1515,14 @@ fn vs_main(
         prim.bounds.w + shadow_expand * 2.0
     );
 
-    // Generate quad vertices
+    // Generate quad vertices split along / diagonal (1-3 shared edge)
     let quad_verts = array<vec2<f32>, 6>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(1.0, 1.0),
-        vec2<f32>(0.0, 1.0),
+        vec2<f32>(0.0, 0.0), // 0 - top-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
+        vec2<f32>(1.0, 0.0), // 1 - top-right
+        vec2<f32>(1.0, 1.0), // 2 - bottom-right
+        vec2<f32>(0.0, 1.0), // 3 - bottom-left
     );
 
     let local_uv = quad_verts[vertex_index];
@@ -1651,7 +1657,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Calculate SDF
     let d = sd_rounded_rect(p, origin, size, prim.corner_radius);
-    let aa = fwidth(d) * 2.0;
+    let aa = 1.5; // Constant AA to avoid Vulkan triangle seam artifacts
     let mask = (1.0 - smoothstep(-aa, aa, d)) * clip_alpha;
 
     // Drop shadow
@@ -1932,7 +1938,8 @@ fn calculate_clip_alpha(p: vec2<f32>, clip_bounds: vec4<f32>, clip_radius: vec4<
     }
 
     // Anti-aliased clip edge
-    let aa_width = fwidth(clip_d) * 0.5;
+    // Use constant AA width to avoid discontinuities at triangle seams on Vulkan
+    let aa_width = 0.75;
     return 1.0 - smoothstep(-aa_width, aa_width, clip_d);
 }
 
