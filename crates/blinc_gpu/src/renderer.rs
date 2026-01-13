@@ -923,6 +923,66 @@ impl GpuRenderer {
         Ok((renderer, surface))
     }
 
+    /// Create a new renderer with an existing wgpu instance and surface
+    ///
+    /// This is useful for platforms like Android where the surface is created
+    /// from a native window handle before the renderer is initialized.
+    pub async fn with_instance_and_surface(
+        instance: wgpu::Instance,
+        surface: &wgpu::Surface<'_>,
+        config: RendererConfig,
+    ) -> Result<Self, RendererError> {
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or(RendererError::AdapterNotFound)?;
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("Blinc GPU Device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::MemoryUsage,
+                },
+                None,
+            )
+            .await
+            .map_err(RendererError::DeviceError)?;
+
+        let device = Arc::new(device);
+        let queue = Arc::new(queue);
+
+        let surface_caps = surface.get_capabilities(&adapter);
+        tracing::debug!("Surface capabilities - formats: {:?}", surface_caps.formats);
+
+        // Select texture format based on platform
+        let texture_format = config.texture_format.unwrap_or_else(|| {
+            // On Android, prefer sRGB format
+            surface_caps
+                .formats
+                .iter()
+                .find(|f| f.is_srgb())
+                .copied()
+                .unwrap_or(surface_caps.formats[0])
+        });
+        tracing::debug!("Selected texture format: {:?}", texture_format);
+
+        Self::create_renderer(
+            instance,
+            adapter,
+            device,
+            queue,
+            texture_format,
+            config,
+            (800, 600),
+        )
+    }
+
     fn create_renderer(
         instance: wgpu::Instance,
         adapter: wgpu::Adapter,

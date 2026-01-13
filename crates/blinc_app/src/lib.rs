@@ -69,7 +69,20 @@ pub fn system_font_paths() -> &'static [&'static str] {
     {
         &["C:\\Windows\\Fonts\\segoeui.ttf"]
     }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    #[cfg(target_os = "android")]
+    {
+        &[
+            "/system/fonts/Roboto-Regular.ttf",
+            "/system/fonts/NotoSansCJK-Regular.ttc",
+            "/system/fonts/DroidSans.ttf",
+        ]
+    }
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "android"
+    )))]
     {
         &[]
     }
@@ -80,8 +93,13 @@ mod context;
 mod error;
 mod text_measurer;
 
-#[cfg(feature = "windowed")]
+// Windowed module is compiled for both desktop (windowed feature) and Android
+// since WindowedContext and shared types are used by both platforms
+#[cfg(any(feature = "windowed", all(feature = "android", target_os = "android")))]
 pub mod windowed;
+
+#[cfg(all(feature = "android", target_os = "android"))]
+pub mod android;
 
 #[cfg(test)]
 mod tests;

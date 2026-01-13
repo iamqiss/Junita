@@ -64,6 +64,14 @@ impl BlincApp {
         Self::with_config(BlincConfig::default())
     }
 
+    /// Create a new Blinc application from an existing render context
+    ///
+    /// This is used internally for platform-specific initialization (Android, iOS)
+    /// where the GPU setup is done differently.
+    pub(crate) fn from_context(ctx: RenderContext, config: BlincConfig) -> Self {
+        Self { ctx, config }
+    }
+
     /// Create a new Blinc application with custom configuration
     pub fn with_config(config: BlincConfig) -> Result<Self> {
         // Create renderer with sample_count=1 for SDF pipelines.

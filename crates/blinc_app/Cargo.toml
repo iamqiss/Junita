@@ -44,6 +44,10 @@ blinc_platform_desktop = { path = "../../extensions/blinc_platform_desktop", opt
 
 [target.'cfg(target_os = "android")'.dependencies]
 blinc_platform_android = { path = "../../extensions/blinc_platform_android", optional = true }
+android-activity = { workspace = true, optional = true }
+ndk = { workspace = true, optional = true }
+jni = { workspace = true, optional = true }
+android_logger = { version = "0.14", optional = true }
 
 [dev-dependencies]
 image.workspace = true
@@ -53,4 +57,4 @@ blinc_cn = { path = "../blinc_cn" }
 [features]
 default = ["windowed"]
 windowed = ["winit", "blinc_platform_desktop"]
-android = ["blinc_platform_android"]
+android = ["blinc_platform_android", "android-activity", "ndk", "jni", "android_logger"]

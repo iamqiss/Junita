@@ -153,6 +153,45 @@ impl WindowedContext {
         }
     }
 
+    /// Create a WindowedContext for Android
+    ///
+    /// This is used by the Android runner since it doesn't have a Window trait implementation.
+    #[cfg(all(feature = "android", target_os = "android"))]
+    pub(crate) fn new_android(
+        logical_width: f32,
+        logical_height: f32,
+        scale_factor: f64,
+        physical_width: f32,
+        physical_height: f32,
+        focused: bool,
+        animations: SharedAnimationScheduler,
+        ref_dirty_flag: RefDirtyFlag,
+        reactive: SharedReactiveGraph,
+        hooks: SharedHookState,
+        overlay_mgr: OverlayManager,
+        element_registry: SharedElementRegistry,
+        ready_callbacks: SharedReadyCallbacks,
+    ) -> Self {
+        Self {
+            width: logical_width,
+            height: logical_height,
+            scale_factor,
+            physical_width,
+            physical_height,
+            focused,
+            rebuild_count: 0,
+            event_router: EventRouter::new(),
+            animations,
+            ref_dirty_flag,
+            reactive,
+            hooks,
+            overlay_manager: overlay_mgr,
+            had_visible_overlays: false,
+            element_registry,
+            ready_callbacks,
+        }
+    }
+
     /// Update context from window (preserving event router, dirty flag, and reactive graph)
     fn update_from_window<W: Window>(&mut self, window: &W) {
         let (physical_width, physical_height) = window.size();
