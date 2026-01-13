@@ -939,6 +939,7 @@ impl RenderTree {
 
         // Update scroll physics if this is a scroll element
         if let Some(physics) = element.scroll_physics() {
+            eprintln!("REGISTERING scroll physics for node {:?}", node_id);
             // Set the animation scheduler for bounce springs
             if let Some(scheduler) = self.animations.upgrade() {
                 physics.lock().unwrap().set_scheduler(&scheduler);
@@ -3653,6 +3654,86 @@ impl RenderTree {
         self.motion_bindings.contains_key(&node_id)
     }
 
+    /// Render scrollbar overlay for a scroll container
+    fn render_scrollbar(
+        &self,
+        ctx: &mut dyn DrawContext,
+        viewport_width: f32,
+        viewport_height: f32,
+        info: &crate::scroll::ScrollbarRenderInfo,
+    ) {
+        let config = &info.config;
+        let scrollbar_width = config.width();
+        let edge_padding = config.edge_padding;
+
+        // Apply opacity to colors
+        let opacity = info.opacity;
+        let thumb_color = Color::rgba(
+            config.thumb_color[0],
+            config.thumb_color[1],
+            config.thumb_color[2],
+            config.thumb_color[3] * opacity,
+        );
+        let track_color = Color::rgba(
+            config.track_color[0],
+            config.track_color[1],
+            config.track_color[2],
+            config.track_color[3] * opacity,
+        );
+
+        // Calculate corner radius for thumb
+        let thumb_radius = CornerRadius::uniform(scrollbar_width * config.corner_radius);
+
+        // Render vertical scrollbar
+        if info.show_vertical {
+            // Track position (right edge)
+            let track_x = viewport_width - scrollbar_width - edge_padding;
+            let track_y = edge_padding;
+            let track_height = viewport_height - edge_padding * 2.0;
+
+            // Draw track
+            let track_rect = Rect::new(track_x, track_y, scrollbar_width, track_height);
+            ctx.fill_rect(track_rect, thumb_radius, Brush::Solid(track_color));
+
+            // Draw thumb
+            let thumb_rect = Rect::new(
+                track_x,
+                track_y + info.vertical_thumb_y - edge_padding,
+                scrollbar_width,
+                info.vertical_thumb_height,
+            );
+            ctx.fill_rect(thumb_rect, thumb_radius, Brush::Solid(thumb_color));
+        }
+
+        // Render horizontal scrollbar
+        if info.show_horizontal {
+            // Track position (bottom edge)
+            let track_x = edge_padding;
+            let track_y = viewport_height - scrollbar_width - edge_padding;
+            let track_width = viewport_width - edge_padding * 2.0;
+
+            // Adjust for vertical scrollbar if present
+            let track_width = if info.show_vertical {
+                track_width - scrollbar_width - edge_padding
+            } else {
+                track_width
+            };
+
+            // Draw track
+            let track_rect = Rect::new(track_x, track_y, track_width, scrollbar_width);
+            ctx.fill_rect(track_rect, thumb_radius, Brush::Solid(track_color));
+
+            // Draw thumb
+            let thumb_rect = Rect::new(
+                track_x + info.horizontal_thumb_x - edge_padding,
+                track_y,
+                info.horizontal_thumb_width,
+                scrollbar_width,
+            );
+            ctx.fill_rect(thumb_rect, thumb_radius, Brush::Solid(thumb_color));
+        }
+    }
+
     /// Get the scroll direction for a node (if it's a scroll container)
     ///
     /// Returns None if the node is not a scroll container.
@@ -3789,12 +3870,37 @@ impl RenderTree {
         // Clamp dt to prevent huge jumps if app was paused
         let dt_secs = dt_secs.min(0.1);
 
+        // Collect node_ids to iterate (avoid borrow conflicts)
+        let node_ids: Vec<_> = self.scroll_physics.keys().copied().collect();
+
         let mut any_animating = false;
-        for physics in self.scroll_physics.values() {
-            if physics.lock().unwrap().tick(dt_secs) {
+        for node_id in node_ids {
+            let Some(physics_arc) = self.scroll_physics.get(&node_id) else {
+                continue;
+            };
+
+            let mut physics = physics_arc.lock().unwrap();
+
+            // Tick the physics
+            if physics.tick(dt_secs) {
                 any_animating = true;
             }
+
+            // Tick scrollbar animations (opacity fade in/out)
+            if physics.tick_scrollbar(dt_secs) {
+                any_animating = true;
+            }
+
+            // Sync ScrollRef state with current physics (for scrollbar position updates)
+            if let Some(scroll_ref) = self.scroll_refs.get(&node_id) {
+                scroll_ref.update_state(
+                    (physics.offset_x.abs(), physics.offset_y.abs()),
+                    (physics.content_width, physics.content_height),
+                    (physics.viewport_width, physics.viewport_height),
+                );
+            }
         }
+
         any_animating
     }
 
@@ -4647,6 +4753,27 @@ impl RenderTree {
             ctx.pop_transform();
         }
 
+        // Render scrollbar overlay if this is a scroll container with visible scrollbar
+        if let Some(physics) = self.scroll_physics.get(&node) {
+            if let Ok(p) = physics.try_lock() {
+                let info = p.scrollbar_render_info();
+                tracing::info!(
+                    "Scrollbar: opacity={:.2}, show_v={}, show_h={}, state={:?}, content_h={:.0}, viewport_h={:.0}",
+                    info.opacity,
+                    info.show_vertical,
+                    info.show_horizontal,
+                    info.state,
+                    p.content_height,
+                    p.viewport_height
+                );
+                // Only render if scrollbar is visible (opacity > 0)
+                if info.opacity > 0.01 {
+                    tracing::info!("Rendering scrollbar with opacity {:.2}", info.opacity);
+                    self.render_scrollbar(ctx, bounds.width, bounds.height, &info);
+                }
+            }
+        }
+
         // Pop clip if we pushed one
         if clips_content {
             ctx.pop_clip();
@@ -5268,6 +5395,20 @@ impl RenderTree {
         // Pop scroll transform
         if has_scroll {
             ctx.pop_transform();
+        }
+
+        // Render scrollbar overlay if this is a scroll container
+        // Scrollbar is rendered after scroll transform is popped (in viewport space)
+        // but before clip is popped (clipped within scroll container)
+        if effective_layer == target_layer {
+            if let Some(physics) = self.scroll_physics.get(&node) {
+                if let Ok(p) = physics.try_lock() {
+                    let info = p.scrollbar_render_info();
+                    if info.opacity > 0.01 {
+                        self.render_scrollbar(ctx, bounds.width, bounds.height, &info);
+                    }
+                }
+            }
         }
 
         // Pop clip

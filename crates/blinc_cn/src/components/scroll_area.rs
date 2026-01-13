@@ -1,7 +1,7 @@
 //! Scroll Area component - styled scrollable container with customizable scrollbar
 //!
-//! A themed scroll container that wraps `blinc_layout::scroll()` with a custom
-//! scrollbar overlay. Supports various scrollbar visibility modes and auto-dismiss.
+//! A themed scroll container that wraps `blinc_layout::scroll()` with the built-in
+//! scrollbar. Supports various scrollbar visibility modes and auto-dismiss.
 //!
 //! # Example
 //!
@@ -38,18 +38,15 @@
 //!     .child(content)
 //! ```
 
-use std::cell::OnceCell;
-use std::sync::{Arc, Mutex};
+use std::cell::{OnceCell, RefCell};
 
-use blinc_animation::{get_scheduler, AnimatedValue, SharedAnimatedValue, SpringConfig};
-use blinc_core::{BlincContextState, Color};
+use blinc_core::Color;
 use blinc_layout::element::RenderProps;
-use blinc_layout::motion::motion;
 use blinc_layout::prelude::*;
-use blinc_layout::stateful::{stateful_with_key, NoState};
 use blinc_layout::tree::{LayoutNodeId, LayoutTree};
-use blinc_layout::widgets::scroll::{scroll, ScrollDirection};
-use blinc_layout::InstanceKey;
+use blinc_layout::widgets::scroll::{
+    scroll, Scroll, ScrollDirection, ScrollbarSize, ScrollbarVisibility as LayoutScrollbarVisibility,
+};
 use blinc_theme::{ColorToken, ThemeState};
 
 /// Scrollbar visibility modes
@@ -64,6 +61,18 @@ pub enum ScrollbarVisibility {
     Auto,
     /// Never show scrollbar (content still scrollable)
     Never,
+}
+
+impl ScrollbarVisibility {
+    /// Convert to the layout crate's ScrollbarVisibility
+    fn to_layout(self) -> LayoutScrollbarVisibility {
+        match self {
+            ScrollbarVisibility::Always => LayoutScrollbarVisibility::Always,
+            ScrollbarVisibility::Hover => LayoutScrollbarVisibility::Hover,
+            ScrollbarVisibility::Auto => LayoutScrollbarVisibility::Auto,
+            ScrollbarVisibility::Never => LayoutScrollbarVisibility::Never,
+        }
+    }
 }
 
 /// Scroll area size presets
@@ -84,6 +93,15 @@ impl ScrollAreaSize {
             ScrollAreaSize::Small => 4.0,
             ScrollAreaSize::Medium => 6.0,
             ScrollAreaSize::Large => 10.0,
+        }
+    }
+
+    /// Convert to the layout crate's ScrollbarSize
+    fn to_layout(self) -> ScrollbarSize {
+        match self {
+            ScrollAreaSize::Small => ScrollbarSize::Thin,
+            ScrollAreaSize::Medium => ScrollbarSize::Normal,
+            ScrollAreaSize::Large => ScrollbarSize::Wide,
         }
     }
 }
@@ -108,7 +126,11 @@ struct ScrollAreaConfig {
     /// Enable bounce physics
     bounce: bool,
     /// Content builder
-    content: Option<Box<dyn ElementBuilder>>,
+    content: Option<Div>,
+    /// Corner radius
+    rounded: Option<f32>,
+    /// Background color
+    bg: Option<Color>,
 }
 
 impl Default for ScrollAreaConfig {
@@ -124,26 +146,22 @@ impl Default for ScrollAreaConfig {
             height: None,
             bounce: true,
             content: None,
+            rounded: None,
+            bg: None,
         }
     }
 }
 
-/// Built scroll area with inner element
+/// Built scroll area using the underlying scroll widget
 struct BuiltScrollArea {
-    inner: Box<dyn ElementBuilder>,
+    inner: Scroll,
 }
 
 impl BuiltScrollArea {
-    fn from_config(config: &ScrollAreaConfig, key: &InstanceKey) -> Self {
+    fn from_config(config: ScrollAreaConfig) -> Self {
         let theme = ThemeState::get();
-        let ctx = BlincContextState::get();
-        let scheduler = get_scheduler();
 
-        // Calculate scrollbar dimensions
-        let bar_width = config
-            .scrollbar_width
-            .unwrap_or_else(|| config.size.scrollbar_width());
-
+        // Get theme-based colors if not specified
         let thumb_color = config
             .thumb_color
             .unwrap_or_else(|| theme.color(ColorToken::Border).with_alpha(0.5));
@@ -151,311 +169,49 @@ impl BuiltScrollArea {
             .track_color
             .unwrap_or_else(|| theme.color(ColorToken::Surface).with_alpha(0.1));
 
-        // State for tracking scroll position and hover
-        let instance_key = key.get().to_string();
-        let is_hovered = ctx.use_state_keyed(&format!("{}_hover", instance_key), || false);
-        let is_scrolling = ctx.use_state_keyed(&format!("{}_scrolling", instance_key), || false);
-        let scroll_position =
-            ctx.use_state_keyed(&format!("{}_scroll_pos", instance_key), || 0.0f32);
-        let content_size =
-            ctx.use_state_keyed(&format!("{}_content_size", instance_key), || 1000.0f32);
-        let viewport_size =
-            ctx.use_state_keyed(&format!("{}_viewport_size", instance_key), || 400.0f32);
-
-        // State for thumb dragging
-        let is_dragging = ctx.use_state_keyed(&format!("{}_dragging", instance_key), || false);
-        let drag_start_y = ctx.use_state_keyed(&format!("{}_drag_start_y", instance_key), || 0.0f32);
-        let drag_start_scroll =
-            ctx.use_state_keyed(&format!("{}_drag_start_scroll", instance_key), || 0.0f32);
-
-        // Create opacity animation for auto-dismiss (persisted via context)
-        let opacity_anim: SharedAnimatedValue = Arc::new(Mutex::new(AnimatedValue::new(
-            scheduler,
-            if config.visibility == ScrollbarVisibility::Always {
-                1.0
-            } else {
-                0.0
-            },
-            SpringConfig::gentle(),
-        )));
-
         // Get viewport dimensions
         let viewport_width = config.width.unwrap_or(300.0);
         let viewport_height = config.height.unwrap_or(400.0);
 
-        // Build scroll container with physics
-        let mut scroll_container = scroll()
+        // Build the scroll widget with built-in scrollbar
+        let mut scroll_widget = scroll()
             .w(viewport_width)
             .h(viewport_height)
             .direction(config.direction)
-            .bounce(config.bounce);
+            .bounce(config.bounce)
+            .scrollbar_visibility(config.visibility.to_layout())
+            .scrollbar_thumb_color(thumb_color.r, thumb_color.g, thumb_color.b, thumb_color.a)
+            .scrollbar_track_color(track_color.r, track_color.g, track_color.b, track_color.a);
 
-        // Clone states for scroll handler
-        let scroll_pos_for_handler = scroll_position.clone();
-        let is_scrolling_for_handler = is_scrolling.clone();
-
-        scroll_container = scroll_container.on_scroll(move |e| {
-            // Update scroll position state
-            let current = scroll_pos_for_handler.get();
-            scroll_pos_for_handler.set(current + e.scroll_delta_y);
-            is_scrolling_for_handler.set(true);
-        });
-
-        // Add content if present - note: content is added via .child() on the builder
-        let _ = &config.content; // Acknowledge content field
-
-        // Clone states for hover handlers
-        let is_hovered_enter = is_hovered.clone();
-        let is_hovered_leave = is_hovered.clone();
-
-        let visibility = config.visibility;
-
-        // For Always/Never modes, no need for reactive updates
-        if visibility == ScrollbarVisibility::Always || visibility == ScrollbarVisibility::Never {
-            // Calculate thumb size and position (static)
-            let viewport = viewport_size.get();
-            let content = content_size.get().max(viewport);
-            let scroll_ratio = viewport / content;
-            let thumb_height = (scroll_ratio * viewport).max(30.0).min(viewport - 8.0);
-            let scroll_range = content - viewport;
-            let scroll_offset = scroll_position.get().abs();
-            let scroll_progress = if scroll_range > 0.0 {
-                (scroll_offset / scroll_range).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let max_thumb_travel = viewport - thumb_height - 8.0;
-            let thumb_offset = scroll_progress * max_thumb_travel + 4.0;
-
-            // Clone states for drag handlers
-            let scroll_pos_for_down = scroll_position.clone();
-            let drag_start_y_for_down = drag_start_y.clone();
-            let drag_start_scroll_for_down = drag_start_scroll.clone();
-            let is_dragging_for_drag = is_dragging.clone();
-            let drag_start_y_for_drag = drag_start_y.clone();
-            let drag_start_scroll_for_drag = drag_start_scroll.clone();
-            let scroll_pos_for_drag = scroll_position.clone();
-            let is_dragging_for_end = is_dragging.clone();
-
-            // Build scrollbar thumb with drag handlers
-            let thumb = div()
-                .absolute()
-                .right(2.0)
-                .top(thumb_offset)
-                .w(bar_width)
-                .h(thumb_height)
-                .rounded(bar_width / 2.0)
-                .bg(thumb_color)
-                .cursor(CursorStyle::Grab)
-                .on_mouse_down(move |event| {
-                    drag_start_y_for_down.set(event.mouse_y);
-                    drag_start_scroll_for_down.set(scroll_pos_for_down.get());
-                })
-                .on_drag(move |event| {
-                    is_dragging_for_drag.set(true);
-                    let start_y = drag_start_y_for_drag.get();
-                    let delta_y = event.mouse_y - start_y;
-
-                    // Convert thumb drag to scroll position
-                    // thumb_delta / max_thumb_travel = scroll_delta / scroll_range
-                    let scroll_delta = if max_thumb_travel > 0.0 {
-                        (delta_y / max_thumb_travel) * scroll_range
-                    } else {
-                        0.0
-                    };
-
-                    let start_scroll = drag_start_scroll_for_drag.get();
-                    let new_scroll = (start_scroll - scroll_delta).clamp(-scroll_range, 0.0);
-                    scroll_pos_for_drag.set(new_scroll);
-                })
-                .on_drag_end(move |_| {
-                    is_dragging_for_end.set(false);
-                });
-
-            // Build scrollbar track
-            let track = div()
-                .absolute()
-                .right(0.0)
-                .top(0.0)
-                .bottom(0.0)
-                .w(bar_width + 4.0)
-                .bg(track_color)
-                .rounded(bar_width / 2.0)
-                .child(thumb);
-
-            let mut container = div()
-                .w(viewport_width)
-                .h(viewport_height)
-                .relative()
-                .overflow_clip()
-                .child(scroll_container);
-
-            if visibility == ScrollbarVisibility::Always {
-                container = container.child(track);
-            }
-
-            Self {
-                inner: Box::new(container),
-            }
+        // Apply scrollbar width
+        if let Some(width) = config.scrollbar_width {
+            scroll_widget = scroll_widget.scrollbar_width(width);
         } else {
-            // For Hover/Auto modes, use stateful to react to state changes
-            let stateful_key = format!("{}_stateful", instance_key);
-
-            // Extract values from config BEFORE the closure (to avoid capturing non-Send types)
-            let direction = config.direction;
-            let bounce = config.bounce;
-
-            // Clone everything needed for the render closure
-            let is_hovered_for_deps = is_hovered.clone();
-            let is_scrolling_for_deps = is_scrolling.clone();
-            let scroll_position_for_deps = scroll_position.clone();
-            let viewport_size_for_render = viewport_size.clone();
-            let content_size_for_render = content_size.clone();
-            let scroll_position_for_render = scroll_position.clone();
-            let is_hovered_for_render = is_hovered.clone();
-            let is_scrolling_for_render = is_scrolling.clone();
-            let opacity_anim_for_render = opacity_anim.clone();
-
-            // Clone drag states for the closure
-            let is_dragging_for_render = is_dragging.clone();
-            let drag_start_y_for_render = drag_start_y.clone();
-            let drag_start_scroll_for_render = drag_start_scroll.clone();
-            let scroll_position_for_drag = scroll_position.clone();
-
-            let inner = stateful_with_key::<NoState>(&stateful_key)
-                .deps([
-                    is_hovered_for_deps.signal_id(),
-                    is_scrolling_for_deps.signal_id(),
-                    scroll_position_for_deps.signal_id(),
-                ])
-                .on_state(move |_| {
-                    // Determine if scrollbar should be visible
-                    let should_show = match visibility {
-                        ScrollbarVisibility::Hover => is_hovered_for_render.get(),
-                        ScrollbarVisibility::Auto => {
-                            is_scrolling_for_render.get() || is_hovered_for_render.get()
-                        }
-                        _ => false,
-                    };
-
-                    // Update opacity animation target
-                    {
-                        let mut anim = opacity_anim_for_render.lock().unwrap();
-                        anim.set_target(if should_show { 1.0 } else { 0.0 });
-                    }
-
-                    // Calculate thumb size and position
-                    let viewport = viewport_size_for_render.get();
-                    let content = content_size_for_render.get().max(viewport);
-                    let scroll_ratio = viewport / content;
-                    let thumb_height = (scroll_ratio * viewport).max(30.0).min(viewport - 8.0);
-                    let scroll_range = content - viewport;
-                    let scroll_offset = scroll_position_for_render.get().abs();
-                    let scroll_progress = if scroll_range > 0.0 {
-                        (scroll_offset / scroll_range).clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let max_thumb_travel = viewport - thumb_height - 8.0;
-                    let thumb_offset = scroll_progress * max_thumb_travel + 4.0;
-
-                    // Clone drag states for thumb handlers
-                    let scroll_pos_for_down = scroll_position_for_drag.clone();
-                    let drag_start_y_for_down = drag_start_y_for_render.clone();
-                    let drag_start_scroll_for_down = drag_start_scroll_for_render.clone();
-                    let is_dragging_for_drag = is_dragging_for_render.clone();
-                    let drag_start_y_for_drag = drag_start_y_for_render.clone();
-                    let drag_start_scroll_for_drag = drag_start_scroll_for_render.clone();
-                    let scroll_pos_for_drag = scroll_position_for_drag.clone();
-                    let is_dragging_for_end = is_dragging_for_render.clone();
-
-                    // Build scrollbar thumb with drag handlers
-                    let thumb = div()
-                        .absolute()
-                        .right(2.0)
-                        .top(thumb_offset)
-                        .w(bar_width)
-                        .h(thumb_height)
-                        .rounded(bar_width / 2.0)
-                        .bg(thumb_color)
-                        .cursor(CursorStyle::Grab)
-                        .on_mouse_down(move |event| {
-                            drag_start_y_for_down.set(event.mouse_y);
-                            drag_start_scroll_for_down.set(scroll_pos_for_down.get());
-                        })
-                        .on_drag(move |event| {
-                            is_dragging_for_drag.set(true);
-                            let start_y = drag_start_y_for_drag.get();
-                            let delta_y = event.mouse_y - start_y;
-
-                            // Convert thumb drag to scroll position
-                            let scroll_delta = if max_thumb_travel > 0.0 {
-                                (delta_y / max_thumb_travel) * scroll_range
-                            } else {
-                                0.0
-                            };
-
-                            let start_scroll = drag_start_scroll_for_drag.get();
-                            let new_scroll = (start_scroll - scroll_delta).clamp(-scroll_range, 0.0);
-                            scroll_pos_for_drag.set(new_scroll);
-                        })
-                        .on_drag_end(move |_| {
-                            is_dragging_for_end.set(false);
-                        });
-
-                    // Build scrollbar track
-                    let track = div()
-                        .absolute()
-                        .right(0.0)
-                        .top(0.0)
-                        .bottom(0.0)
-                        .w(bar_width + 4.0)
-                        .bg(track_color)
-                        .rounded(bar_width / 2.0)
-                        .child(thumb);
-
-                    // Wrap track with opacity animation
-                    let animated_track =
-                        motion().opacity(opacity_anim_for_render.clone()).child(track);
-
-                    // Build container with scroll and animated scrollbar
-                    div()
-                        .w(viewport_width)
-                        .h(viewport_height)
-                        .relative()
-                        .overflow_clip()
-                        .on_hover_enter({
-                            let is_hovered = is_hovered_enter.clone();
-                            move |_| {
-                                is_hovered.set(true);
-                            }
-                        })
-                        .on_hover_leave({
-                            let is_hovered = is_hovered_leave.clone();
-                            move |_| {
-                                is_hovered.set(false);
-                            }
-                        })
-                        .child(
-                            scroll()
-                                .w(viewport_width)
-                                .h(viewport_height)
-                                .direction(direction)
-                                .bounce(bounce),
-                        )
-                        .child(animated_track)
-                });
-
-            Self {
-                inner: Box::new(inner),
-            }
+            scroll_widget = scroll_widget.scrollbar_size(config.size.to_layout());
         }
+
+        // Apply corner radius
+        if let Some(radius) = config.rounded {
+            scroll_widget = scroll_widget.rounded(radius);
+        }
+
+        // Apply background color
+        if let Some(bg) = config.bg {
+            scroll_widget = scroll_widget.bg(bg);
+        }
+
+        // Add content if provided
+        if let Some(content) = config.content {
+            scroll_widget = scroll_widget.child(content);
+        }
+
+        Self { inner: scroll_widget }
     }
 }
 
 /// Scroll Area component with customizable scrollbar
 pub struct ScrollArea {
-    inner: Box<dyn ElementBuilder>,
+    inner: Scroll,
 }
 
 impl ElementBuilder for ScrollArea {
@@ -470,12 +226,15 @@ impl ElementBuilder for ScrollArea {
     fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
         self.inner.children_builders()
     }
+
+    fn event_handlers(&self) -> Option<&blinc_layout::event_handler::EventHandlers> {
+        self.inner.event_handlers()
+    }
 }
 
 /// Builder for scroll area
 pub struct ScrollAreaBuilder {
-    config: ScrollAreaConfig,
-    key: InstanceKey,
+    config: RefCell<ScrollAreaConfig>,
     built: OnceCell<ScrollArea>,
 }
 
@@ -484,111 +243,121 @@ impl ScrollAreaBuilder {
     #[track_caller]
     pub fn new() -> Self {
         Self {
-            config: ScrollAreaConfig::default(),
-            key: InstanceKey::new("scroll_area"),
+            config: RefCell::new(ScrollAreaConfig::default()),
             built: OnceCell::new(),
         }
     }
 
     fn get_or_build(&self) -> &ScrollArea {
         self.built.get_or_init(|| {
-            let built = BuiltScrollArea::from_config(&self.config, &self.key);
-            ScrollArea {
-                inner: built.inner,
-            }
+            // Take ownership of config, replacing with default
+            let config = self.config.take();
+            let built = BuiltScrollArea::from_config(config);
+            ScrollArea { inner: built.inner }
         })
     }
 
     /// Set scrollbar visibility mode
-    pub fn scrollbar(mut self, visibility: ScrollbarVisibility) -> Self {
-        self.config.visibility = visibility;
+    pub fn scrollbar(self, visibility: ScrollbarVisibility) -> Self {
+        self.config.borrow_mut().visibility = visibility;
         self
     }
 
     /// Set scroll direction
-    pub fn direction(mut self, direction: ScrollDirection) -> Self {
-        self.config.direction = direction;
+    pub fn direction(self, direction: ScrollDirection) -> Self {
+        self.config.borrow_mut().direction = direction;
         self
     }
 
     /// Set to vertical scrolling (default)
-    pub fn vertical(mut self) -> Self {
-        self.config.direction = ScrollDirection::Vertical;
+    pub fn vertical(self) -> Self {
+        self.config.borrow_mut().direction = ScrollDirection::Vertical;
         self
     }
 
     /// Set to horizontal scrolling
-    pub fn horizontal(mut self) -> Self {
-        self.config.direction = ScrollDirection::Horizontal;
+    pub fn horizontal(self) -> Self {
+        self.config.borrow_mut().direction = ScrollDirection::Horizontal;
         self
     }
 
     /// Set to scroll in both directions
-    pub fn both_directions(mut self) -> Self {
-        self.config.direction = ScrollDirection::Both;
+    pub fn both_directions(self) -> Self {
+        self.config.borrow_mut().direction = ScrollDirection::Both;
         self
     }
 
     /// Set scrollbar size preset
-    pub fn size(mut self, size: ScrollAreaSize) -> Self {
-        self.config.size = size;
+    pub fn size(self, size: ScrollAreaSize) -> Self {
+        self.config.borrow_mut().size = size;
         self
     }
 
     /// Set custom scrollbar width
-    pub fn scrollbar_width(mut self, width: f32) -> Self {
-        self.config.scrollbar_width = Some(width);
+    pub fn scrollbar_width(self, width: f32) -> Self {
+        self.config.borrow_mut().scrollbar_width = Some(width);
         self
     }
 
     /// Set scrollbar thumb color
-    pub fn thumb_color(mut self, color: impl Into<Color>) -> Self {
-        self.config.thumb_color = Some(color.into());
+    pub fn thumb_color(self, color: impl Into<Color>) -> Self {
+        self.config.borrow_mut().thumb_color = Some(color.into());
         self
     }
 
     /// Set scrollbar track color
-    pub fn track_color(mut self, color: impl Into<Color>) -> Self {
-        self.config.track_color = Some(color.into());
+    pub fn track_color(self, color: impl Into<Color>) -> Self {
+        self.config.borrow_mut().track_color = Some(color.into());
         self
     }
 
     /// Set viewport width
-    pub fn w(mut self, width: f32) -> Self {
-        self.config.width = Some(width);
+    pub fn w(self, width: f32) -> Self {
+        self.config.borrow_mut().width = Some(width);
         self
     }
 
     /// Set viewport height
-    pub fn h(mut self, height: f32) -> Self {
-        self.config.height = Some(height);
+    pub fn h(self, height: f32) -> Self {
+        self.config.borrow_mut().height = Some(height);
         self
     }
 
     /// Enable or disable bounce physics
-    pub fn bounce(mut self, enabled: bool) -> Self {
-        self.config.bounce = enabled;
+    pub fn bounce(self, enabled: bool) -> Self {
+        self.config.borrow_mut().bounce = enabled;
         self
     }
 
     /// Disable bounce physics
-    pub fn no_bounce(mut self) -> Self {
-        self.config.bounce = false;
+    pub fn no_bounce(self) -> Self {
+        self.config.borrow_mut().bounce = false;
+        self
+    }
+
+    /// Set corner radius
+    pub fn rounded(self, radius: f32) -> Self {
+        self.config.borrow_mut().rounded = Some(radius);
+        self
+    }
+
+    /// Set background color
+    pub fn bg(self, color: impl Into<Color>) -> Self {
+        self.config.borrow_mut().bg = Some(color.into());
         self
     }
 
     /// Set the scrollable content
-    pub fn child(mut self, content: impl ElementBuilder + 'static) -> Self {
-        self.config.content = Some(Box::new(content));
+    pub fn child(self, content: Div) -> Self {
+        self.config.borrow_mut().content = Some(content);
         self
     }
 
     /// Build the final ScrollArea component
     pub fn build_final(self) -> ScrollArea {
-        let built = BuiltScrollArea::from_config(&self.config, &self.key);
-        ScrollArea {
-            inner: built.inner,
-        }
+        let config = self.config.into_inner();
+        let built = BuiltScrollArea::from_config(config);
+        ScrollArea { inner: built.inner }
     }
 }
 
@@ -609,6 +378,10 @@ impl ElementBuilder for ScrollAreaBuilder {
 
     fn children_builders(&self) -> &[Box<dyn ElementBuilder>] {
         self.get_or_build().children_builders()
+    }
+
+    fn event_handlers(&self) -> Option<&blinc_layout::event_handler::EventHandlers> {
+        self.get_or_build().event_handlers()
     }
 }
 
@@ -670,9 +443,10 @@ mod tests {
             .h(500.0)
             .w(300.0);
 
-        assert_eq!(builder.config.visibility, ScrollbarVisibility::Always);
-        assert_eq!(builder.config.size, ScrollAreaSize::Large);
-        assert_eq!(builder.config.height, Some(500.0));
-        assert_eq!(builder.config.width, Some(300.0));
+        let config = builder.config.borrow();
+        assert_eq!(config.visibility, ScrollbarVisibility::Always);
+        assert_eq!(config.size, ScrollAreaSize::Large);
+        assert_eq!(config.height, Some(500.0));
+        assert_eq!(config.width, Some(300.0));
     }
 }

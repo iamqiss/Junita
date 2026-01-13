@@ -90,7 +90,8 @@ pub use text_area::{
 // Re-export scroll widget
 pub use scroll::{
     scroll, scroll_no_bounce, Scroll, ScrollConfig, ScrollDirection, ScrollPhysics,
-    ScrollRenderInfo, SharedScrollPhysics,
+    ScrollRenderInfo, ScrollbarConfig, ScrollbarRenderInfo, ScrollbarSize, ScrollbarState,
+    ScrollbarVisibility, SharedScrollPhysics,
 };
 
 // Re-export cursor widget (canvas-based smooth cursor)

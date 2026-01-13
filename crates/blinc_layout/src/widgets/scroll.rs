@@ -60,6 +60,167 @@ pub enum ScrollDirection {
 }
 
 // ============================================================================
+// Scrollbar Types
+// ============================================================================
+
+/// Scrollbar visibility modes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollbarVisibility {
+    /// Always show scrollbar (like classic Windows style)
+    Always,
+    /// Show scrollbar only when hovering over the scroll area
+    Hover,
+    /// Show when scrolling, auto-dismiss after inactivity (like macOS)
+    #[default]
+    Auto,
+    /// Never show scrollbar (content still scrollable)
+    Never,
+}
+
+/// Scrollbar interaction state (FSM for scrollbar UI)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollbarState {
+    /// Scrollbar is not interacted with
+    #[default]
+    Idle,
+    /// Mouse is hovering over the scrollbar track
+    TrackHovered,
+    /// Mouse is hovering over the scrollbar thumb
+    ThumbHovered,
+    /// Scrollbar thumb is being dragged
+    Dragging,
+    /// Scrollbar is visible due to active scrolling
+    Scrolling,
+    /// Scrollbar is fading out (auto-dismiss)
+    FadingOut,
+}
+
+impl ScrollbarState {
+    /// Check if the scrollbar should be visible
+    pub fn is_visible(&self) -> bool {
+        !matches!(self, ScrollbarState::Idle)
+    }
+
+    /// Check if the scrollbar is being actively interacted with
+    pub fn is_interacting(&self) -> bool {
+        matches!(
+            self,
+            ScrollbarState::ThumbHovered | ScrollbarState::Dragging
+        )
+    }
+
+    /// Get opacity value for the scrollbar (0.0 to 1.0)
+    pub fn opacity(&self) -> f32 {
+        match self {
+            ScrollbarState::Idle => 0.0,
+            ScrollbarState::FadingOut => 0.3, // Partial visibility during fade
+            ScrollbarState::TrackHovered => 0.6,
+            ScrollbarState::Scrolling => 0.7,
+            ScrollbarState::ThumbHovered => 0.9,
+            ScrollbarState::Dragging => 1.0,
+        }
+    }
+}
+
+/// Size presets for scrollbar
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScrollbarSize {
+    /// Thin scrollbar (4px)
+    Thin,
+    /// Normal scrollbar (6px)
+    #[default]
+    Normal,
+    /// Wide scrollbar (10px)
+    Wide,
+}
+
+impl ScrollbarSize {
+    /// Get the width in pixels
+    pub fn width(&self) -> f32 {
+        match self {
+            ScrollbarSize::Thin => 4.0,
+            ScrollbarSize::Normal => 6.0,
+            ScrollbarSize::Wide => 10.0,
+        }
+    }
+}
+
+/// Configuration for scrollbar appearance and behavior
+#[derive(Debug, Clone, Copy)]
+pub struct ScrollbarConfig {
+    /// Visibility mode
+    pub visibility: ScrollbarVisibility,
+    /// Scrollbar size preset (or use custom_width)
+    pub size: ScrollbarSize,
+    /// Custom width override (takes precedence over size)
+    pub custom_width: Option<f32>,
+    /// Thumb color (RGBA)
+    pub thumb_color: [f32; 4],
+    /// Thumb color when hovered
+    pub thumb_hover_color: [f32; 4],
+    /// Track color (RGBA)
+    pub track_color: [f32; 4],
+    /// Corner radius for thumb (fraction of width, 0.0-0.5)
+    pub corner_radius: f32,
+    /// Padding from edge of scroll container
+    pub edge_padding: f32,
+    /// Auto-dismiss delay in seconds (for Auto visibility mode)
+    pub auto_dismiss_delay: f32,
+    /// Minimum thumb length in pixels
+    pub min_thumb_length: f32,
+}
+
+impl Default for ScrollbarConfig {
+    fn default() -> Self {
+        Self {
+            visibility: ScrollbarVisibility::Auto,
+            size: ScrollbarSize::Normal,
+            custom_width: None,
+            // Semi-transparent gray thumb
+            thumb_color: [0.5, 0.5, 0.5, 0.5],
+            thumb_hover_color: [0.6, 0.6, 0.6, 0.8],
+            // Very subtle track
+            track_color: [0.5, 0.5, 0.5, 0.1],
+            corner_radius: 0.5, // Fully rounded by default
+            edge_padding: 2.0,
+            auto_dismiss_delay: 1.5, // 1.5 seconds like macOS
+            min_thumb_length: 30.0,
+        }
+    }
+}
+
+impl ScrollbarConfig {
+    /// Create config with always-visible scrollbar
+    pub fn always_visible() -> Self {
+        Self {
+            visibility: ScrollbarVisibility::Always,
+            ..Default::default()
+        }
+    }
+
+    /// Create config with hover-triggered scrollbar
+    pub fn show_on_hover() -> Self {
+        Self {
+            visibility: ScrollbarVisibility::Hover,
+            ..Default::default()
+        }
+    }
+
+    /// Create config with hidden scrollbar
+    pub fn hidden() -> Self {
+        Self {
+            visibility: ScrollbarVisibility::Never,
+            ..Default::default()
+        }
+    }
+
+    /// Get the actual scrollbar width
+    pub fn width(&self) -> f32 {
+        self.custom_width.unwrap_or_else(|| self.size.width())
+    }
+}
+
+// ============================================================================
 // Scroll Configuration
 // ============================================================================
 
@@ -78,6 +239,8 @@ pub struct ScrollConfig {
     pub max_overscroll: f32,
     /// Scroll direction
     pub direction: ScrollDirection,
+    /// Scrollbar configuration
+    pub scrollbar: ScrollbarConfig,
 }
 
 impl Default for ScrollConfig {
@@ -92,6 +255,7 @@ impl Default for ScrollConfig {
             velocity_threshold: 10.0, // Stop when below 10 px/s
             max_overscroll: 0.3,      // 30% of viewport for visible elastic effect
             direction: ScrollDirection::Vertical,
+            scrollbar: ScrollbarConfig::default(),
         }
     }
 }
@@ -154,6 +318,30 @@ pub struct ScrollPhysics {
     pub config: ScrollConfig,
     /// Weak reference to animation scheduler for spring management
     scheduler: Weak<Mutex<AnimationScheduler>>,
+
+    // =========================================================================
+    // Scrollbar State
+    // =========================================================================
+    /// Current scrollbar interaction state
+    pub scrollbar_state: ScrollbarState,
+    /// Current scrollbar opacity (0.0 to 1.0, animated)
+    pub scrollbar_opacity: f32,
+    /// Target scrollbar opacity (for animation)
+    scrollbar_target_opacity: f32,
+    /// Whether the scroll area is being hovered
+    pub area_hovered: bool,
+    /// Time accumulator since last scroll activity (seconds)
+    pub idle_time: f32,
+    /// Vertical scrollbar thumb drag start position (mouse Y)
+    pub thumb_drag_start_y: f32,
+    /// Horizontal scrollbar thumb drag start position (mouse X)
+    pub thumb_drag_start_x: f32,
+    /// Scroll offset at drag start (Y)
+    pub thumb_drag_start_scroll_y: f32,
+    /// Scroll offset at drag start (X)
+    pub thumb_drag_start_scroll_x: f32,
+    /// Spring ID for scrollbar opacity animation
+    scrollbar_opacity_spring: Option<SpringId>,
 }
 
 impl Default for ScrollPhysics {
@@ -172,8 +360,34 @@ impl Default for ScrollPhysics {
             viewport_width: 0.0,
             config: ScrollConfig::default(),
             scheduler: Weak::new(),
+            // Scrollbar state
+            scrollbar_state: ScrollbarState::Idle,
+            scrollbar_opacity: 0.0,
+            scrollbar_target_opacity: 0.0,
+            area_hovered: false,
+            idle_time: 0.0,
+            thumb_drag_start_y: 0.0,
+            thumb_drag_start_x: 0.0,
+            thumb_drag_start_scroll_y: 0.0,
+            thumb_drag_start_scroll_x: 0.0,
+            scrollbar_opacity_spring: None,
         }
     }
+}
+
+/// Result of scrollbar hit testing
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollbarHitResult {
+    /// Not over any scrollbar
+    None,
+    /// Over vertical scrollbar track (but not thumb)
+    VerticalTrack,
+    /// Over vertical scrollbar thumb
+    VerticalThumb,
+    /// Over horizontal scrollbar track (but not thumb)
+    HorizontalTrack,
+    /// Over horizontal scrollbar thumb
+    HorizontalThumb,
 }
 
 impl ScrollPhysics {
@@ -659,6 +873,515 @@ impl ScrollPhysics {
             self.state = ScrollState::Bouncing;
         }
     }
+
+    // =========================================================================
+    // Scrollbar State Methods
+    // =========================================================================
+
+    /// Called when scroll area is hovered
+    pub fn on_area_hover_enter(&mut self) {
+        self.area_hovered = true;
+        self.update_scrollbar_visibility();
+    }
+
+    /// Called when scroll area hover ends
+    pub fn on_area_hover_leave(&mut self) {
+        self.area_hovered = false;
+        // Only hide if not dragging
+        if self.scrollbar_state != ScrollbarState::Dragging {
+            self.update_scrollbar_visibility();
+        }
+    }
+
+    /// Called when scrollbar track is hovered
+    pub fn on_scrollbar_track_hover(&mut self) {
+        if self.scrollbar_state != ScrollbarState::Dragging {
+            self.scrollbar_state = ScrollbarState::TrackHovered;
+            self.update_scrollbar_visibility();
+        }
+    }
+
+    /// Called when scrollbar thumb is hovered
+    pub fn on_scrollbar_thumb_hover(&mut self) {
+        if self.scrollbar_state != ScrollbarState::Dragging {
+            self.scrollbar_state = ScrollbarState::ThumbHovered;
+            self.update_scrollbar_visibility();
+        }
+    }
+
+    /// Called when scrollbar hover ends (mouse leaves track/thumb)
+    pub fn on_scrollbar_hover_leave(&mut self) {
+        if self.scrollbar_state != ScrollbarState::Dragging {
+            self.scrollbar_state = if self.area_hovered {
+                ScrollbarState::Scrolling
+            } else {
+                ScrollbarState::Idle
+            };
+            self.update_scrollbar_visibility();
+        }
+    }
+
+    /// Called when scrollbar thumb drag starts
+    ///
+    /// # Arguments
+    /// * `mouse_x` - Current mouse X position
+    /// * `mouse_y` - Current mouse Y position
+    pub fn on_scrollbar_drag_start(&mut self, mouse_x: f32, mouse_y: f32) {
+        self.scrollbar_state = ScrollbarState::Dragging;
+        self.thumb_drag_start_x = mouse_x;
+        self.thumb_drag_start_y = mouse_y;
+        self.thumb_drag_start_scroll_x = self.offset_x;
+        self.thumb_drag_start_scroll_y = self.offset_y;
+        self.update_scrollbar_visibility();
+    }
+
+    /// Called during scrollbar thumb drag
+    ///
+    /// # Arguments
+    /// * `mouse_x` - Current mouse X position
+    /// * `mouse_y` - Current mouse Y position
+    ///
+    /// # Returns
+    /// New scroll offset (x, y) that should be applied
+    pub fn on_scrollbar_drag(&mut self, mouse_x: f32, mouse_y: f32) -> (f32, f32) {
+        let delta_x = mouse_x - self.thumb_drag_start_x;
+        let delta_y = mouse_y - self.thumb_drag_start_y;
+
+        // Calculate thumb travel range and scroll range
+        let (thumb_travel_x, scroll_range_x) = self.thumb_travel_x();
+        let (thumb_travel_y, scroll_range_y) = self.thumb_travel_y();
+
+        // Convert thumb drag delta to scroll delta
+        let scroll_delta_x = if thumb_travel_x > 0.0 {
+            (delta_x / thumb_travel_x) * scroll_range_x
+        } else {
+            0.0
+        };
+        let scroll_delta_y = if thumb_travel_y > 0.0 {
+            (delta_y / thumb_travel_y) * scroll_range_y
+        } else {
+            0.0
+        };
+
+        // Calculate new scroll position (clamped to bounds)
+        let new_x = (self.thumb_drag_start_scroll_x - scroll_delta_x)
+            .clamp(self.max_offset_x(), self.min_offset_x());
+        let new_y = (self.thumb_drag_start_scroll_y - scroll_delta_y)
+            .clamp(self.max_offset_y(), self.min_offset_y());
+
+        (new_x, new_y)
+    }
+
+    /// Called when scrollbar thumb drag ends
+    pub fn on_scrollbar_drag_end(&mut self) {
+        self.scrollbar_state = if self.area_hovered {
+            ScrollbarState::Scrolling
+        } else {
+            ScrollbarState::FadingOut
+        };
+        self.idle_time = 0.0;
+        self.update_scrollbar_visibility();
+    }
+
+    /// Called when scroll activity occurs (shows scrollbar in Auto mode)
+    pub fn on_scroll_activity(&mut self) {
+        self.idle_time = 0.0;
+        if self.scrollbar_state == ScrollbarState::Idle
+            || self.scrollbar_state == ScrollbarState::FadingOut
+        {
+            self.scrollbar_state = ScrollbarState::Scrolling;
+        }
+        self.update_scrollbar_visibility();
+    }
+
+    /// Update scrollbar visibility based on current state and config
+    fn update_scrollbar_visibility(&mut self) {
+        let target = match self.config.scrollbar.visibility {
+            ScrollbarVisibility::Always => 1.0,
+            ScrollbarVisibility::Never => 0.0,
+            ScrollbarVisibility::Hover => {
+                if self.area_hovered || self.scrollbar_state.is_interacting() {
+                    self.scrollbar_state.opacity()
+                } else {
+                    0.0
+                }
+            }
+            ScrollbarVisibility::Auto => {
+                if self.scrollbar_state == ScrollbarState::Idle {
+                    0.0
+                } else {
+                    self.scrollbar_state.opacity()
+                }
+            }
+        };
+
+        self.scrollbar_target_opacity = target;
+
+        // Animate opacity using spring if scheduler available
+        if let Some(scheduler_arc) = self.scheduler.upgrade() {
+            let mut scheduler = scheduler_arc.lock().unwrap();
+
+            // Remove existing spring if any
+            if let Some(spring_id) = self.scrollbar_opacity_spring.take() {
+                scheduler.remove_spring(spring_id);
+            }
+
+            // Create new spring for smooth opacity transition
+            if (self.scrollbar_opacity - target).abs() > 0.01 {
+                let spring_config = SpringConfig::new(300.0, 25.0, 1.0); // Gentle animation
+                let mut spring = Spring::new(spring_config, self.scrollbar_opacity);
+                spring.set_target(target);
+                let spring_id = scheduler.add_spring(spring);
+                self.scrollbar_opacity_spring = Some(spring_id);
+            } else {
+                self.scrollbar_opacity = target;
+            }
+        } else {
+            // No scheduler - instant transition
+            self.scrollbar_opacity = target;
+        }
+    }
+
+    /// Tick scrollbar animation (call from main tick)
+    ///
+    /// # Arguments
+    /// * `dt` - Delta time in seconds
+    ///
+    /// # Returns
+    /// true if scrollbar animation is still active
+    pub fn tick_scrollbar(&mut self, dt: f32) -> bool {
+        let mut animating = false;
+
+        // Auto-detect scrolling activity from physics state
+        // This shows the scrollbar even if scroll events don't go through handlers
+        if self.state == ScrollState::Scrolling || self.state == ScrollState::Bouncing {
+            if self.scrollbar_state == ScrollbarState::Idle
+                || self.scrollbar_state == ScrollbarState::FadingOut
+            {
+                self.scrollbar_state = ScrollbarState::Scrolling;
+                self.idle_time = 0.0;
+                self.update_scrollbar_visibility();
+            }
+        }
+
+        // Update idle timer for auto-dismiss
+        if self.scrollbar_state == ScrollbarState::Scrolling
+            || self.scrollbar_state == ScrollbarState::FadingOut
+        {
+            self.idle_time += dt;
+
+            // Check for auto-dismiss timeout
+            // For Auto mode: fade after inactivity regardless of hover (unless interacting)
+            // For Hover mode: don't fade while hovered
+            let should_fade = match self.config.scrollbar.visibility {
+                ScrollbarVisibility::Auto => {
+                    self.idle_time >= self.config.scrollbar.auto_dismiss_delay
+                        && !self.scrollbar_state.is_interacting()
+                }
+                ScrollbarVisibility::Hover => {
+                    self.idle_time >= self.config.scrollbar.auto_dismiss_delay
+                        && !self.area_hovered
+                        && !self.scrollbar_state.is_interacting()
+                }
+                _ => false,
+            };
+
+            if should_fade && self.scrollbar_state != ScrollbarState::FadingOut {
+                self.scrollbar_state = ScrollbarState::FadingOut;
+                self.update_scrollbar_visibility();
+            }
+
+            // Transition to Idle when fully faded
+            if self.scrollbar_state == ScrollbarState::FadingOut
+                && self.scrollbar_opacity < 0.01
+            {
+                self.scrollbar_state = ScrollbarState::Idle;
+                self.scrollbar_opacity = 0.0;
+            }
+        }
+
+        // Read opacity spring value if animating
+        if let Some(scheduler_arc) = self.scheduler.upgrade() {
+            let scheduler = scheduler_arc.lock().unwrap();
+            if let Some(spring_id) = self.scrollbar_opacity_spring {
+                if let Some(spring) = scheduler.get_spring(spring_id) {
+                    self.scrollbar_opacity = spring.value();
+                    if !spring.is_settled() {
+                        animating = true;
+                    } else {
+                        self.scrollbar_opacity = spring.target();
+                    }
+                }
+            }
+        }
+
+        animating
+    }
+
+    /// Calculate thumb dimensions for vertical scrollbar
+    ///
+    /// # Returns
+    /// (thumb_height, thumb_y_position) in pixels
+    pub fn thumb_dimensions_y(&self) -> (f32, f32) {
+        let viewport = self.viewport_height;
+        let content = self.content_height.max(viewport);
+        let scroll_ratio = viewport / content;
+
+        // Calculate thumb height (with minimum)
+        let thumb_height = (scroll_ratio * viewport)
+            .max(self.config.scrollbar.min_thumb_length)
+            .min(viewport - self.config.scrollbar.edge_padding * 2.0);
+
+        // Calculate thumb position
+        let max_scroll = (content - viewport).max(0.0);
+        let scroll_progress = if max_scroll > 0.0 {
+            (-self.offset_y / max_scroll).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        let track_height = viewport - self.config.scrollbar.edge_padding * 2.0;
+        let max_thumb_travel = track_height - thumb_height;
+        let thumb_y = self.config.scrollbar.edge_padding + (scroll_progress * max_thumb_travel);
+
+        (thumb_height, thumb_y)
+    }
+
+    /// Calculate thumb dimensions for horizontal scrollbar
+    ///
+    /// # Returns
+    /// (thumb_width, thumb_x_position) in pixels
+    pub fn thumb_dimensions_x(&self) -> (f32, f32) {
+        let viewport = self.viewport_width;
+        let content = self.content_width.max(viewport);
+        let scroll_ratio = viewport / content;
+
+        // Calculate thumb width (with minimum)
+        let thumb_width = (scroll_ratio * viewport)
+            .max(self.config.scrollbar.min_thumb_length)
+            .min(viewport - self.config.scrollbar.edge_padding * 2.0);
+
+        // Calculate thumb position
+        let max_scroll = (content - viewport).max(0.0);
+        let scroll_progress = if max_scroll > 0.0 {
+            (-self.offset_x / max_scroll).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        let track_width = viewport - self.config.scrollbar.edge_padding * 2.0;
+        let max_thumb_travel = track_width - thumb_width;
+        let thumb_x = self.config.scrollbar.edge_padding + (scroll_progress * max_thumb_travel);
+
+        (thumb_width, thumb_x)
+    }
+
+    /// Get vertical thumb travel range and scroll range
+    fn thumb_travel_y(&self) -> (f32, f32) {
+        let viewport = self.viewport_height;
+        let content = self.content_height.max(viewport);
+        let (thumb_height, _) = self.thumb_dimensions_y();
+
+        let track_height = viewport - self.config.scrollbar.edge_padding * 2.0;
+        let thumb_travel = track_height - thumb_height;
+        let scroll_range = (content - viewport).max(0.0);
+
+        (thumb_travel, scroll_range)
+    }
+
+    /// Get horizontal thumb travel range and scroll range
+    fn thumb_travel_x(&self) -> (f32, f32) {
+        let viewport = self.viewport_width;
+        let content = self.content_width.max(viewport);
+        let (thumb_width, _) = self.thumb_dimensions_x();
+
+        let track_width = viewport - self.config.scrollbar.edge_padding * 2.0;
+        let thumb_travel = track_width - thumb_width;
+        let scroll_range = (content - viewport).max(0.0);
+
+        (thumb_travel, scroll_range)
+    }
+
+    /// Check if content is scrollable vertically
+    pub fn can_scroll_y(&self) -> bool {
+        self.content_height > self.viewport_height
+    }
+
+    /// Check if content is scrollable horizontally
+    pub fn can_scroll_x(&self) -> bool {
+        self.content_width > self.viewport_width
+    }
+
+    /// Hit test a point against the scrollbar
+    ///
+    /// Takes coordinates relative to the scroll container (local space).
+    /// Returns what part of the scrollbar (if any) the point is over.
+    pub fn hit_test_scrollbar(&self, local_x: f32, local_y: f32) -> ScrollbarHitResult {
+        let config = &self.config.scrollbar;
+        let scrollbar_width = config.width();
+        let edge_padding = config.edge_padding;
+
+        // Check vertical scrollbar (right edge)
+        if self.can_scroll_y()
+            && matches!(
+                self.config.direction,
+                ScrollDirection::Vertical | ScrollDirection::Both
+            )
+        {
+            let track_x = self.viewport_width - scrollbar_width - edge_padding;
+            let track_y = edge_padding;
+            let track_height = self.viewport_height - edge_padding * 2.0;
+
+            // Check if in vertical track area
+            if local_x >= track_x
+                && local_x <= track_x + scrollbar_width
+                && local_y >= track_y
+                && local_y <= track_y + track_height
+            {
+                // Check if over thumb
+                let (thumb_height, thumb_y) = self.thumb_dimensions_y();
+                if local_y >= thumb_y && local_y <= thumb_y + thumb_height {
+                    return ScrollbarHitResult::VerticalThumb;
+                }
+                return ScrollbarHitResult::VerticalTrack;
+            }
+        }
+
+        // Check horizontal scrollbar (bottom edge)
+        if self.can_scroll_x()
+            && matches!(
+                self.config.direction,
+                ScrollDirection::Horizontal | ScrollDirection::Both
+            )
+        {
+            let track_x = edge_padding;
+            let track_y = self.viewport_height - scrollbar_width - edge_padding;
+            let track_width = self.viewport_width - edge_padding * 2.0;
+
+            // Check if in horizontal track area
+            if local_x >= track_x
+                && local_x <= track_x + track_width
+                && local_y >= track_y
+                && local_y <= track_y + scrollbar_width
+            {
+                // Check if over thumb
+                let (thumb_width, thumb_x) = self.thumb_dimensions_x();
+                if local_x >= thumb_x && local_x <= thumb_x + thumb_width {
+                    return ScrollbarHitResult::HorizontalThumb;
+                }
+                return ScrollbarHitResult::HorizontalTrack;
+            }
+        }
+
+        ScrollbarHitResult::None
+    }
+
+    /// Handle pointer down on scrollbar
+    ///
+    /// Returns true if the event was handled (pointer was over scrollbar).
+    pub fn on_scrollbar_pointer_down(&mut self, local_x: f32, local_y: f32) -> bool {
+        let hit = self.hit_test_scrollbar(local_x, local_y);
+        match hit {
+            ScrollbarHitResult::VerticalThumb | ScrollbarHitResult::HorizontalThumb => {
+                self.on_scrollbar_drag_start(local_x, local_y);
+                true
+            }
+            ScrollbarHitResult::VerticalTrack => {
+                // Click on track - jump to that position
+                let (thumb_height, _) = self.thumb_dimensions_y();
+                let track_height =
+                    self.viewport_height - self.config.scrollbar.edge_padding * 2.0;
+                let click_ratio =
+                    (local_y - self.config.scrollbar.edge_padding - thumb_height / 2.0)
+                        / (track_height - thumb_height);
+                let click_ratio = click_ratio.clamp(0.0, 1.0);
+                let max_scroll = (self.content_height - self.viewport_height).max(0.0);
+                self.offset_y = -click_ratio * max_scroll;
+                self.on_scroll_activity();
+                true
+            }
+            ScrollbarHitResult::HorizontalTrack => {
+                // Click on track - jump to that position
+                let (thumb_width, _) = self.thumb_dimensions_x();
+                let track_width = self.viewport_width - self.config.scrollbar.edge_padding * 2.0;
+                let click_ratio =
+                    (local_x - self.config.scrollbar.edge_padding - thumb_width / 2.0)
+                        / (track_width - thumb_width);
+                let click_ratio = click_ratio.clamp(0.0, 1.0);
+                let max_scroll = (self.content_width - self.viewport_width).max(0.0);
+                self.offset_x = -click_ratio * max_scroll;
+                self.on_scroll_activity();
+                true
+            }
+            ScrollbarHitResult::None => false,
+        }
+    }
+
+    /// Handle pointer move during scrollbar drag
+    ///
+    /// Returns Some((new_offset_x, new_offset_y)) if dragging, None otherwise.
+    pub fn on_scrollbar_pointer_move(&mut self, local_x: f32, local_y: f32) -> Option<(f32, f32)> {
+        if self.scrollbar_state == ScrollbarState::Dragging {
+            let (new_x, new_y) = self.on_scrollbar_drag(local_x, local_y);
+            self.offset_x = new_x;
+            self.offset_y = new_y;
+            Some((new_x, new_y))
+        } else {
+            // Update hover state
+            let hit = self.hit_test_scrollbar(local_x, local_y);
+            match hit {
+                ScrollbarHitResult::VerticalThumb | ScrollbarHitResult::HorizontalThumb => {
+                    self.on_scrollbar_thumb_hover();
+                }
+                ScrollbarHitResult::VerticalTrack | ScrollbarHitResult::HorizontalTrack => {
+                    self.on_scrollbar_track_hover();
+                }
+                ScrollbarHitResult::None => {
+                    if self.scrollbar_state == ScrollbarState::ThumbHovered
+                        || self.scrollbar_state == ScrollbarState::TrackHovered
+                    {
+                        self.on_scrollbar_hover_leave();
+                    }
+                }
+            }
+            None
+        }
+    }
+
+    /// Handle pointer up during scrollbar drag
+    pub fn on_scrollbar_pointer_up(&mut self) {
+        if self.scrollbar_state == ScrollbarState::Dragging {
+            self.on_scrollbar_drag_end();
+        }
+    }
+
+    /// Get current scrollbar render info
+    pub fn scrollbar_render_info(&self) -> ScrollbarRenderInfo {
+        let (thumb_height, thumb_y) = self.thumb_dimensions_y();
+        let (thumb_width, thumb_x) = self.thumb_dimensions_x();
+
+        ScrollbarRenderInfo {
+            state: self.scrollbar_state,
+            opacity: self.scrollbar_opacity,
+            config: self.config.scrollbar,
+            // Vertical scrollbar
+            show_vertical: self.can_scroll_y()
+                && matches!(
+                    self.config.direction,
+                    ScrollDirection::Vertical | ScrollDirection::Both
+                ),
+            vertical_thumb_height: thumb_height,
+            vertical_thumb_y: thumb_y,
+            // Horizontal scrollbar
+            show_horizontal: self.can_scroll_x()
+                && matches!(
+                    self.config.direction,
+                    ScrollDirection::Horizontal | ScrollDirection::Both
+                ),
+            horizontal_thumb_width: thumb_width,
+            horizontal_thumb_x: thumb_x,
+        }
+    }
 }
 
 // ============================================================================
@@ -667,6 +1390,49 @@ impl ScrollPhysics {
 
 /// Shared handle to scroll physics for external access
 pub type SharedScrollPhysics = Arc<Mutex<ScrollPhysics>>;
+
+// ============================================================================
+// Scrollbar Render Info (for renderer)
+// ============================================================================
+
+/// Information about scrollbar state for rendering
+#[derive(Debug, Clone, Copy)]
+pub struct ScrollbarRenderInfo {
+    /// Current scrollbar interaction state
+    pub state: ScrollbarState,
+    /// Current opacity (0.0 to 1.0)
+    pub opacity: f32,
+    /// Scrollbar configuration
+    pub config: ScrollbarConfig,
+    /// Whether to show vertical scrollbar
+    pub show_vertical: bool,
+    /// Vertical thumb height in pixels
+    pub vertical_thumb_height: f32,
+    /// Vertical thumb Y position in pixels
+    pub vertical_thumb_y: f32,
+    /// Whether to show horizontal scrollbar
+    pub show_horizontal: bool,
+    /// Horizontal thumb width in pixels
+    pub horizontal_thumb_width: f32,
+    /// Horizontal thumb X position in pixels
+    pub horizontal_thumb_x: f32,
+}
+
+impl Default for ScrollbarRenderInfo {
+    fn default() -> Self {
+        Self {
+            state: ScrollbarState::Idle,
+            opacity: 0.0,
+            config: ScrollbarConfig::default(),
+            show_vertical: false,
+            vertical_thumb_height: 30.0,
+            vertical_thumb_y: 0.0,
+            show_horizontal: false,
+            horizontal_thumb_width: 30.0,
+            horizontal_thumb_x: 0.0,
+        }
+    }
+}
 
 // ============================================================================
 // Scroll Render Info (for renderer)
@@ -798,14 +1564,60 @@ impl Scroll {
     fn create_internal_handlers(physics: SharedScrollPhysics) -> EventHandlers {
         let mut handlers = EventHandlers::new();
 
-        // Internal handler that applies scroll delta to physics
+        // Internal handler that applies scroll delta to physics and shows scrollbar
         handlers.on_scroll({
             let physics = Arc::clone(&physics);
             move |ctx| {
-                physics
-                    .lock()
-                    .unwrap()
-                    .apply_scroll_delta(ctx.scroll_delta_x, ctx.scroll_delta_y);
+                let mut p = physics.lock().unwrap();
+                p.apply_scroll_delta(ctx.scroll_delta_x, ctx.scroll_delta_y);
+                // Show scrollbar when scrolling
+                p.on_scroll_activity();
+            }
+        });
+
+        // Show scrollbar on hover (for Hover visibility mode)
+        handlers.on_hover_enter({
+            let physics = Arc::clone(&physics);
+            move |_ctx| {
+                physics.lock().unwrap().on_area_hover_enter();
+            }
+        });
+
+        // Hide scrollbar on hover leave
+        handlers.on_hover_leave({
+            let physics = Arc::clone(&physics);
+            move |_ctx| {
+                physics.lock().unwrap().on_area_hover_leave();
+            }
+        });
+
+        // Handle pointer down on scrollbar (start drag or track click)
+        handlers.on_mouse_down({
+            let physics = Arc::clone(&physics);
+            move |ctx| {
+                let mut p = physics.lock().unwrap();
+                // Check if click is on scrollbar using local coordinates
+                p.on_scrollbar_pointer_down(ctx.local_x, ctx.local_y);
+            }
+        });
+
+        // Handle drag events for scrollbar dragging
+        handlers.on_drag({
+            let physics = Arc::clone(&physics);
+            move |ctx| {
+                let mut p = physics.lock().unwrap();
+                if p.scrollbar_state == ScrollbarState::Dragging {
+                    p.on_scrollbar_pointer_move(ctx.local_x, ctx.local_y);
+                }
+            }
+        });
+
+        // Handle drag end for scrollbar
+        handlers.on_drag_end({
+            let physics = Arc::clone(&physics);
+            move |_ctx| {
+                let mut p = physics.lock().unwrap();
+                p.on_scrollbar_pointer_up();
             }
         });
 
@@ -899,6 +1711,85 @@ impl Scroll {
     /// Set to free scrolling (both directions)
     pub fn both_directions(self) -> Self {
         self.direction(ScrollDirection::Both)
+    }
+
+    // =========================================================================
+    // Scrollbar Configuration
+    // =========================================================================
+
+    /// Set scrollbar visibility mode
+    pub fn scrollbar_visibility(self, visibility: ScrollbarVisibility) -> Self {
+        let mut physics = self.physics.lock().unwrap();
+        physics.config.scrollbar.visibility = visibility;
+        // Update visibility immediately so initial state is correct
+        physics.update_scrollbar_visibility();
+        drop(physics);
+        self
+    }
+
+    /// Always show scrollbar
+    pub fn scrollbar_always(self) -> Self {
+        self.scrollbar_visibility(ScrollbarVisibility::Always)
+    }
+
+    /// Show scrollbar on hover only
+    pub fn scrollbar_on_hover(self) -> Self {
+        self.scrollbar_visibility(ScrollbarVisibility::Hover)
+    }
+
+    /// Auto-show scrollbar when scrolling (default macOS style)
+    pub fn scrollbar_auto(self) -> Self {
+        self.scrollbar_visibility(ScrollbarVisibility::Auto)
+    }
+
+    /// Hide scrollbar completely
+    pub fn scrollbar_hidden(self) -> Self {
+        self.scrollbar_visibility(ScrollbarVisibility::Never)
+    }
+
+    /// Set scrollbar size preset
+    pub fn scrollbar_size(self, size: ScrollbarSize) -> Self {
+        self.physics.lock().unwrap().config.scrollbar.size = size;
+        self
+    }
+
+    /// Set thin scrollbar (4px)
+    pub fn scrollbar_thin(self) -> Self {
+        self.scrollbar_size(ScrollbarSize::Thin)
+    }
+
+    /// Set wide scrollbar (10px)
+    pub fn scrollbar_wide(self) -> Self {
+        self.scrollbar_size(ScrollbarSize::Wide)
+    }
+
+    /// Set custom scrollbar width
+    pub fn scrollbar_width(self, width: f32) -> Self {
+        self.physics.lock().unwrap().config.scrollbar.custom_width = Some(width);
+        self
+    }
+
+    /// Set scrollbar thumb color
+    pub fn scrollbar_thumb_color(self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        self.physics.lock().unwrap().config.scrollbar.thumb_color = [r, g, b, a];
+        self
+    }
+
+    /// Set scrollbar track color
+    pub fn scrollbar_track_color(self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        self.physics.lock().unwrap().config.scrollbar.track_color = [r, g, b, a];
+        self
+    }
+
+    /// Set scrollbar auto-dismiss delay in seconds
+    pub fn scrollbar_dismiss_delay(self, seconds: f32) -> Self {
+        self.physics.lock().unwrap().config.scrollbar.auto_dismiss_delay = seconds;
+        self
+    }
+
+    /// Get current scrollbar render info
+    pub fn scrollbar_info(&self) -> ScrollbarRenderInfo {
+        self.physics.lock().unwrap().scrollbar_render_info()
     }
 
     // =========================================================================
@@ -1689,5 +2580,209 @@ mod tests {
                 first_card_layout.location.x
             );
         }
+    }
+
+    // =========================================================================
+    // Scrollbar State Tests
+    // =========================================================================
+
+    #[test]
+    fn test_scrollbar_state_visibility() {
+        assert!(!ScrollbarState::Idle.is_visible());
+        assert!(ScrollbarState::TrackHovered.is_visible());
+        assert!(ScrollbarState::ThumbHovered.is_visible());
+        assert!(ScrollbarState::Dragging.is_visible());
+        assert!(ScrollbarState::Scrolling.is_visible());
+        assert!(ScrollbarState::FadingOut.is_visible());
+    }
+
+    #[test]
+    fn test_scrollbar_state_interacting() {
+        assert!(!ScrollbarState::Idle.is_interacting());
+        assert!(!ScrollbarState::TrackHovered.is_interacting());
+        assert!(ScrollbarState::ThumbHovered.is_interacting());
+        assert!(ScrollbarState::Dragging.is_interacting());
+        assert!(!ScrollbarState::Scrolling.is_interacting());
+        assert!(!ScrollbarState::FadingOut.is_interacting());
+    }
+
+    #[test]
+    fn test_scrollbar_state_opacity() {
+        assert_eq!(ScrollbarState::Idle.opacity(), 0.0);
+        assert!(ScrollbarState::Dragging.opacity() > ScrollbarState::ThumbHovered.opacity());
+        assert!(ScrollbarState::ThumbHovered.opacity() > ScrollbarState::Scrolling.opacity());
+        assert!(ScrollbarState::FadingOut.opacity() > 0.0);
+    }
+
+    #[test]
+    fn test_scrollbar_size_presets() {
+        assert_eq!(ScrollbarSize::Thin.width(), 4.0);
+        assert_eq!(ScrollbarSize::Normal.width(), 6.0);
+        assert_eq!(ScrollbarSize::Wide.width(), 10.0);
+    }
+
+    #[test]
+    fn test_scrollbar_config_default() {
+        let config = ScrollbarConfig::default();
+        assert_eq!(config.visibility, ScrollbarVisibility::Auto);
+        assert_eq!(config.size, ScrollbarSize::Normal);
+        assert!(config.custom_width.is_none());
+        assert!(config.auto_dismiss_delay > 0.0);
+        assert!(config.min_thumb_length > 0.0);
+    }
+
+    #[test]
+    fn test_scrollbar_config_presets() {
+        let always = ScrollbarConfig::always_visible();
+        assert_eq!(always.visibility, ScrollbarVisibility::Always);
+
+        let hover = ScrollbarConfig::show_on_hover();
+        assert_eq!(hover.visibility, ScrollbarVisibility::Hover);
+
+        let hidden = ScrollbarConfig::hidden();
+        assert_eq!(hidden.visibility, ScrollbarVisibility::Never);
+    }
+
+    #[test]
+    fn test_scrollbar_config_width() {
+        let mut config = ScrollbarConfig::default();
+        assert_eq!(config.width(), 6.0); // Normal size
+
+        config.size = ScrollbarSize::Thin;
+        assert_eq!(config.width(), 4.0);
+
+        config.custom_width = Some(12.0);
+        assert_eq!(config.width(), 12.0); // Custom takes precedence
+    }
+
+    #[test]
+    fn test_scrollbar_thumb_dimensions() {
+        let mut physics = ScrollPhysics::default();
+        physics.viewport_height = 400.0;
+        physics.content_height = 1000.0;
+        physics.viewport_width = 300.0;
+        physics.content_width = 600.0;
+
+        // Test vertical thumb
+        let (thumb_height, thumb_y) = physics.thumb_dimensions_y();
+        assert!(thumb_height >= physics.config.scrollbar.min_thumb_length);
+        assert!(thumb_height <= physics.viewport_height);
+        assert!(thumb_y >= 0.0);
+
+        // Test horizontal thumb
+        let (thumb_width, thumb_x) = physics.thumb_dimensions_x();
+        assert!(thumb_width >= physics.config.scrollbar.min_thumb_length);
+        assert!(thumb_width <= physics.viewport_width);
+        assert!(thumb_x >= 0.0);
+    }
+
+    #[test]
+    fn test_scrollbar_thumb_position_updates() {
+        let mut physics = ScrollPhysics::default();
+        physics.viewport_height = 400.0;
+        physics.content_height = 1000.0;
+
+        // At top
+        physics.offset_y = 0.0;
+        let (_, thumb_y_at_top) = physics.thumb_dimensions_y();
+
+        // Scroll to middle
+        physics.offset_y = -300.0; // Halfway through 600px scrollable
+        let (_, thumb_y_at_middle) = physics.thumb_dimensions_y();
+
+        // Scroll to bottom
+        physics.offset_y = -600.0;
+        let (_, thumb_y_at_bottom) = physics.thumb_dimensions_y();
+
+        // Thumb should move down as we scroll
+        assert!(thumb_y_at_middle > thumb_y_at_top);
+        assert!(thumb_y_at_bottom > thumb_y_at_middle);
+    }
+
+    #[test]
+    fn test_scrollbar_state_transitions() {
+        let mut physics = ScrollPhysics::default();
+        physics.viewport_height = 400.0;
+        physics.content_height = 1000.0;
+
+        // Initial state
+        assert_eq!(physics.scrollbar_state, ScrollbarState::Idle);
+        assert_eq!(physics.scrollbar_opacity, 0.0);
+
+        // Area hover enter
+        physics.on_area_hover_enter();
+        assert!(physics.area_hovered);
+
+        // Thumb hover
+        physics.on_scrollbar_thumb_hover();
+        assert_eq!(physics.scrollbar_state, ScrollbarState::ThumbHovered);
+
+        // Start drag
+        physics.on_scrollbar_drag_start(100.0, 100.0);
+        assert_eq!(physics.scrollbar_state, ScrollbarState::Dragging);
+        assert_eq!(physics.thumb_drag_start_y, 100.0);
+
+        // End drag
+        physics.on_scrollbar_drag_end();
+        assert_ne!(physics.scrollbar_state, ScrollbarState::Dragging);
+
+        // Area hover leave
+        physics.on_area_hover_leave();
+        assert!(!physics.area_hovered);
+    }
+
+    #[test]
+    fn test_scrollbar_can_scroll() {
+        let mut physics = ScrollPhysics::default();
+
+        // No content - can't scroll
+        physics.viewport_height = 400.0;
+        physics.content_height = 300.0;
+        assert!(!physics.can_scroll_y());
+
+        // More content than viewport - can scroll
+        physics.content_height = 1000.0;
+        assert!(physics.can_scroll_y());
+
+        // Same for horizontal
+        physics.viewport_width = 300.0;
+        physics.content_width = 200.0;
+        assert!(!physics.can_scroll_x());
+
+        physics.content_width = 600.0;
+        assert!(physics.can_scroll_x());
+    }
+
+    #[test]
+    fn test_scrollbar_render_info() {
+        let mut physics = ScrollPhysics::default();
+        physics.viewport_height = 400.0;
+        physics.content_height = 1000.0;
+        physics.viewport_width = 300.0;
+        physics.content_width = 300.0; // No horizontal scroll
+
+        let info = physics.scrollbar_render_info();
+
+        assert_eq!(info.state, ScrollbarState::Idle);
+        assert!(info.show_vertical); // Content > viewport
+        assert!(!info.show_horizontal); // Content == viewport
+        assert!(info.vertical_thumb_height > 0.0);
+    }
+
+    #[test]
+    fn test_scroll_builder_scrollbar_config() {
+        let s = scroll()
+            .h(400.0)
+            .scrollbar_always()
+            .scrollbar_thin()
+            .scrollbar_dismiss_delay(2.0);
+
+        let physics = s.physics.lock().unwrap();
+        assert_eq!(
+            physics.config.scrollbar.visibility,
+            ScrollbarVisibility::Always
+        );
+        assert_eq!(physics.config.scrollbar.size, ScrollbarSize::Thin);
+        assert_eq!(physics.config.scrollbar.auto_dismiss_delay, 2.0);
     }
 }
