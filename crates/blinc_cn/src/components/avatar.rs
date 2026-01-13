@@ -38,6 +38,7 @@ use std::cell::{OnceCell, RefCell};
 use blinc_core::Color;
 use blinc_layout::element::RenderProps;
 use blinc_layout::prelude::*;
+use blinc_layout::text::Text as TextElement;
 use blinc_layout::tree::{LayoutNodeId, LayoutTree};
 use blinc_theme::{ColorToken, RadiusToken, ThemeState};
 
@@ -141,7 +142,7 @@ impl AvatarStatus {
     fn color(&self, theme: &ThemeState) -> Color {
         match self {
             AvatarStatus::Online => theme.color(ColorToken::Success),
-            AvatarStatus::Offline => theme.color(ColorToken::TextMuted),
+            AvatarStatus::Offline => theme.color(ColorToken::TextTertiary),
             AvatarStatus::Away => theme.color(ColorToken::Warning),
             AvatarStatus::Busy => theme.color(ColorToken::Error),
         }
@@ -185,7 +186,7 @@ impl Default for AvatarConfig {
 
 /// Built avatar component
 struct BuiltAvatar {
-    inner: Div,
+    inner: Box<dyn ElementBuilder>,
 }
 
 impl BuiltAvatar {
@@ -197,10 +198,7 @@ impl BuiltAvatar {
         // Determine background and content
         let (background, content) = if let Some(ref src) = config.src {
             // Image avatar
-            let image = img(src)
-                .size(size_px, size_px)
-                .cover()
-                .rounded(radius);
+            let image = img(src).size(size_px, size_px).cover().rounded(radius);
             (None, AvatarContent::Image(image))
         } else if let Some(ref fallback_text) = config.fallback {
             // Fallback initials
@@ -217,7 +215,7 @@ impl BuiltAvatar {
                 .color(fg)
                 .no_wrap();
 
-            (Some(bg), AvatarContent::Text(initials))
+            (Some(bg), AvatarContent::Initials(initials))
         } else {
             // Empty fallback - show placeholder
             let bg = config
@@ -225,7 +223,7 @@ impl BuiltAvatar {
                 .unwrap_or_else(|| theme.color(ColorToken::Surface));
             let fg = config
                 .fallback_color
-                .unwrap_or_else(|| theme.color(ColorToken::TextMuted));
+                .unwrap_or_else(|| theme.color(ColorToken::TextTertiary));
 
             // Default user icon placeholder
             let placeholder = text("?")
@@ -234,54 +232,65 @@ impl BuiltAvatar {
                 .color(fg)
                 .no_wrap();
 
-            (Some(bg), AvatarContent::Text(placeholder))
+            (Some(bg), AvatarContent::Initials(placeholder))
         };
 
-        // Build the avatar container
-        let mut container = div()
+        // Build the inner avatar container (with clipping for image/initials)
+        let mut inner = div()
             .w(size_px)
             .h(size_px)
             .rounded(radius)
             .overflow_clip()
             .flex_row()
             .items_center()
-            .justify_center()
-            .relative();
+            .justify_center();
 
         // Apply background if needed (for fallback)
         if let Some(bg) = background {
-            container = container.bg(bg);
+            inner = inner.bg(bg);
         }
 
         // Add content
         match content {
             AvatarContent::Image(image) => {
-                container = container.child(image);
+                inner = inner.child(image);
             }
-            AvatarContent::Text(text_el) => {
-                container = container.child(text_el);
+            AvatarContent::Initials(text_el) => {
+                inner = inner.child(text_el);
             }
         }
 
-        // Add status indicator if present
-        if let Some(status) = config.status {
+        // If we have a status indicator, use foreground layer to render on top of images
+        let container = if let Some(status) = config.status {
             let status_size = config.size.status_size();
             let status_offset = config.size.status_offset();
             let status_color = status.color(&theme);
+            let border_color = theme.color(ColorToken::Background);
 
-            // Status indicator positioned at bottom-right
+            // Status indicator positioned at bottom-right of the circular avatar
+            // // Use foreground() to ensure it renders AFTER background-layer images
             let status_indicator = div()
                 .w(status_size)
                 .h(status_size)
-                .rounded(status_size / 2.0) // Always circular
+                .rounded_full()
                 .bg(status_color)
-                .border(2.0, theme.color(ColorToken::Background)) // Ring around indicator
+                // .border(2.0, border_color)
+                .shadow_sm()
                 .absolute()
                 .bottom(status_offset)
                 .right(status_offset);
 
-            container = container.child(status_indicator);
-        }
+            Box::new(
+                stack()
+                    .w(size_px)
+                    .h(size_px)
+                    .overflow_visible()
+                    .child(inner)
+                    .child(status_indicator),
+            ) as Box<dyn ElementBuilder>
+        } else {
+            Box::new(inner) as Box<dyn ElementBuilder>
+        };
 
         Self { inner: container }
     }
@@ -290,12 +299,12 @@ impl BuiltAvatar {
 /// Avatar content type
 enum AvatarContent {
     Image(Image),
-    Text(Text),
+    Initials(TextElement),
 }
 
 /// Avatar component
 pub struct Avatar {
-    inner: Div,
+    inner: Box<dyn ElementBuilder>,
 }
 
 impl ElementBuilder for Avatar {
@@ -550,6 +559,9 @@ impl BuiltAvatarGroup {
         let size_px = config.size.pixels();
         let overlap = config.overlap;
 
+        // Convert overlap pixels to margin units (1 unit = 4px)
+        let overlap_units = -overlap / 4.0;
+
         let mut container = div().flex_row().items_center();
 
         let total = config.avatars.len();
@@ -557,20 +569,26 @@ impl BuiltAvatarGroup {
         let remaining = total.saturating_sub(visible_count);
 
         // Add visible avatars with overlap
+        // Border adds 2px on each side, so total wrapper size is size_px + 4
+        let wrapper_size = size_px + 4.0;
+        let wrapper_radius = wrapper_size / 2.0;
+
         for (i, avatar) in config.avatars.into_iter().take(visible_count).enumerate() {
             // Each avatar after the first gets negative margin for overlap
-            let avatar_wrapper = if i > 0 {
-                div()
-                    .margin_left(Length::Px(-overlap))
-                    .border(2.0, theme.color(ColorToken::Background))
-                    .rounded(size_px / 2.0)
-                    .child_box(avatar)
-            } else {
-                div()
-                    .border(2.0, theme.color(ColorToken::Background))
-                    .rounded(size_px / 2.0)
-                    .child_box(avatar)
-            };
+            // No overflow_clip - let the avatar's own clipping handle it
+            let mut avatar_wrapper = div()
+                .w(wrapper_size)
+                .h(wrapper_size)
+                .rounded(wrapper_radius)
+                .border(2.0, theme.color(ColorToken::Background))
+                .flex_row()
+                .items_center()
+                .justify_center()
+                .child_box(avatar);
+
+            if i > 0 {
+                avatar_wrapper = avatar_wrapper.ml(overlap_units);
+            }
 
             container = container.child(avatar_wrapper);
         }
@@ -578,20 +596,20 @@ impl BuiltAvatarGroup {
         // Add "+N" indicator if there are remaining avatars
         if remaining > 0 {
             let remaining_indicator = div()
-                .w(size_px)
-                .h(size_px)
-                .rounded(size_px / 2.0)
+                .w(wrapper_size)
+                .h(wrapper_size)
+                .rounded(wrapper_radius)
                 .bg(theme.color(ColorToken::Surface))
                 .border(2.0, theme.color(ColorToken::Background))
                 .flex_row()
                 .items_center()
                 .justify_center()
-                .margin_left(Length::Px(-overlap))
+                .ml(overlap_units)
                 .child(
                     text(format!("+{}", remaining))
                         .size(config.size.font_size())
                         .weight(FontWeight::Medium)
-                        .color(theme.color(ColorToken::TextMuted))
+                        .color(theme.color(ColorToken::TextTertiary))
                         .no_wrap(),
                 );
 

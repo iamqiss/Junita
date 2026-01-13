@@ -124,6 +124,10 @@ pub use aspect_ratio::{
     aspect_ratio, aspect_ratio_16_9, aspect_ratio_21_9, aspect_ratio_4_3, aspect_ratio_9_16,
     aspect_ratio_square, AspectRatio, AspectRatioBuilder, AspectRatioPreset,
 };
+pub use avatar::{
+    avatar, avatar_group, Avatar, AvatarBuilder, AvatarGroup, AvatarGroupBuilder, AvatarShape,
+    AvatarSize, AvatarStatus,
+};
 pub use scroll_area::{
     scroll_area, ScrollArea, ScrollAreaBuilder, ScrollAreaSize, ScrollbarVisibility,
 };

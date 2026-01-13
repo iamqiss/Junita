@@ -54,7 +54,7 @@ Components for displaying data.
 
 | Component | Primitives Used | Status |
 |-----------|-----------------|--------|
-| **Avatar** | image, div, text | Planned |
+| **Avatar** | image, div, text | ✅ Done |
 | **Table** | div, scroll | Planned |
 | **Data Table** | table, scroll, sorting | Planned |
 | **Progress** | div | ✅ Done |

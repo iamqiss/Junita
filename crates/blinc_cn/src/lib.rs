@@ -103,6 +103,8 @@ pub mod cn {
         aspect_ratio, aspect_ratio_16_9, aspect_ratio_21_9, aspect_ratio_4_3, aspect_ratio_9_16,
         aspect_ratio_square,
     };
+    // Avatar
+    pub use crate::components::avatar::{avatar, avatar_group, AvatarShape, AvatarSize, AvatarStatus};
 }
 
 /// Prelude for convenient imports
@@ -214,6 +216,11 @@ pub mod prelude {
     pub use crate::components::aspect_ratio::{
         aspect_ratio, aspect_ratio_16_9, aspect_ratio_21_9, aspect_ratio_4_3, aspect_ratio_9_16,
         aspect_ratio_square, AspectRatio, AspectRatioBuilder, AspectRatioPreset,
+    };
+    // Avatar
+    pub use crate::components::avatar::{
+        avatar, avatar_group, Avatar, AvatarBuilder, AvatarGroup, AvatarGroupBuilder, AvatarShape,
+        AvatarSize, AvatarStatus,
     };
     pub use blinc_layout::stateful::ButtonState;
     // Re-export State for checkbox/switch/radio usage
