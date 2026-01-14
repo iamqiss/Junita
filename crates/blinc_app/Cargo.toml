@@ -13,16 +13,16 @@ description = "Blinc application framework with clean layout and rendering API"
 crate-type = ["rlib", "staticlib"]
 
 [dependencies]
-blinc_core = { path = "../blinc_core" }
-blinc_layout = { path = "../blinc_layout" }
-blinc_gpu = { path = "../blinc_gpu", default-features = false }
-blinc_svg = { path = "../blinc_svg" }
-blinc_text = { path = "../blinc_text" }
-blinc_image = { path = "../blinc_image" }
-blinc_platform = { path = "../blinc_platform" }
-blinc_animation = { path = "../blinc_animation" }
-blinc_macros = { path = "../blinc_macros" }
-blinc_theme = { path = "../blinc_theme" }
+blinc_core = { path = "../blinc_core", version = "0.1.1" }
+blinc_layout = { path = "../blinc_layout", version = "0.1.1" }
+blinc_gpu = { path = "../blinc_gpu", version = "0.1.1", default-features = false }
+blinc_svg = { path = "../blinc_svg", version = "0.1.1" }
+blinc_text = { path = "../blinc_text", version = "0.1.1" }
+blinc_image = { path = "../blinc_image", version = "0.1.1" }
+blinc_platform = { path = "../blinc_platform", version = "0.1.1" }
+blinc_animation = { path = "../blinc_animation", version = "0.1.1" }
+blinc_macros = { path = "../blinc_macros", version = "0.1.1" }
+blinc_theme = { path = "../blinc_theme", version = "0.1.1" }
 
 # GPU
 wgpu.workspace = true
@@ -45,10 +45,10 @@ tracing.workspace = true
 lru = { workspace = true }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-blinc_platform_desktop = { path = "../../extensions/blinc_platform_desktop", optional = true }
+blinc_platform_desktop = { path = "../../extensions/blinc_platform_desktop", version = "0.1.1", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
-blinc_platform_android = { path = "../../extensions/blinc_platform_android", optional = true }
+blinc_platform_android = { path = "../../extensions/blinc_platform_android", version = "0.1.1", optional = true }
 android-activity = { workspace = true, optional = true }
 ndk = { workspace = true, optional = true }
 jni = { workspace = true, optional = true }
@@ -58,12 +58,12 @@ tracing-android = { version = "0.2", optional = true }
 tracing-subscriber = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "ios")'.dependencies]
-blinc_platform_ios = { path = "../../extensions/blinc_platform_ios", optional = true }
+blinc_platform_ios = { path = "../../extensions/blinc_platform_ios", version = "0.1.1", optional = true }
 
 [dev-dependencies]
 image.workspace = true
 tracing-subscriber.workspace = true
-blinc_cn = { path = "../blinc_cn" }
+blinc_cn = { path = "../blinc_cn", version = "0.1.1" }
 
 [features]
 default = ["windowed"]

@@ -5,8 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-blinc_core = { path = "../blinc_core" }
-blinc_animation = { path = "../blinc_animation" }
+blinc_core = { path = "../blinc_core", version = "0.1.1" }
+blinc_animation = { path = "../blinc_animation", version = "0.1.1" }
 
 # Utilities
 tracing = { workspace = true }

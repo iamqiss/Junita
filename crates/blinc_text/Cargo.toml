@@ -8,7 +8,7 @@ rust-version.workspace = true
 description = "High-quality text rendering for Blinc UI framework"
 
 [dependencies]
-blinc_core = { path = "../blinc_core" }
+blinc_core = { path = "../blinc_core", version = "0.1.1" }
 
 # Font parsing
 ttf-parser = { workspace = true }

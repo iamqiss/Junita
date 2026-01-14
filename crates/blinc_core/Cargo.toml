@@ -28,7 +28,7 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-blinc_animation = { path = "../blinc_animation" }
+blinc_animation = { path = "../blinc_animation", version = "0.1.1" }
 
 # Benchmarks will be added later
 # criterion.workspace = true

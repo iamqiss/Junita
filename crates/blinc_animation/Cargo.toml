@@ -4,6 +4,10 @@ description = "Blinc animation system - spring physics, keyframes, and timeline 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+keywords = ["ui", "gui", "animation", "spring", "blinc"]
+categories = ["gui"]
 
 [lib]
 crate-type = ["lib"]
@@ -13,7 +17,7 @@ default = []
 zrtl-plugin = []  # Enable ZRTL plugin exports (for when Zyntax Grammar2 is ready)
 
 [dependencies]
-blinc_core = { path = "../blinc_core" }
+blinc_core = { path = "../blinc_core", version = "0.1.1" }
 
 # Data structures
 slotmap.workspace = true
