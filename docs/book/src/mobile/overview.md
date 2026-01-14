@@ -79,7 +79,7 @@ fn app(ctx: &mut WindowedContext) -> impl ElementBuilder {
     div()
         .w(ctx.width)
         .h(ctx.height)
-        .bg(0x1a1a2e)
+        .bg(Color::from_hex(0x1a1a2e))
         .flex_col()
         .items_center()
         .justify_center()
@@ -95,7 +95,7 @@ fn counter_display(count: State<i32>) -> impl ElementBuilder {
         .on_state(move |_ctx| {
             text(format!("Count: {}", count.get()))
                 .size(48.0)
-                .color(0xffffff)
+                .color(Color::WHITE)
         })
 }
 
@@ -104,10 +104,10 @@ fn counter_button(label: &str, count: State<i32>, delta: i32) -> impl ElementBui
     stateful::<ButtonState>()
         .on_state(move |ctx| {
             let bg = match ctx.state() {
-                ButtonState::Idle => 0x4a4a5a,
-                ButtonState::Hovered => 0x5a5a6a,
-                ButtonState::Pressed => 0x3a3a4a,
-                ButtonState::Disabled => 0x2a2a2a,
+                ButtonState::Idle => Color::from_hex(0x4a4a5a),
+                ButtonState::Hovered => Color::from_hex(0x5a5a6a),
+                ButtonState::Pressed => Color::from_hex(0x3a3a4a),
+                ButtonState::Disabled => Color::from_hex(0x2a2a2a),
             };
             div()
                 .w(80.0).h(50.0)
@@ -115,7 +115,7 @@ fn counter_button(label: &str, count: State<i32>, delta: i32) -> impl ElementBui
                 .bg(bg)
                 .items_center()
                 .justify_center()
-                .child(text(&label).size(24.0).color(0xffffff))
+                .child(text(&label).size(24.0).color(Color::WHITE))
         })
         .on_click(move |_| count.set_rebuild(count.get() + delta))
 }
