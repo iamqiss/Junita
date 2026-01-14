@@ -5,6 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/blinc_macros"
 rust-version.workspace = true
 keywords = ["ui", "gui", "macros", "blinc"]
 categories = ["gui", "development-tools::procedural-macro-helpers"]

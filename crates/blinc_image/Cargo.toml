@@ -5,6 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+documentation = "https://docs.rs/blinc_image"
 rust-version.workspace = true
 keywords = ["ui", "gui", "image", "blinc"]
 categories = ["gui", "multimedia::images"]
