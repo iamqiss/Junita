@@ -33,6 +33,13 @@ local.properties
 Pods/
 DerivedData/
 *.ipa
+**/platforms/ios/libs/
+
+# Android build artifacts
+**/platforms/android/app/src/main/jniLibs/
+**/platforms/android/.gradle/
+**/platforms/android/build/
+**/platforms/android/app/build/
 
 # Compiled Blinc
 *.zbc
