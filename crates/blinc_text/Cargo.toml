@@ -1,11 +1,13 @@
 [package]
 name = "blinc_text"
+description = "High-quality text rendering for Blinc UI framework"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "High-quality text rendering for Blinc UI framework"
+keywords = ["ui", "gui", "text", "font", "blinc"]
+categories = ["gui", "text-processing"]
 
 [dependencies]
 blinc_core = { path = "../blinc_core", version = "0.1.1" }

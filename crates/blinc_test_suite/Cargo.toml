@@ -3,6 +3,8 @@ name = "blinc_test_suite"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 description = "Visual test suite for Blinc UI framework rendering capabilities"
 
 [lib]

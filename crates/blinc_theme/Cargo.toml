@@ -3,6 +3,8 @@ name = "blinc_theme"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 blinc_core = { path = "../blinc_core", version = "0.1.1" }
