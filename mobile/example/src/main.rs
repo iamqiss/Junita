@@ -43,7 +43,8 @@ fn counter_display(count: State<i32>) -> impl ElementBuilder {
             div().child(
                 text(format!("Count: {}", count.get()))
                     .size(48.0)
-                    .color(Color::rgba(0.4, 0.8, 1.0, 1.0)),
+                    .color(Color::rgba(0.4, 0.8, 1.0, 1.0))
+                    .align(TextAlign::Center),
             )
         })
 }
@@ -60,7 +61,13 @@ fn app_ui(ctx: &mut WindowedContext) -> impl ElementBuilder {
         .items_center()
         .justify_center()
         .gap(20.0)
-        .child(div().child(text("Blinc Mobile Example").size(32.0).color(Color::WHITE)))
+        .child(
+            text("Blinc Mobile Example")
+                .align(TextAlign::Center)
+                .size(32.0)
+                .color(Color::WHITE)
+                .no_wrap(),
+        )
         .child(counter_display(count.clone()))
         .child(
             div()
