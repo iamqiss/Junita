@@ -89,14 +89,12 @@ pub use input::{
 pub use scenic::{DisplayInfo, FocusState, FrameInfo, ScenicView, ViewProperties, ViewState};
 pub use window::FuchsiaWindow;
 
-use blinc_platform::PlatformError;
-
 // Convenience constructor for non-Fuchsia builds
 #[cfg(not(target_os = "fuchsia"))]
 impl FuchsiaPlatform {
     /// Create a placeholder platform (for cross-compilation checks)
-    pub fn with_placeholder() -> Result<Self, PlatformError> {
-        Err(PlatformError::Unsupported(
+    pub fn with_placeholder() -> Result<Self, blinc_platform::PlatformError> {
+        Err(blinc_platform::PlatformError::Unsupported(
             "Fuchsia platform only available on Fuchsia OS".to_string(),
         ))
     }

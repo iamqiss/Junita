@@ -39,9 +39,18 @@ use crate::tree::{LayoutNodeId, LayoutTree};
 /// Open a URL in the system's default browser
 ///
 /// This is the default action for links when clicked.
+/// On platforms without the `open` crate support, this logs a warning.
 pub fn open_url(url: &str) {
-    if let Err(e) = open::that(url) {
-        tracing::warn!("Failed to open URL '{}': {}", url, e);
+    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+    {
+        if let Err(e) = open::that(url) {
+            tracing::warn!("Failed to open URL '{}': {}", url, e);
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        tracing::warn!("URL opening not supported on this platform: {}", url);
     }
 }
 

@@ -29,6 +29,10 @@ pub enum BlincError {
     #[error("Platform error: {0}")]
     Platform(String),
 
+    /// Platform unsupported (running on wrong OS)
+    #[error("Platform unsupported: {0}")]
+    PlatformUnsupported(String),
+
     /// Generic error
     #[error("{0}")]
     Other(String),

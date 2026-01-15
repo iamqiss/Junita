@@ -89,12 +89,21 @@ pub fn system_font_paths() -> &'static [&'static str] {
             "/System/Library/Fonts/CoreUI/Menlo.ttc", // Menlo (monospace)
         ]
     }
+    #[cfg(target_os = "fuchsia")]
+    {
+        // Fuchsia system fonts - from package namespace or system fonts
+        &[
+            "/pkg/data/fonts/Roboto-Regular.ttf",
+            "/system/fonts/Roboto-Regular.ttf",
+        ]
+    }
     #[cfg(not(any(
         target_os = "macos",
         target_os = "linux",
         target_os = "windows",
         target_os = "android",
-        target_os = "ios"
+        target_os = "ios",
+        target_os = "fuchsia"
     )))]
     {
         &[]
@@ -106,12 +115,13 @@ mod context;
 mod error;
 mod text_measurer;
 
-// Windowed module is compiled for desktop (windowed feature), Android, and iOS
+// Windowed module is compiled for desktop (windowed feature), Android, iOS, and Fuchsia
 // since WindowedContext and shared types are used by all platforms
 #[cfg(any(
     feature = "windowed",
     all(feature = "android", target_os = "android"),
-    all(feature = "ios", target_os = "ios")
+    all(feature = "ios", target_os = "ios"),
+    all(feature = "fuchsia", target_os = "fuchsia")
 ))]
 pub mod windowed;
 
@@ -122,6 +132,11 @@ pub use android::AndroidApp;
 
 #[cfg(all(feature = "ios", target_os = "ios"))]
 pub mod ios;
+
+#[cfg(all(feature = "fuchsia", target_os = "fuchsia"))]
+pub mod fuchsia;
+#[cfg(all(feature = "fuchsia", target_os = "fuchsia"))]
+pub use fuchsia::FuchsiaApp;
 
 #[cfg(test)]
 mod tests;

@@ -19,11 +19,11 @@ metal = ["wgpu/metal"]
 dx12 = ["wgpu/dx12"]
 webgl = ["wgpu/webgl"]
 # Platform-specific presets
-desktop = ["vulkan", "metal", "dx12"]  # All desktop backends
-android = ["vulkan"]                    # Android only uses Vulkan
-ios = ["metal"]                         # iOS only uses Metal
-fuchsia = ["vulkan"]                    # Fuchsia uses Vulkan via Scenic
-harmony = ["vulkan"]                    # HarmonyOS prefers Vulkan
+desktop = ["vulkan", "metal", "dx12", "winit"]  # All desktop backends + windowing
+android = ["vulkan"]                    # Android only uses Vulkan (native windowing)
+ios = ["metal"]                         # iOS only uses Metal (native windowing)
+fuchsia = ["vulkan"]                    # Fuchsia uses Vulkan via Scenic (native windowing)
+harmony = ["vulkan"]                    # HarmonyOS prefers Vulkan (native windowing)
 
 [dependencies]
 blinc_core = { path = "../blinc_core", version = "0.1.1" }
@@ -36,8 +36,8 @@ wgpu.workspace = true
 naga.workspace = true
 bytemuck.workspace = true
 
-# Windowing
-winit.workspace = true
+# Windowing (optional - only needed for desktop)
+winit = { workspace = true, optional = true }
 raw-window-handle.workspace = true
 
 # Data structures

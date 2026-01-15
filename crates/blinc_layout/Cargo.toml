@@ -40,8 +40,9 @@ pulldown-cmark = "0.10"
 # HTML entity decoding
 html-escape = "0.2"
 
-# URL opening (for links)
-open = "5"
-
 # CSS parser combinators
 nom = "7"
+
+# URL opening (for links) - desktop only
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+open = "5"
