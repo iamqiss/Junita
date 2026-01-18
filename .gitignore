@@ -41,6 +41,9 @@ DerivedData/
 **/platforms/android/build/
 **/platforms/android/app/build/
 
+# HarmonyOS build artifacts
+**/.cxx
+
 # Compiled Blinc
 *.zbc
 *.zrtl

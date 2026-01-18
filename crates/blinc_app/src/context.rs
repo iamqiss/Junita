@@ -314,7 +314,7 @@ impl RenderContext {
                 layout_height,
             ) {
                 Ok(mut glyphs) => {
-                    tracing::debug!(
+                    tracing::trace!(
                         "Prepared {} glyphs for text '{}' (font={:?}, generic={:?})",
                         glyphs.len(),
                         text.content,
@@ -335,7 +335,7 @@ impl RenderContext {
             }
         }
 
-        tracing::debug!(
+        tracing::trace!(
             "Text rendering: {} texts collected, {} total glyphs prepared",
             texts.len(),
             all_glyphs.len()
@@ -860,7 +860,7 @@ impl RenderContext {
             let image_data = match blinc_image::ImageData::load(source) {
                 Ok(data) => data,
                 Err(e) => {
-                    tracing::debug!("Failed to load image '{}': {:?}", image.source, e);
+                    tracing::trace!("Failed to load image '{}': {:?}", image.source, e);
                     continue; // Skip images that fail to load
                 }
             };
@@ -1639,7 +1639,7 @@ impl RenderContext {
                         || (effective_motion_scale.0 - 1.0).abs() > 0.01
                         || (effective_motion_scale.1 - 1.0).abs() > 0.01
                     {
-                        tracing::debug!(
+                        tracing::trace!(
                             "Text '{}': motion_translate=({:.1}, {:.1}), motion_scale=({:.2}, {:.2}), base=({:.1}, {:.1}), final=({:.1}, {:.1})",
                             text_data.content,
                             effective_motion_translate.0,
@@ -1652,7 +1652,7 @@ impl RenderContext {
                             scaled_y,
                         );
                     }
-                    tracing::debug!(
+                    tracing::trace!(
                         "Text '{}': abs=({:.1}, {:.1}), size=({:.1}x{:.1}), font={:.1}, align={:?}, v_align={:?}, z_layer={}",
                         text_data.content,
                         scaled_x,
@@ -2181,7 +2181,7 @@ impl RenderContext {
                 layout_height,
             ) {
                 Ok(mut glyphs) => {
-                    tracing::debug!(
+                    tracing::trace!(
                         "render_tree_with_motion: prepared {} glyphs for '{}' (font={:?})",
                         glyphs.len(),
                         text.content,
@@ -2209,7 +2209,7 @@ impl RenderContext {
             }
         }
 
-        tracing::debug!(
+        tracing::trace!(
             "render_tree_with_motion: {} texts, {} z-layers with glyphs",
             texts.len(),
             glyphs_by_layer.len()
@@ -2563,7 +2563,7 @@ impl RenderContext {
         let max_text_z = glyphs_by_layer.keys().cloned().max().unwrap_or(0);
         let max_layer = max_z.max(max_text_z);
 
-        tracing::debug!(
+        tracing::trace!(
             "render_overlay_tree: {} primitives, {} text layers, max_layer={}",
             batch.primitives.len(),
             glyphs_by_layer.len(),
@@ -2574,7 +2574,7 @@ impl RenderContext {
         for z in 0..=max_layer {
             let layer_primitives = batch.primitives_for_layer(z);
             if !layer_primitives.is_empty() {
-                tracing::debug!(
+                tracing::trace!(
                     "render_overlay_tree: rendering {} primitives at z={}",
                     layer_primitives.len(),
                     z
@@ -2585,7 +2585,7 @@ impl RenderContext {
 
             if let Some(glyphs) = glyphs_by_layer.get(&z) {
                 if !glyphs.is_empty() {
-                    tracing::debug!(
+                    tracing::trace!(
                         "render_overlay_tree: rendering {} glyphs at z={}",
                         glyphs.len(),
                         z

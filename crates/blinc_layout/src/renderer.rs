@@ -3445,6 +3445,89 @@ impl RenderTree {
         (delta_x, delta_y)
     }
 
+    /// Dispatch scroll with time for touch velocity tracking (mobile)
+    ///
+    /// Same as dispatch_scroll_chain but includes time for momentum scrolling.
+    pub fn dispatch_scroll_chain_with_time(
+        &mut self,
+        hit_node: LayoutNodeId,
+        ancestors: &[LayoutNodeId],
+        mouse_x: f32,
+        mouse_y: f32,
+        delta_x: f32,
+        delta_y: f32,
+        scroll_time: f64,
+    ) -> (f32, f32) {
+        // Build the chain from leaf to root
+        let mut chain: Vec<LayoutNodeId> = vec![hit_node];
+        for &ancestor in ancestors.iter().rev() {
+            if ancestor != hit_node {
+                chain.push(ancestor);
+            }
+        }
+
+        let mut remaining_dx = delta_x;
+        let mut remaining_dy = delta_y;
+
+        for node_id in chain {
+            if remaining_dx.abs() < 0.001 && remaining_dy.abs() < 0.001 {
+                break;
+            }
+
+            let has_handler = self
+                .handler_registry
+                .has_handler(node_id, blinc_core::events::event_types::SCROLL);
+
+            if !has_handler {
+                continue;
+            }
+
+            let direction = self.get_scroll_direction(node_id);
+            let (can_consume_x, can_consume_y) = self.can_consume_scroll(node_id, remaining_dx, remaining_dy);
+
+            let has_scroll_physics = direction.is_some();
+            let handles_x = direction.map_or(true, |d| {
+                matches!(d, crate::scroll::ScrollDirection::Horizontal | crate::scroll::ScrollDirection::Both)
+            });
+            let handles_y = direction.map_or(true, |d| {
+                matches!(d, crate::scroll::ScrollDirection::Vertical | crate::scroll::ScrollDirection::Both)
+            });
+
+            let dispatch_x = if handles_x { remaining_dx } else { 0.0 };
+            let dispatch_y = if handles_y { remaining_dy } else { 0.0 };
+
+            if dispatch_x.abs() > 0.001 || dispatch_y.abs() > 0.001 {
+                let ctx = crate::event_handler::EventContext::new(
+                    blinc_core::events::event_types::SCROLL,
+                    node_id,
+                )
+                .with_mouse_pos(mouse_x, mouse_y)
+                .with_scroll_delta(dispatch_x, dispatch_y)
+                .with_scroll_time(scroll_time);
+
+                self.handler_registry.dispatch(&ctx);
+
+                if has_scroll_physics {
+                    if can_consume_x && handles_x {
+                        remaining_dx = 0.0;
+                    }
+                    if can_consume_y && handles_y {
+                        remaining_dy = 0.0;
+                    }
+                } else {
+                    if handles_x {
+                        remaining_dx = 0.0;
+                    }
+                    if handles_y {
+                        remaining_dy = 0.0;
+                    }
+                }
+            }
+        }
+
+        (remaining_dx, remaining_dy)
+    }
+
     // =========================================================================
     // Motion Animation Initialization
     // =========================================================================

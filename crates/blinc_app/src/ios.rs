@@ -255,6 +255,8 @@ impl IOSApp {
             ready_callbacks,
             wake_proxy,
             rebuild_count: 0,
+            last_touch_pos: None,
+            is_scrolling: false,
         })
     }
 
@@ -285,6 +287,11 @@ pub struct IOSRenderContext {
     wake_proxy: IOSWakeProxy,
     /// Number of rebuilds
     rebuild_count: u64,
+    /// Touch tracking for scroll delta calculation
+    /// Stores (x, y) of last touch position
+    last_touch_pos: Option<(f32, f32)>,
+    /// Whether currently scrolling (touch drag in progress)
+    is_scrolling: bool,
 }
 
 impl IOSRenderContext {
@@ -347,6 +354,21 @@ impl IOSRenderContext {
         }
     }
 
+    /// Tick scroll physics - must be called every frame for scroll to work
+    ///
+    /// Returns true if scroll is animating and needs another frame.
+    /// Call this before `build_ui` or `render_frame`.
+    pub fn tick_scroll(&mut self) -> bool {
+        if let Some(ref mut tree) = self.render_tree {
+            let current_time = blinc_layout::prelude::elapsed_ms();
+            let animating = tree.tick_scroll_physics(current_time);
+            tree.process_pending_scroll_refs();
+            animating
+        } else {
+            false
+        }
+    }
+
     /// Build and layout the UI tree
     ///
     /// Call this before rendering each frame.
@@ -357,6 +379,9 @@ impl IOSRenderContext {
     {
         // Clear dirty flag
         self.ref_dirty_flag.swap(false, Ordering::SeqCst);
+
+        // Tick scroll physics first
+        self.tick_scroll();
 
         // Tick animations
         if let Ok(mut sched) = self.animations.lock() {
@@ -440,7 +465,7 @@ impl IOSRenderContext {
         let tree = match &self.render_tree {
             Some(t) => t,
             None => {
-                eprintln!("[Blinc] iOS handle_touch: No render tree yet, ignoring touch");
+                tracing::debug!("[Blinc] iOS handle_touch: No render tree yet, ignoring touch");
                 return;
             }
         };
@@ -452,15 +477,15 @@ impl IOSRenderContext {
         // Log tree info for debugging
         if let Some(root) = tree.root() {
             if let Some(bounds) = tree.layout().get_bounds(root, (0.0, 0.0)) {
-                eprintln!(
+                tracing::trace!(
                     "[Blinc] iOS Touch at ({:.1}, {:.1}) - tree root bounds: ({:.1}, {:.1}, {:.1}x{:.1})",
                     lx, ly, bounds.x, bounds.y, bounds.width, bounds.height
                 );
             } else {
-                eprintln!("[Blinc] iOS Touch: tree root has no bounds!");
+                tracing::debug!("[Blinc] iOS Touch: tree root has no bounds!");
             }
         } else {
-            eprintln!("[Blinc] iOS Touch: tree has no root!");
+            tracing::debug!("[Blinc] iOS Touch: tree has no root!");
         }
 
         // Collect pending events via callback
@@ -480,43 +505,87 @@ impl IOSRenderContext {
             }
         });
 
+        // Track scroll info for dispatch after regular event handling
+        let mut scroll_info: Option<(f32, f32, f32, f32)> = None;
+        let mut touch_ended = false;
+
         // Route touch event through event router
         match touch.phase {
             TouchPhase::Began => {
-                eprintln!("[Blinc] iOS Touch BEGAN at ({:.1}, {:.1})", lx, ly);
+                tracing::trace!("[Blinc] iOS Touch BEGAN at ({:.1}, {:.1})", lx, ly);
                 self.windowed_ctx
                     .event_router
                     .on_mouse_down(tree, lx, ly, MouseButton::Left);
+                // Initialize touch tracking for scroll
+                self.last_touch_pos = Some((lx, ly));
+                self.is_scrolling = false;
             }
             TouchPhase::Moved => {
                 self.windowed_ctx.event_router.on_mouse_move(tree, lx, ly);
+
+                // Calculate scroll delta from touch movement
+                // Touch: dragging down = positive delta = content scrolls up (shows below)
+                if let Some((prev_x, prev_y)) = self.last_touch_pos {
+                    let delta_x = lx - prev_x;
+                    let delta_y = ly - prev_y;
+
+                    // Only dispatch scroll if there's actual movement
+                    // Small threshold to avoid jitter
+                    if delta_x.abs() > 0.5 || delta_y.abs() > 0.5 {
+                        self.is_scrolling = true;
+                        // Store scroll info for dispatch after event loop
+                        scroll_info = Some((lx, ly, delta_x, delta_y));
+                        tracing::trace!(
+                            "Touch scroll: delta=({:.1}, {:.1})",
+                            delta_x,
+                            delta_y
+                        );
+                    }
+                }
+
+                // Update last touch position
+                self.last_touch_pos = Some((lx, ly));
             }
             TouchPhase::Ended => {
-                eprintln!("[Blinc] iOS Touch ENDED at ({:.1}, {:.1})", lx, ly);
+                tracing::trace!("[Blinc] iOS Touch ENDED at ({:.1}, {:.1})", lx, ly);
                 self.windowed_ctx
                     .event_router
                     .on_mouse_up(tree, lx, ly, MouseButton::Left);
                 // On touch devices, finger lift means pointer leaves too
                 // This transitions ButtonState from Hovered back to Idle
                 self.windowed_ctx.event_router.on_mouse_leave();
+
+                // Mark touch ended for scroll physics
+                if self.is_scrolling {
+                    touch_ended = true;
+                }
+                // Clear touch tracking
+                self.last_touch_pos = None;
+                self.is_scrolling = false;
             }
             TouchPhase::Cancelled => {
-                eprintln!("[Blinc] iOS Touch CANCELLED");
+                tracing::trace!("[Blinc] iOS Touch CANCELLED");
                 self.windowed_ctx.event_router.on_mouse_leave();
+                // Clear touch tracking on cancel too
+                self.last_touch_pos = None;
+                if self.is_scrolling {
+                    touch_ended = true;
+                }
+                self.is_scrolling = false;
             }
         }
 
         // Clear callback
         self.windowed_ctx.event_router.clear_event_callback();
 
-        eprintln!(
+        tracing::trace!(
             "[Blinc] iOS Touch: collected {} pending events",
             pending_events.len()
         );
 
         // Dispatch collected events to the tree
         if !pending_events.is_empty() {
-            eprintln!("[Blinc] iOS dispatching {} events", pending_events.len());
+            tracing::trace!("[Blinc] iOS dispatching {} events", pending_events.len());
 
             if let Some(ref mut tree) = self.render_tree {
                 let router = &self.windowed_ctx.event_router;
@@ -546,6 +615,45 @@ impl IOSRenderContext {
             }
             // Stateful elements will call request_redraw() internally when state changes
             // The needs_render() check will pick this up for the next frame
+        }
+
+        // Dispatch scroll events (touch scrolling)
+        // NOTE: Do NOT set ref_dirty_flag here - that triggers full UI rebuild!
+        // Scroll just updates internal offset and needs redraw, not rebuild.
+        // The wake_proxy and animation system handle continuous redraw.
+        if let Some((mouse_x, mouse_y, delta_x, delta_y)) = scroll_info {
+            if let Some(ref mut tree) = self.render_tree {
+                let router = &mut self.windowed_ctx.event_router;
+                // Hit test to get node chain for nested scroll dispatch
+                if let Some(hit) = router.hit_test(tree, mouse_x, mouse_y) {
+                    tracing::debug!(
+                        "Dispatching scroll: hit={:?}, delta=({:.1}, {:.1})",
+                        hit.node,
+                        delta_x,
+                        delta_y
+                    );
+                    tree.dispatch_scroll_chain(
+                        hit.node,
+                        &hit.ancestors,
+                        mouse_x,
+                        mouse_y,
+                        delta_x,
+                        delta_y,
+                    );
+                    // Wake to trigger redraw (NOT rebuild)
+                    self.wake_proxy.wake();
+                }
+            }
+        }
+
+        // Handle touch end - notify scroll physics for bounce/momentum
+        if touch_ended {
+            if let Some(ref mut tree) = self.render_tree {
+                tracing::debug!("Touch ended - notifying scroll physics");
+                tree.on_scroll_end();
+                // Wake to trigger redraw for bounce animation (NOT rebuild)
+                self.wake_proxy.wake();
+            }
         }
     }
 
@@ -804,13 +912,13 @@ pub extern "C" fn blinc_handle_touch(
     y: f32,
     phase: i32,
 ) {
-    eprintln!(
+    tracing::trace!(
         "[Blinc FFI] blinc_handle_touch called: x={}, y={}, phase={}",
         x, y, phase
     );
 
     if ctx.is_null() {
-        eprintln!("[Blinc FFI] blinc_handle_touch: ctx is NULL!");
+        tracing::debug!("[Blinc FFI] blinc_handle_touch: ctx is NULL!");
         return;
     }
 
@@ -825,7 +933,7 @@ pub extern "C" fn blinc_handle_touch(
     unsafe {
         (*ctx).handle_touch(touch);
     }
-    eprintln!("[Blinc FFI] blinc_handle_touch completed");
+    tracing::trace!("[Blinc FFI] blinc_handle_touch completed");
 }
 
 /// Set the focus state (C FFI for Swift)

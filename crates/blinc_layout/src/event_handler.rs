@@ -67,6 +67,9 @@ pub struct EventContext {
     /// Scroll delta for SCROLL events (pixels scrolled)
     pub scroll_delta_x: f32,
     pub scroll_delta_y: f32,
+    /// Scroll event time in milliseconds (for touch velocity tracking)
+    /// If Some, indicates touch scroll that needs velocity tracking for momentum
+    pub scroll_time: Option<f64>,
     /// Drag delta for DRAG/DRAG_END events (offset from drag start)
     pub drag_delta_x: f32,
     pub drag_delta_y: f32,
@@ -100,6 +103,7 @@ impl EventContext {
             bounds_height: 0.0,
             scroll_delta_x: 0.0,
             scroll_delta_y: 0.0,
+            scroll_time: None,
             drag_delta_x: 0.0,
             drag_delta_y: 0.0,
             key_char: None,
@@ -143,6 +147,12 @@ impl EventContext {
     pub fn with_scroll_delta(mut self, dx: f32, dy: f32) -> Self {
         self.scroll_delta_x = dx;
         self.scroll_delta_y = dy;
+        self
+    }
+
+    /// Set scroll time for touch velocity tracking (milliseconds)
+    pub fn with_scroll_time(mut self, time: f64) -> Self {
+        self.scroll_time = Some(time);
         self
     }
 

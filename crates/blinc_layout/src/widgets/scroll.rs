@@ -342,6 +342,8 @@ pub struct ScrollPhysics {
     pub thumb_drag_start_scroll_x: f32,
     /// Spring ID for scrollbar opacity animation
     scrollbar_opacity_spring: Option<SpringId>,
+    /// Last scroll event time in milliseconds (for velocity calculation)
+    last_scroll_time: Option<f64>,
 }
 
 impl Default for ScrollPhysics {
@@ -371,6 +373,7 @@ impl Default for ScrollPhysics {
             thumb_drag_start_scroll_y: 0.0,
             thumb_drag_start_scroll_x: 0.0,
             scrollbar_opacity_spring: None,
+            last_scroll_time: None,
         }
     }
 }
@@ -597,6 +600,35 @@ impl ScrollPhysics {
         }
     }
 
+    /// Apply scroll delta from touch input with velocity tracking
+    ///
+    /// This is used on mobile platforms where we need to track velocity
+    /// ourselves for momentum scrolling (unlike macOS which provides it).
+    ///
+    /// `current_time` is in milliseconds (from elapsed_ms()).
+    pub fn apply_touch_scroll_delta(&mut self, delta_x: f32, delta_y: f32, current_time: f64) {
+        // Calculate velocity from delta and time since last event
+        if let Some(last_time) = self.last_scroll_time {
+            let dt_seconds = ((current_time - last_time) / 1000.0) as f32;
+            if dt_seconds > 0.0 && dt_seconds < 0.5 {
+                // Smooth velocity using exponential moving average
+                let alpha = 0.3; // Smoothing factor
+                let instant_vx = delta_x / dt_seconds;
+                let instant_vy = delta_y / dt_seconds;
+                self.velocity_x = self.velocity_x * (1.0 - alpha) + instant_vx * alpha;
+                self.velocity_y = self.velocity_y * (1.0 - alpha) + instant_vy * alpha;
+            }
+        } else {
+            // First event - initialize velocity from delta assuming 16ms frame
+            self.velocity_x = delta_x * 60.0;
+            self.velocity_y = delta_y * 60.0;
+        }
+        self.last_scroll_time = Some(current_time);
+
+        // Apply the delta using normal scroll logic
+        self.apply_scroll_delta(delta_x, delta_y);
+    }
+
     /// Called when scroll gesture ends - start momentum/bounce
     pub fn on_scroll_end(&mut self) {
         if let Some(new_state) = self
@@ -606,9 +638,23 @@ impl ScrollPhysics {
             self.state = new_state;
         }
 
+        // Clear scroll time tracking
+        self.last_scroll_time = None;
+
         // If overscrolling, start bounce immediately
         if self.is_overscrolling() && self.config.bounce_enabled {
             self.start_bounce();
+            return;
+        }
+
+        // If we have significant velocity, start momentum scrolling
+        let has_velocity = self.velocity_x.abs() > self.config.velocity_threshold
+            || self.velocity_y.abs() > self.config.velocity_threshold;
+        if has_velocity {
+            if let Some(new_state) = self.state.on_event(blinc_core::events::event_types::SCROLL_END) {
+                self.state = new_state;
+            }
+            // State should now be Decelerating - tick() will apply momentum
         }
     }
 
@@ -721,7 +767,9 @@ impl ScrollPhysics {
     /// Returns true if still animating, false if settled.
     /// This reads spring values from the AnimationScheduler which ticks them
     /// on a background thread at 120fps.
-    pub fn tick(&mut self, _dt: f32) -> bool {
+    ///
+    /// `dt` is delta time in seconds since last tick.
+    pub fn tick(&mut self, dt: f32) -> bool {
         match self.state {
             ScrollState::Idle => false,
 
@@ -733,9 +781,66 @@ impl ScrollPhysics {
             }
 
             ScrollState::Decelerating => {
-                // On macOS, the system provides momentum via scroll events.
-                // When momentum finishes, on_scroll_end() is called which starts bounce.
-                false
+                // Apply momentum scrolling (for touch devices)
+                // On macOS, the system provides momentum via scroll events instead.
+
+                // Apply velocity to position
+                let dx = self.velocity_x * dt;
+                let dy = self.velocity_y * dt;
+
+                // Check if we would hit bounds
+                let new_offset_y = self.offset_y + dy;
+                let new_offset_x = self.offset_x + dx;
+
+                // Apply deceleration (friction)
+                let decel = self.config.deceleration * dt;
+                if self.velocity_x > 0.0 {
+                    self.velocity_x = (self.velocity_x - decel).max(0.0);
+                } else if self.velocity_x < 0.0 {
+                    self.velocity_x = (self.velocity_x + decel).min(0.0);
+                }
+                if self.velocity_y > 0.0 {
+                    self.velocity_y = (self.velocity_y - decel).max(0.0);
+                } else if self.velocity_y < 0.0 {
+                    self.velocity_y = (self.velocity_y + decel).min(0.0);
+                }
+
+                // Check if we've hit edge bounds
+                let hit_edge_y = new_offset_y > self.min_offset_y()
+                    || new_offset_y < self.max_offset_y();
+                let hit_edge_x = new_offset_x > self.min_offset_x()
+                    || new_offset_x < self.max_offset_x();
+
+                if hit_edge_y || hit_edge_x {
+                    // Hit edge - clamp and start bounce
+                    self.offset_y = new_offset_y.clamp(self.max_offset_y(), self.min_offset_y());
+                    self.offset_x = new_offset_x.clamp(self.max_offset_x(), self.min_offset_x());
+                    self.velocity_x = 0.0;
+                    self.velocity_y = 0.0;
+                    if let Some(new_state) = self.state.on_event(scroll_events::SETTLED) {
+                        self.state = new_state;
+                    }
+                    return false;
+                }
+
+                // Update position
+                self.offset_y = new_offset_y;
+                self.offset_x = new_offset_x;
+
+                // Check if velocity is below threshold
+                let stopped = self.velocity_x.abs() < self.config.velocity_threshold
+                    && self.velocity_y.abs() < self.config.velocity_threshold;
+
+                if stopped {
+                    self.velocity_x = 0.0;
+                    self.velocity_y = 0.0;
+                    if let Some(new_state) = self.state.on_event(scroll_events::SETTLED) {
+                        self.state = new_state;
+                    }
+                    return false;
+                }
+
+                true // Still decelerating
             }
 
             ScrollState::Bouncing => {
@@ -1566,7 +1671,13 @@ impl Scroll {
             let physics = Arc::clone(&physics);
             move |ctx| {
                 let mut p = physics.lock().unwrap();
-                p.apply_scroll_delta(ctx.scroll_delta_x, ctx.scroll_delta_y);
+                // Use touch scroll with velocity tracking if time is provided (mobile)
+                if let Some(time) = ctx.scroll_time {
+                    p.apply_touch_scroll_delta(ctx.scroll_delta_x, ctx.scroll_delta_y, time);
+                } else {
+                    // Desktop/trackpad - system provides momentum
+                    p.apply_scroll_delta(ctx.scroll_delta_x, ctx.scroll_delta_y);
+                }
                 // Show scrollbar when scrolling
                 p.on_scroll_activity();
             }

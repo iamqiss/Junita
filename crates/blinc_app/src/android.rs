@@ -36,7 +36,7 @@ use blinc_layout::overlay_state::OverlayContext;
 use blinc_layout::prelude::*;
 use blinc_layout::widgets::overlay::{overlay_manager, OverlayManager};
 use blinc_platform::assets::set_global_asset_loader;
-use blinc_platform_android::{AndroidAssetLoader, AndroidWakeProxy};
+use blinc_platform_android::AndroidAssetLoader;
 
 use crate::app::BlincApp;
 use crate::error::{BlincError, Result};
@@ -152,19 +152,10 @@ impl AndroidApp {
             );
         }
 
-        // Animation scheduler
-        let mut scheduler = AnimationScheduler::new();
-
-        // Set up wake proxy for Android - this allows the animation thread to wake the event loop
-        // The ForeignLooper is obtained from the current thread (the main event loop thread)
-        if let Some(wake_proxy) = AndroidWakeProxy::new() {
-            tracing::info!("Android WakeProxy enabled for animations");
-            scheduler.set_wake_callback(move || wake_proxy.wake());
-        } else {
-            tracing::warn!("Failed to create Android WakeProxy - using polling fallback");
-        }
-
-        scheduler.start_background();
+        // Animation scheduler - single-threaded for mobile efficiency
+        // Unlike desktop, we tick animations on main thread to avoid mutex contention
+        // and high CPU usage from background thread + main thread fighting
+        let scheduler = AnimationScheduler::new();
         let animations: SharedAnimationScheduler = Arc::new(Mutex::new(scheduler));
 
         // Set global scheduler handle
@@ -239,15 +230,21 @@ impl AndroidApp {
         let mut running = true;
         let mut focused = false;
 
+        // Touch tracking for scroll delta calculation
+        // On mobile, scroll happens via touch drag, not wheel events
+        let mut last_touch_x: Option<f32> = None;
+        let mut last_touch_y: Option<f32> = None;
+        let mut is_scrolling = false;
+
         tracing::info!("Entering Android event loop");
 
         while running {
-            // Use non-blocking poll if we need to redraw, otherwise wait up to 16ms
-            // This ensures immediate response to state changes while saving CPU when idle
+            // When animating: don't wait - vsync in present() handles frame pacing
+            // When idle: wait for events to save power
             let poll_timeout = if needs_rebuild || needs_redraw_next_frame {
-                None // Non-blocking - just check for events
+                Some(std::time::Duration::ZERO) // Don't wait - vsync paces us
             } else {
-                Some(std::time::Duration::from_millis(16)) // Wait for events (~60fps max)
+                Some(std::time::Duration::from_millis(100)) // Idle - save power
             };
             needs_redraw_next_frame = false;
 
@@ -417,8 +414,8 @@ impl AndroidApp {
                     },
 
                     PollEvent::Wake => {
-                        // Animation thread wake - request redraw
-                        needs_rebuild = true;
+                        // Animation thread wake - request redraw only (NOT rebuild)
+                        needs_redraw_next_frame = true;
                     }
 
                     _ => {}
@@ -436,6 +433,10 @@ impl AndroidApp {
             }
 
             let mut pending_events: Vec<PendingEvent> = Vec::new();
+            // Track scroll info for dispatch after event processing (mouse_x, mouse_y, delta_x, delta_y)
+            let mut scroll_info: Option<(f32, f32, f32, f32)> = None;
+            // Track if touch ended (for scroll physics)
+            let mut touch_ended = false;
 
             if let (Some(ref mut windowed_ctx), Some(ref tree)) = (&mut ctx, &render_tree) {
                 // Get the scale factor for coordinate conversion
@@ -493,6 +494,10 @@ impl AndroidApp {
                                                     ly,
                                                     MouseButton::Left,
                                                 );
+                                                // Initialize touch tracking for scroll
+                                                last_touch_x = Some(lx);
+                                                last_touch_y = Some(ly);
+                                                is_scrolling = false;
                                                 // Update pending events with coordinates
                                                 unsafe {
                                                     let events = &mut pending_events
@@ -505,6 +510,33 @@ impl AndroidApp {
                                             }
                                             MotionAction::Move => {
                                                 router.on_mouse_move(tree, lx, ly);
+
+                                                // Calculate scroll delta from touch movement
+                                                // Touch: dragging down = positive delta = content scrolls up (shows below)
+                                                if let (Some(prev_x), Some(prev_y)) =
+                                                    (last_touch_x, last_touch_y)
+                                                {
+                                                    let delta_x = lx - prev_x;
+                                                    let delta_y = ly - prev_y;
+
+                                                    // Only collect scroll if there's actual movement
+                                                    // Small threshold to avoid jitter
+                                                    if delta_x.abs() > 0.5 || delta_y.abs() > 0.5 {
+                                                        is_scrolling = true;
+                                                        // Store scroll info for dispatch after event loop
+                                                        scroll_info = Some((lx, ly, delta_x, delta_y));
+                                                        tracing::trace!(
+                                                            "Touch scroll: delta=({:.1}, {:.1})",
+                                                            delta_x,
+                                                            delta_y
+                                                        );
+                                                    }
+                                                }
+
+                                                // Update last touch position
+                                                last_touch_x = Some(lx);
+                                                last_touch_y = Some(ly);
+
                                                 unsafe {
                                                     let events = &mut pending_events
                                                         as *mut Vec<PendingEvent>;
@@ -521,6 +553,16 @@ impl AndroidApp {
                                                     ly
                                                 );
                                                 router.on_mouse_up(tree, lx, ly, MouseButton::Left);
+
+                                                // Mark touch ended for scroll physics
+                                                if is_scrolling {
+                                                    touch_ended = true;
+                                                }
+                                                // Clear touch tracking
+                                                last_touch_x = None;
+                                                last_touch_y = None;
+                                                is_scrolling = false;
+
                                                 unsafe {
                                                     let events = &mut pending_events
                                                         as *mut Vec<PendingEvent>;
@@ -533,6 +575,13 @@ impl AndroidApp {
                                             MotionAction::Cancel => {
                                                 tracing::debug!("Touch CANCEL");
                                                 router.on_mouse_leave();
+                                                // Clear touch tracking on cancel too
+                                                last_touch_x = None;
+                                                last_touch_y = None;
+                                                if is_scrolling {
+                                                    touch_ended = true;
+                                                }
+                                                is_scrolling = false;
                                             }
                                             _ => {}
                                         }
@@ -583,6 +632,62 @@ impl AndroidApp {
                         );
                     }
                 }
+            }
+
+            // Dispatch scroll events (touch scrolling)
+            // NOTE: Do NOT set needs_rebuild here - that triggers full UI rebuild!
+            // Scroll just updates internal offset and needs redraw, not rebuild.
+            if let Some((mouse_x, mouse_y, delta_x, delta_y)) = scroll_info {
+                if let (Some(ref mut windowed_ctx), Some(ref mut tree)) =
+                    (&mut ctx, &mut render_tree)
+                {
+                    let router = &mut windowed_ctx.event_router;
+                    // Hit test to get node chain for nested scroll dispatch
+                    if let Some(hit) = router.hit_test(tree, mouse_x, mouse_y) {
+                        // Get current time for velocity tracking (momentum scrolling)
+                        let scroll_time = blinc_layout::prelude::elapsed_ms() as f64;
+                        tracing::debug!(
+                            "Dispatching scroll: hit={:?}, delta=({:.1}, {:.1})",
+                            hit.node,
+                            delta_x,
+                            delta_y
+                        );
+                        tree.dispatch_scroll_chain_with_time(
+                            hit.node,
+                            &hit.ancestors,
+                            mouse_x,
+                            mouse_y,
+                            delta_x,
+                            delta_y,
+                            scroll_time,
+                        );
+                        // Trigger redraw (NOT rebuild)
+                        needs_redraw_next_frame = true;
+                    }
+                }
+            }
+
+            // Handle touch end - notify scroll physics for bounce/momentum
+            if touch_ended {
+                if let Some(ref mut tree) = render_tree {
+                    tracing::debug!("Touch ended - notifying scroll physics");
+                    tree.on_scroll_end();
+                    // Trigger redraw for bounce animation (NOT rebuild)
+                    needs_redraw_next_frame = true;
+                }
+            }
+
+            // Tick scroll physics for momentum/bounce animations
+            let scroll_animating = if let Some(ref mut tree) = render_tree {
+                let current_time = blinc_layout::prelude::elapsed_ms();
+                let animating = tree.tick_scroll_physics(current_time);
+                tree.process_pending_scroll_refs();
+                animating
+            } else {
+                false
+            };
+            if scroll_animating {
+                needs_redraw_next_frame = true;
             }
 
             // =========================================================
@@ -647,19 +752,28 @@ impl AndroidApp {
                 }
             }
 
-            // Tick animations (just tick, don't force rebuild)
-            {
+            // Tick animations on main thread (single-threaded for mobile)
+            let animations_active = {
                 if let Ok(mut sched) = animations.lock() {
-                    if sched.tick() {
-                        needs_redraw = true;
-                    }
+                    sched.tick()
+                } else {
+                    false
                 }
+            };
+            if animations_active {
+                needs_redraw = true;
+                needs_redraw_next_frame = true;
             }
 
             // =========================================================
             // PHASE 2: Full rebuild only when structure changes
             // =========================================================
+            static REBUILD_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             if needs_rebuild && focused {
+                let count = REBUILD_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if count % 60 == 0 {
+                    tracing::warn!("REBUILD #{} (every 60th logged)", count);
+                }
                 if let (
                     Some(ref mut app_instance),
                     Some(ref surf),
@@ -682,22 +796,31 @@ impl AndroidApp {
                         let mut tree = RenderTree::from_element(&element);
                         tree.set_scale_factor(windowed_ctx.scale_factor as f32);
                         tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                        tree.clear_dirty(); // Start clean
                         render_tree = Some(tree);
                     } else if let Some(ref mut tree) = render_tree {
                         // Full rebuild
-                        tree.clear_dirty();
                         *tree = RenderTree::from_element(&element);
                         tree.set_scale_factor(windowed_ctx.scale_factor as f32);
                         tree.compute_layout(windowed_ctx.width, windowed_ctx.height);
+                        // Clear dirty on the NEW tree to prevent immediate re-rebuild
+                        tree.clear_dirty();
                     }
                     needs_redraw = true;
                 }
+                // Reset rebuild flag after successful rebuild
+                needs_rebuild = false;
             }
 
             // =========================================================
             // PHASE 3: Render if we need redraw
             // =========================================================
+            static REDRAW_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             if needs_redraw && focused {
+                let count = REDRAW_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if count % 120 == 0 {
+                    tracing::info!("REDRAW #{} (every 120th logged)", count);
+                }
                 if let (
                     Some(ref mut app_instance),
                     Some(ref surf),
