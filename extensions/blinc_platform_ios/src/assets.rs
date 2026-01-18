@@ -6,9 +6,9 @@ use blinc_platform::assets::{AssetLoader, AssetPath};
 use blinc_platform::{PlatformError, Result};
 
 #[cfg(target_os = "ios")]
-use objc2_foundation::NSBundle;
-#[cfg(target_os = "ios")]
 use objc2::rc::Retained;
+#[cfg(target_os = "ios")]
+use objc2_foundation::NSBundle;
 
 #[cfg(target_os = "ios")]
 use std::path::PathBuf;
@@ -32,10 +32,12 @@ impl IOSAssetLoader {
         // Get the main bundle's resource path
         let resource_path = unsafe {
             let bundle = NSBundle::mainBundle();
-            bundle.resourcePath().map(|ns_path: Retained<objc2_foundation::NSString>| {
-                let path_str = ns_path.to_string();
-                PathBuf::from(path_str)
-            })
+            bundle
+                .resourcePath()
+                .map(|ns_path: Retained<objc2_foundation::NSString>| {
+                    let path_str = ns_path.to_string();
+                    PathBuf::from(path_str)
+                })
         };
 
         if let Some(ref path) = resource_path {

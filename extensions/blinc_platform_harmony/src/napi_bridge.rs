@@ -43,17 +43,13 @@ use std::ffi::c_void;
 /// These are registered via OH_NativeXComponent_RegisterCallback
 pub struct XComponentCallbacks {
     /// Called when surface is created
-    pub on_surface_created:
-        Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
+    pub on_surface_created: Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
     /// Called when surface is changed (resized)
-    pub on_surface_changed:
-        Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
+    pub on_surface_changed: Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
     /// Called when surface is destroyed
-    pub on_surface_destroyed:
-        Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
+    pub on_surface_destroyed: Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
     /// Called to dispatch touch events
-    pub dispatch_touch_event:
-        Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
+    pub dispatch_touch_event: Option<extern "C" fn(component: *mut c_void, window: *mut c_void)>,
 }
 
 impl Default for XComponentCallbacks {

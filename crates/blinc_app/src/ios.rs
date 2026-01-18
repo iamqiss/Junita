@@ -535,11 +535,7 @@ impl IOSRenderContext {
                         self.is_scrolling = true;
                         // Store scroll info for dispatch after event loop
                         scroll_info = Some((lx, ly, delta_x, delta_y));
-                        tracing::trace!(
-                            "Touch scroll: delta=({:.1}, {:.1})",
-                            delta_x,
-                            delta_y
-                        );
+                        tracing::trace!("Touch scroll: delta=({:.1}, {:.1})", delta_x, delta_y);
                     }
                 }
 
@@ -914,7 +910,9 @@ pub extern "C" fn blinc_handle_touch(
 ) {
     tracing::trace!(
         "[Blinc FFI] blinc_handle_touch called: x={}, y={}, phase={}",
-        x, y, phase
+        x,
+        y,
+        phase
     );
 
     if ctx.is_null() {

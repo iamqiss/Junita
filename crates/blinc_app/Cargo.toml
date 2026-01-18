@@ -78,3 +78,4 @@ windowed = ["winit", "blinc_platform_desktop", "blinc_gpu/desktop"]
 android = ["blinc_platform_android", "android-activity", "ndk", "jni", "android_logger", "log", "tracing-android", "tracing-subscriber", "blinc_gpu/android"]
 ios = ["blinc_platform_ios", "blinc_gpu/ios"]
 harmony = ["blinc_gpu/harmony"]  # blinc_platform_harmony when target is available
+fuchsia = []

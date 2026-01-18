@@ -651,7 +651,10 @@ impl ScrollPhysics {
         let has_velocity = self.velocity_x.abs() > self.config.velocity_threshold
             || self.velocity_y.abs() > self.config.velocity_threshold;
         if has_velocity {
-            if let Some(new_state) = self.state.on_event(blinc_core::events::event_types::SCROLL_END) {
+            if let Some(new_state) = self
+                .state
+                .on_event(blinc_core::events::event_types::SCROLL_END)
+            {
                 self.state = new_state;
             }
             // State should now be Decelerating - tick() will apply momentum
@@ -806,10 +809,10 @@ impl ScrollPhysics {
                 }
 
                 // Check if we've hit edge bounds
-                let hit_edge_y = new_offset_y > self.min_offset_y()
-                    || new_offset_y < self.max_offset_y();
-                let hit_edge_x = new_offset_x > self.min_offset_x()
-                    || new_offset_x < self.max_offset_x();
+                let hit_edge_y =
+                    new_offset_y > self.min_offset_y() || new_offset_y < self.max_offset_y();
+                let hit_edge_x =
+                    new_offset_x > self.min_offset_x() || new_offset_x < self.max_offset_x();
 
                 if hit_edge_y || hit_edge_x {
                     // Hit edge - clamp and start bounce

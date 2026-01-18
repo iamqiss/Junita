@@ -524,7 +524,8 @@ impl AndroidApp {
                                                     if delta_x.abs() > 0.5 || delta_y.abs() > 0.5 {
                                                         is_scrolling = true;
                                                         // Store scroll info for dispatch after event loop
-                                                        scroll_info = Some((lx, ly, delta_x, delta_y));
+                                                        scroll_info =
+                                                            Some((lx, ly, delta_x, delta_y));
                                                         tracing::trace!(
                                                             "Touch scroll: delta=({:.1}, {:.1})",
                                                             delta_x,
@@ -768,7 +769,8 @@ impl AndroidApp {
             // =========================================================
             // PHASE 2: Full rebuild only when structure changes
             // =========================================================
-            static REBUILD_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            static REBUILD_COUNT: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(0);
             if needs_rebuild && focused {
                 let count = REBUILD_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if count % 60 == 0 {
@@ -815,7 +817,8 @@ impl AndroidApp {
             // =========================================================
             // PHASE 3: Render if we need redraw
             // =========================================================
-            static REDRAW_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            static REDRAW_COUNT: std::sync::atomic::AtomicU64 =
+                std::sync::atomic::AtomicU64::new(0);
             if needs_redraw && focused {
                 let count = REDRAW_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if count % 120 == 0 {

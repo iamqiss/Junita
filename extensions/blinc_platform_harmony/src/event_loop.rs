@@ -88,8 +88,7 @@ impl EventLoop for HarmonyEventLoop {
         tracing::info!("HarmonyOS event loop - events delivered via XComponent callbacks");
 
         Err(PlatformError::Unsupported(
-            "HarmonyOS event loop is callback-based. Use XComponent callbacks instead."
-                .to_string(),
+            "HarmonyOS event loop is callback-based. Use XComponent callbacks instead.".to_string(),
         ))
     }
 }

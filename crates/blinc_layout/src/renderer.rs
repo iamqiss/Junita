@@ -3483,14 +3483,22 @@ impl RenderTree {
             }
 
             let direction = self.get_scroll_direction(node_id);
-            let (can_consume_x, can_consume_y) = self.can_consume_scroll(node_id, remaining_dx, remaining_dy);
+            let (can_consume_x, can_consume_y) =
+                self.can_consume_scroll(node_id, remaining_dx, remaining_dy);
 
             let has_scroll_physics = direction.is_some();
             let handles_x = direction.map_or(true, |d| {
-                matches!(d, crate::scroll::ScrollDirection::Horizontal | crate::scroll::ScrollDirection::Both)
+                matches!(
+                    d,
+                    crate::scroll::ScrollDirection::Horizontal
+                        | crate::scroll::ScrollDirection::Both
+                )
             });
             let handles_y = direction.map_or(true, |d| {
-                matches!(d, crate::scroll::ScrollDirection::Vertical | crate::scroll::ScrollDirection::Both)
+                matches!(
+                    d,
+                    crate::scroll::ScrollDirection::Vertical | crate::scroll::ScrollDirection::Both
+                )
             });
 
             let dispatch_x = if handles_x { remaining_dx } else { 0.0 };
