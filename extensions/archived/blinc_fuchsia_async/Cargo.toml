@@ -17,6 +17,6 @@ crate-type = ["lib"]
 default = []
 
 [dependencies]
-blinc_fuchsia_zircon = { path = "../blinc_fuchsia_zircon", version = "0.1.1" }
+blinc_fuchsia_zircon = { path = "../blinc_fuchsia_zircon", version = "0.1.12" }
 futures = "0.3"
 pin-project-lite = "0.2"
