@@ -3552,13 +3552,13 @@ impl RenderTree {
     ) {
         let event_type = blinc_core::events::event_types::PINCH;
 
-        let mut chain: Vec<LayoutNodeId> = Vec::with_capacity(hit.ancestors.len() + 1);
-        chain.push(hit.node);
-        for &ancestor in hit.ancestors.iter().rev() {
-            if ancestor != hit.node {
-                chain.push(ancestor);
-            }
-        }
+        let chain = std::iter::once(hit.node).chain(
+            hit.ancestors
+                .iter()
+                .rev()
+                .copied()
+                .filter(|ancestor| *ancestor != hit.node),
+        );
 
         for node_id in chain {
             if !self.handler_registry.has_handler(node_id, event_type) {
@@ -3575,9 +3575,7 @@ impl RenderTree {
                         hit.local_x,
                         hit.local_y,
                     )
-                } else if let Some((bx, by, bw, bh)) =
-                    hit.ancestor_bounds.get(&(node_id.to_raw() as u32))
-                {
+                } else if let Some((bx, by, bw, bh)) = hit.ancestor_bounds.get(&node_id.to_raw()) {
                     (*bx, *by, *bw, *bh, center_x - *bx, center_y - *by)
                 } else {
                     continue;
