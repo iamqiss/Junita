@@ -101,6 +101,16 @@ fn apply_renderer_config_overrides(
     config
 }
 
+fn log_renderer_config(config: &RendererConfig) {
+    tracing::info!(
+        "gpu config: max_primitives={}, max_glyphs={}, max_glass_primitives={}, sample_count={}",
+        config.max_primitives,
+        config.max_glyphs,
+        config.max_glass_primitives,
+        config.sample_count
+    );
+}
+
 /// Error type for renderer operations
 #[derive(Debug)]
 pub enum RendererError {
@@ -876,14 +886,7 @@ impl GpuRenderer {
 
         let required_limits = device_required_limits(&adapter);
         let config = apply_renderer_config_overrides(config, &required_limits);
-
-        tracing::info!(
-            "gpu config: max_primitives={}, max_glyphs={}, max_glass_primitives={}, sample_count={}",
-            config.max_primitives,
-            config.max_glyphs,
-            config.max_glass_primitives,
-            config.sample_count
-        );
+        log_renderer_config(&config);
 
         let (device, queue) = adapter
             .request_device(
@@ -952,14 +955,7 @@ impl GpuRenderer {
 
         let required_limits = device_required_limits(&adapter);
         let config = apply_renderer_config_overrides(config, &required_limits);
-
-        tracing::info!(
-            "gpu config: max_primitives={}, max_glyphs={}, max_glass_primitives={}, sample_count={}",
-            config.max_primitives,
-            config.max_glyphs,
-            config.max_glass_primitives,
-            config.sample_count
-        );
+        log_renderer_config(&config);
 
         let (device, queue) = adapter
             .request_device(
@@ -1046,14 +1042,7 @@ impl GpuRenderer {
 
         let required_limits = device_required_limits(&adapter);
         let config = apply_renderer_config_overrides(config, &required_limits);
-
-        tracing::info!(
-            "gpu config: max_primitives={}, max_glyphs={}, max_glass_primitives={}, sample_count={}",
-            config.max_primitives,
-            config.max_glyphs,
-            config.max_glass_primitives,
-            config.sample_count
-        );
+        log_renderer_config(&config);
 
         let (device, queue) = adapter
             .request_device(
