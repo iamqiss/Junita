@@ -40,8 +40,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./logo.svg",
-          "dark": "./logo.svg"
+          "light": "./icon.svg",
+          "dark": "./icon.svg"
         }
       }
     ],
