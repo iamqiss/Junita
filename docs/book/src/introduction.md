@@ -32,85 +32,69 @@ div()
 Built-in support for glass, metallic, and other material effects:
 
 ```rust
-div()
-    .glass()
-    .rounded(16.0)
-    .p(24.0)
-    .child(text("Frosted Glass"))
-```
+```markdown
+# Junita — The UI framework that actually feels alive
 
-### Type-Safe Animations
-The `JunitaComponent` derive macro generates type-safe animation hooks:
+![window graphic](../../window.svg)
 
-```rust
-#[derive(JunitaComponent)]
-struct MyCard {
-    #[animation]
-    scale: f32,
-    #[animation]
-    opacity: f32,
-}
+<div align="center">
+  ![Junita logo](../../logo.svg){:height="64"}
+</div>
 
-// Usage
-let scale = MyCard::use_scale(ctx, 1.0, SpringConfig::snappy());
-let opacity = MyCard::use_opacity(ctx, 0.0, SpringConfig::gentle());
-```
+Junita is a GPU-first, reactive UI framework for Rust — built for people who want silky animations, modern material effects, and the control of native rendering without the pain of low-level GPU plumbing.
 
-### Event Handling
-Intuitive event handling with closures:
+Why Junita shines:
 
-```rust
-div()
-    .on_click(|_| println!("Clicked!"))
-    .on_hover_enter(|_| println!("Hovered"))
-```
+- GPU-first rendering via `wgpu` for fluid 60fps motion and rich visuals.
+- Declarative, builder-style API inspired by modern UI toolkits (easy to learn, pleasant to compose).
+- Fine-grained reactivity and spring-based motion for natural, interruptible animations.
+- Cross-platform: Desktop and Mobile with the same expressive API.
 
-## Architecture Overview
+What this book gives you
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   Your Application                   │
-├─────────────────────────────────────────────────────┤
-│  junita_app   │  WindowedApp, Context, State Hooks   │
-├──────────────┼──────────────────────────────────────┤
-│  junita_layout│  Elements, Flexbox, Event Routing    │
-├──────────────┼──────────────────────────────────────┤
-│  junita_animation │  Springs, Timelines, Motion      │
-├──────────────┼──────────────────────────────────────┤
-│  junita_gpu   │  Render Pipeline, Materials          │
-├──────────────┼──────────────────────────────────────┤
-│  wgpu        │  GPU Abstraction Layer               │
-└─────────────────────────────────────────────────────┘
-```
+- A quick ramp from "hello world" to production-ready UI patterns.
+- Deep dives on layout, materials, animation, and performance tuning.
+- Practical recipes for responsive input, state machines, and platform integration.
 
-## Quick Example
+What you'll build
 
-Here's a minimal Junita application:
+By the end of this book you will know how to:
+
+- Compose complex layouts with a flexbox-inspired API.
+- Create reusable, animated components with type-safe hooks.
+- Apply modern materials (glass, acrylic, blur) and fine-tune rendering.
+- Integrate Junita into a native windowed app and ship across platforms.
+
+Quick taste — a tiny Junita app
 
 ```rust
 use junita_app::prelude::*;
-use junita_app::windowed::{WindowedApp, WindowedContext};
 
 fn main() -> Result<()> {
     WindowedApp::run(WindowConfig::default(), |ctx| {
         div()
-            .w(ctx.width)
-            .h(ctx.height)
-            .bg(Color::rgba(0.1, 0.1, 0.15, 1.0))
+            .w(ctx.width).h(ctx.height)
+            .bg(Color::rgba(0.06, 0.07, 0.10, 1.0))
             .flex_center()
             .child(
                 div()
                     .glass()
                     .rounded(16.0)
-                    .p(32.0)
-                    .child(text("Hello, Junita!").size(24.0).color(Color::WHITE))
+                    .p(28.0)
+                    .child(text("Welcome to Junita").size(28.0).color(Color::WHITE))
+                    .child(text("Fast. Smooth. Delightful.").size(14.0).color(Color::GRAY))
             )
     })
 }
 ```
 
-## Next Steps
+How this book is organized
 
-- [Installation](./getting-started/installation.md) - Set up your development environment
-- [Your First App](./getting-started/first-app.md) - Build a complete application step by step
-- [Elements & Layout](./core/elements-layout.md) - Learn about available UI elements
+- Getting started — installation and your first app
+- Core & Layout — elements, layout rules, and styling
+- Animation & Motion — springs, timelines, and choreography
+- Advanced — performance, custom materials, and platform tips
+
+Ready to go? Jump to the [Getting Started](./getting-started/first-app.md) chapter and let’s make something that moves.
+```
+            .flex_center()
