@@ -137,7 +137,10 @@ impl DerefMut for Alert {
 }
 
 impl ElementBuilder for Alert {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -253,7 +256,10 @@ impl DerefMut for AlertBox {
 }
 
 impl ElementBuilder for AlertBox {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 

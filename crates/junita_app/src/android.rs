@@ -29,7 +29,7 @@ use android_activity::{AndroidApp as NdkAndroidApp, InputStatus, MainEvent, Poll
 use ndk::native_window::NativeWindow;
 
 use junita_animation::AnimationScheduler;
-use junita_core::context_state::{JunitaContextState, HookState, SharedHookState};
+use junita_core::context_state::{HookState, JunitaContextState, SharedHookState};
 use junita_core::reactive::{ReactiveGraph, SignalId};
 use junita_layout::event_router::MouseButton;
 use junita_layout::overlay_state::OverlayContext;
@@ -313,8 +313,9 @@ impl AndroidApp {
                                             .set_viewport_size(logical_width, logical_height);
 
                                         // Initialize render state
-                                        let mut rs =
-                                            junita_layout::RenderState::new(Arc::clone(&animations));
+                                        let mut rs = junita_layout::RenderState::new(Arc::clone(
+                                            &animations,
+                                        ));
                                         rs.set_shared_motion_states(Arc::clone(
                                             &shared_motion_states,
                                         ));

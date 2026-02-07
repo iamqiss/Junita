@@ -226,7 +226,10 @@ impl Textarea {
 }
 
 impl ElementBuilder for Textarea {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -380,7 +383,10 @@ impl TextareaBuilder {
 }
 
 impl ElementBuilder for TextareaBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 

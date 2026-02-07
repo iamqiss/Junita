@@ -35,9 +35,9 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use indexmap::IndexMap;
 use junita_animation::{AnimationPreset, MultiKeyframeAnimation};
 use junita_core::Color;
-use indexmap::IndexMap;
 
 use crate::div::{div, Div};
 use crate::key::InstanceKey;

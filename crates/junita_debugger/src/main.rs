@@ -14,8 +14,8 @@ mod panels;
 mod theme;
 
 use anyhow::Result;
-use junita_theme::{ColorScheme, ThemeState};
 use clap::Parser;
+use junita_theme::{ColorScheme, ThemeState};
 use std::path::PathBuf;
 
 /// Visual debugger for Junita UI recordings

@@ -151,7 +151,10 @@ impl DerefMut for Card {
 }
 
 impl ElementBuilder for Card {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -254,7 +257,10 @@ impl DerefMut for CardHeader {
 }
 
 impl ElementBuilder for CardHeader {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -328,7 +334,10 @@ impl DerefMut for CardContent {
 }
 
 impl ElementBuilder for CardContent {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -401,7 +410,10 @@ impl DerefMut for CardFooter {
 }
 
 impl ElementBuilder for CardFooter {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 

@@ -506,7 +506,10 @@ impl ScrollPhysics {
         }
 
         // Transition state machine
-        if let Some(new_state) = self.state.on_event(junita_core::events::event_types::SCROLL) {
+        if let Some(new_state) = self
+            .state
+            .on_event(junita_core::events::event_types::SCROLL)
+        {
             self.state = new_state;
         }
 

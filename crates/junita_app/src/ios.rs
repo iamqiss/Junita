@@ -33,7 +33,7 @@ use std::sync::{
 };
 
 use junita_animation::AnimationScheduler;
-use junita_core::context_state::{JunitaContextState, HookState, SharedHookState};
+use junita_core::context_state::{HookState, JunitaContextState, SharedHookState};
 use junita_core::reactive::{ReactiveGraph, SignalId};
 use junita_layout::event_router::MouseButton;
 use junita_layout::overlay_state::OverlayContext;
@@ -547,11 +547,7 @@ impl IOSRenderContext {
                             self.is_scrolling = true;
                             // Store scroll info for dispatch after event loop
                             scroll_info = Some((lx, ly, delta_x, delta_y));
-                            tracing::trace!(
-                                "Touch scroll: delta=({:.1}, {:.1})",
-                                delta_x,
-                                delta_y
-                            );
+                            tracing::trace!("Touch scroll: delta=({:.1}, {:.1})", delta_x, delta_y);
                         }
                     }
 

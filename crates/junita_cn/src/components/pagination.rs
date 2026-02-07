@@ -498,7 +498,10 @@ impl DerefMut for Pagination {
 }
 
 impl ElementBuilder for Pagination {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -597,7 +600,10 @@ impl PaginationBuilder {
 }
 
 impl ElementBuilder for PaginationBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 

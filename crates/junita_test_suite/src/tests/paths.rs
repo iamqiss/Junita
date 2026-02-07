@@ -226,9 +226,9 @@ pub fn suite() -> TestSuite {
         // Draw a simple arc from left to right using SVG arc command
         let path = Path::new().move_to(100.0, 150.0).arc_to(
             junita_core::Vec2::new(50.0, 50.0), // radii
-            0.0,                               // rotation
-            false,                             // large_arc
-            true,                              // sweep (clockwise)
+            0.0,                                // rotation
+            false,                              // large_arc
+            true,                               // sweep (clockwise)
             200.0,
             150.0, // end point
         );

@@ -147,7 +147,10 @@ impl AnimatedSkeleton {
 }
 
 impl ElementBuilder for AnimatedSkeleton {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         // Configure timeline for shimmer animation
         // To simulate ping-pong, we add two entries: 0->1 and 1->0
         let half_duration = self.duration_ms / 2;
@@ -255,7 +258,10 @@ impl DerefMut for Skeleton {
 }
 
 impl ElementBuilder for Skeleton {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 

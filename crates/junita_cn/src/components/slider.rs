@@ -41,7 +41,7 @@
 
 use junita_animation::{get_scheduler, AnimationContext, SpringConfig};
 use junita_core::events::event_types;
-use junita_core::{JunitaContext, JunitaContextState, Color, State};
+use junita_core::{Color, JunitaContext, JunitaContextState, State};
 use junita_layout::div::ElementTypeId;
 use junita_layout::element::{CursorStyle, RenderProps};
 use junita_layout::motion::motion;

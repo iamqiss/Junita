@@ -104,12 +104,14 @@ impl AndroidNativeBridgeAdapter {
             })?;
 
             // Find the JunitaNativeBridge class
-            let class = env.find_class("com/junita/JunitaNativeBridge").map_err(|e| {
-                NativeBridgeError::PlatformError(format!(
-                    "Failed to find JunitaNativeBridge class: {}",
-                    e
-                ))
-            })?;
+            let class = env
+                .find_class("com/junita/JunitaNativeBridge")
+                .map_err(|e| {
+                    NativeBridgeError::PlatformError(format!(
+                        "Failed to find JunitaNativeBridge class: {}",
+                        e
+                    ))
+                })?;
             env.new_global_ref(class).map_err(|e| {
                 NativeBridgeError::PlatformError(format!("Failed to create global ref: {}", e))
             })?

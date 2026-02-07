@@ -163,7 +163,10 @@ impl LabelBuilder {
 }
 
 impl ElementBuilder for Label {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -181,7 +184,10 @@ impl ElementBuilder for Label {
 }
 
 impl ElementBuilder for LabelBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 

@@ -149,7 +149,10 @@ impl Progress {
 }
 
 impl ElementBuilder for Progress {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -228,7 +231,10 @@ impl ProgressBuilder {
 }
 
 impl ElementBuilder for ProgressBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 
@@ -356,7 +362,10 @@ impl AnimatedProgress {
 }
 
 impl ElementBuilder for AnimatedProgress {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -429,7 +438,10 @@ impl AnimatedProgressBuilder {
 }
 
 impl ElementBuilder for AnimatedProgressBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 

@@ -7,8 +7,8 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
 
-use junita_animation::AnimationScheduler;
 use indexmap::IndexMap;
+use junita_animation::AnimationScheduler;
 
 use junita_core::{
     BlendMode, Brush, ClipShape, Color, CornerRadius, DrawContext, GlassStyle, LayerConfig, Rect,

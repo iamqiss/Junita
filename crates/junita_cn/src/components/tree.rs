@@ -490,10 +490,11 @@ impl TreeViewBuilder {
                                 .relative()
                                 .overflow_clip()
                                 .animate_bounds(
-                                    junita_layout::visual_animation::VisualAnimationConfig::height()
-                                        .with_key(&anim_key)
-                                        .clip_to_animated()
-                                        .gentle(),
+                                    junita_layout::visual_animation::VisualAnimationConfig::height(
+                                    )
+                                    .with_key(&anim_key)
+                                    .clip_to_animated()
+                                    .gentle(),
                                 );
 
                             // Optional guide line - positioned at center of this node's chevron

@@ -6,6 +6,7 @@
 //! - Reference image comparison
 
 use anyhow::{Context, Result};
+use image::{ImageBuffer, Rgba, RgbaImage};
 use junita_core::{Rect, Size};
 use junita_gpu::{
     GpuGlassPrimitive, GpuGlyph, GpuPaintContext, GpuRenderer, PrimitiveBatch, RendererConfig,
@@ -16,7 +17,6 @@ use junita_layout::prelude::*;
 use junita_layout::renderer::ElementType;
 use junita_svg::SvgDocument;
 use junita_text::TextAnchor;
-use image::{ImageBuffer, Rgba, RgbaImage};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

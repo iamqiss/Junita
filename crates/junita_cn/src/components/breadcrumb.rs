@@ -274,7 +274,10 @@ impl DerefMut for Breadcrumb {
 }
 
 impl ElementBuilder for Breadcrumb {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 
@@ -407,7 +410,10 @@ impl Default for BreadcrumbBuilder {
 }
 
 impl ElementBuilder for BreadcrumbBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().build(tree)
     }
 

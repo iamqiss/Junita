@@ -76,7 +76,7 @@ pub use value::{
 pub use context::{JunitaContext, JunitaContextExt};
 pub use context_state::{
     query, query_motion, request_rebuild, use_signal_keyed, use_state_keyed, AnyElementRegistry,
-    JunitaContextState, Bounds, BoundsCallback, FocusCallback, HookState, MotionAnimationState,
+    Bounds, BoundsCallback, FocusCallback, HookState, JunitaContextState, MotionAnimationState,
     MotionStateCallback, QueryCallback, RecordedEventAny, RecorderEventCallback,
     RecorderSnapshotCallback, RecorderUpdateCallback, ScrollCallback, SharedHookState, StateKey,
     TreeSnapshotAny, UpdateCategory,

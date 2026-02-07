@@ -136,7 +136,10 @@ impl std::fmt::Debug for Kbd {
 }
 
 impl ElementBuilder for KbdBuilder {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.get_or_build().inner.build(tree)
     }
 
@@ -162,7 +165,10 @@ impl ElementBuilder for KbdBuilder {
 }
 
 impl ElementBuilder for Kbd {
-    fn build(&self, tree: &mut junita_layout::tree::LayoutTree) -> junita_layout::tree::LayoutNodeId {
+    fn build(
+        &self,
+        tree: &mut junita_layout::tree::LayoutTree,
+    ) -> junita_layout::tree::LayoutNodeId {
         self.inner.build(tree)
     }
 

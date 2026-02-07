@@ -19,8 +19,8 @@
 //! let emoji = text("Hello 😀 World 🎉");
 //! ```
 
-use junita_core::{Color, Shadow, Transform};
 use html_escape::decode_html_entities;
+use junita_core::{Color, Shadow, Transform};
 use taffy::prelude::*;
 
 use crate::div::{
