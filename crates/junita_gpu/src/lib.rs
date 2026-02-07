@@ -16,6 +16,7 @@
 
 pub mod backbuffer;
 pub mod gradient_texture;
+pub mod gpu_backend;
 pub mod image;
 pub mod paint;
 pub mod particles;
@@ -27,6 +28,7 @@ pub mod text;
 
 pub use backbuffer::{Backbuffer, BackbufferConfig, FrameContext};
 pub use gradient_texture::{GradientTextureCache, RasterizedGradient, GRADIENT_TEXTURE_WIDTH};
+pub use gpu_backend::{WidgetBackend, WidgetRegistryStats};
 pub use image::{GpuImage, GpuImageInstance, ImageRenderingContext};
 pub use paint::GpuPaintContext;
 pub use path::{

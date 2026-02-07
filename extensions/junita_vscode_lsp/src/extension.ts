@@ -2,11 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Junita LSP Extension activated');
-
-    // Register syntax highlighting
-    const disposable = vscode.languages.registerLanguageFeatures('junita', {});
-    context.subscriptions.push(disposable);
+    console.log('Junita DSL Extension activated');
 
     // Command: Connect to hot reload server
     let connectCommand = vscode.commands.registerCommand('junita.connectHotReload', async () => {

@@ -31,6 +31,9 @@ junita_layout = { path = "../junita_layout", version = "0.1.12" }
 junita_paint = { path = "../junita_paint", version = "0.1.12" }
 junita_text = { path = "../junita_text", version = "0.1.12" }
 
+# Error handling
+anyhow.workspace = true
+
 # GPU
 wgpu.workspace = true
 naga.workspace = true
