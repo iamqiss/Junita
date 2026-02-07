@@ -1,0 +1,64 @@
+// Junita Hot Reload Demo
+// This example demonstrates the hot reload system in action
+// Edit this file and save to see changes instantly!
+
+@widget Counter {
+    @prop label: String = "Click me"
+    
+    @state count: Int = 0
+    @state is_active: Bool = false
+    
+    @animation bounce {
+        duration: 300ms,
+        easing: "ease-out"
+    }
+    
+    @render {
+        Box {
+            layout: "flex",
+            direction: "column",
+            padding: 16,
+            background: "rgba(59, 130, 246, 0.1)",
+            border_radius: 8,
+            
+            children: [
+                Text {
+                    text: label,
+                    font_size: 24,
+                    font_weight: "bold",
+                    color: "rgb(59, 130, 246)"
+                },
+                
+                Text {
+                    text: "Count: " + count.to_string(),
+                    font_size: 18,
+                    color: "rgb(107, 114, 128)",
+                    margin_top: 8
+                },
+                
+                Button {
+                    label: "Increment",
+                    on_click: @action { count = count + 1 },
+                    margin_top: 16,
+                    background: "rgb(59, 130, 246)",
+                    padding: 12,
+                    border_radius: 6,
+                    color: "white"
+                }
+            ]
+        }
+    }
+}
+
+@widget App {
+    @render {
+        Window {
+            title: "Junita Hot Reload Demo",
+            width: 400,
+            height: 300,
+            children: [
+                Counter { label: "Hot Reload Counter" }
+            ]
+        }
+    }
+}

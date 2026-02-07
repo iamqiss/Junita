@@ -42,6 +42,7 @@ pub mod hot_reload;
 pub mod layer;
 pub mod native_bridge;
 pub mod reactive;
+pub mod rendering;
 pub mod runtime;
 pub mod store;
 pub mod value;
@@ -95,3 +96,6 @@ pub use native_bridge::{
     NativeBridgeError, NativeBridgeState, NativeHandler, NativeResult, NativeValue,
     PlatformAdapter,
 };
+
+// Re-export rendering adapter
+pub use rendering::{RenderingAdapter, SceneNode, SceneStats};

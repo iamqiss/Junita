@@ -15,6 +15,7 @@ use tracing::{info, warn, debug, error};
 use tokio::sync::broadcast;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
+use crate::compiler::JunitaCompiler;
 
 /// Message sent from hot reload server to client
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,10 +225,11 @@ impl FileWatcher {
     }
 }
 
-/// Compilation trigger for hot reload
+/// Compilation trigger for hot reload with integrated Junita compiler
 pub struct CompilationTrigger {
     project_path: PathBuf,
     target: String,
+    compiler: Arc<Mutex<JunitaCompiler>>,
 }
 
 impl CompilationTrigger {
@@ -235,25 +237,41 @@ impl CompilationTrigger {
         Self {
             project_path,
             target,
+            compiler: Arc::new(Mutex::new(JunitaCompiler::new())),
         }
     }
 
-    /// Trigger a recompilation (stub for now, integrates with Zyntax)
+    /// Trigger incremental recompilation using the Junita compiler
     pub async fn recompile(&self, changed_files: &[PathBuf]) -> Result<()> {
         info!(
-            "Recompiling for {} (target: {})",
+            "Recompiling {} file(s) for target: {}",
             changed_files.len(),
             self.target
         );
 
-        // TODO: When Zyntax integration is ready:
-        // 1. Parse changed .junita files
-        // 2. Run incremental compilation
-        // 3. Link and generate update bundle
-        // 4. Return compiled artifact
+        // Filter to only .junita and .rs files that might need compilation
+        let junita_files: Vec<PathBuf> = changed_files
+            .iter()
+            .filter(|p| {
+                let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+                ext == "junita" || ext == "bl" || ext == "rs"
+            })
+            .cloned()
+            .collect();
 
-        // For now, simulate recompilation
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        if junita_files.is_empty() {
+            debug!("No compilable files in change list");
+            return Ok(());
+        }
+
+        // Compile using the Junita compiler (mock until real Zyntax available)
+        let mut compiler = self.compiler.lock().unwrap();
+        let artifacts = compiler.compile_incremental(&junita_files).await?;
+
+        info!(
+            "Compiled {} artifact(s) for hot reload",
+            artifacts.len()
+        );
 
         debug!("Recompilation complete");
         Ok(())

@@ -13,6 +13,7 @@ mod config;
 mod doctor;
 mod project;
 mod hot_reload;
+mod compiler;
 
 use config::JunitaConfig;
 

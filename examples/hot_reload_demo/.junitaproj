@@ -1,0 +1,20 @@
+[project]
+name = "hot_reload_demo"
+version = "0.1.0"
+description = "Junita hot reload demonstration"
+
+[target.default]
+type = "app"
+main = "main.junita"
+
+[hot_reload]
+watch_extensions = ["junita", "rs", "toml"]
+debounce_ms = 300
+ignore_patterns = ["target", ".git", "node_modules"]
+
+[build]
+optimize = "debug"
+target = "default"
+
+[dependencies]
+# No external dependencies for this demo
