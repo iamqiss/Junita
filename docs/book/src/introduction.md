@@ -35,10 +35,12 @@ Built-in support for glass, metallic, and other material effects:
 ```markdown
 # Junita — The UI framework that actually feels alive
 
-![window graphic](../../window.svg)
+![window graphic](window.svg)
 
 <div align="center">
-  ![Junita logo](../../logo.svg){:height="64"}
+
+![Junita logo](logo.svg)
+
 </div>
 
 Junita is a GPU-first, reactive UI framework for Rust — built for people who want silky animations, modern material effects, and the control of native rendering without the pain of low-level GPU plumbing.
