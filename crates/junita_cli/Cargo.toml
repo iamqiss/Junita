@@ -28,6 +28,12 @@ tokio.workspace = true
 # Async message passing
 broadcast.workspace = true
 
+# WebSocket for network hot reload
+tokio-tungstenite.workspace = true
+
+# Async utilities
+futures.workspace = true
+
 # Config
 toml.workspace = true
 serde.workspace = true

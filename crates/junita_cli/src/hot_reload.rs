@@ -353,6 +353,119 @@ impl HotReloadServer {
     }
 }
 
+// =============================================================================
+// NETWORK HOT RELOAD - WebSocket server for remote device updates
+// =============================================================================
+
+use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tokio::net::TcpListener;
+use futures::stream::StreamExt;
+
+/// Network hot reload server (WebSocket)
+pub struct NetworkHotReloadServer {
+    listener: Option<TcpListener>,
+    port: u16,
+}
+
+impl NetworkHotReloadServer {
+    pub fn new(port: u16) -> Self {
+        Self {
+            listener: None,
+            port,
+        }
+    }
+
+    /// Start the WebSocket server and listen for connections
+    pub async fn start(
+        &mut self,
+        hot_reload_rx: broadcast::Receiver<HotReloadMessage>,
+    ) -> Result<()> {
+        let addr = format!("127.0.0.1:{}", self.port);
+        let listener = TcpListener::bind(&addr).await?;
+        self.listener = Some(listener);
+
+        info!("Network hot reload server listening on ws://{}", addr);
+
+        let listener = self.listener.take().unwrap();
+        let mut rx = hot_reload_rx;
+
+        // Accept connections in a spawned task
+        tokio::spawn(async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, peer_addr)) => {
+                        debug!("Device connected: {}", peer_addr);
+                        let mut rx = rx.resubscribe();
+
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_device_connection(stream, &mut rx).await {
+                                warn!("Device connection error: {}", e);
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        error!("Accept error: {}", e);
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+}
+
+/// Handle a single device WebSocket connection
+async fn handle_device_connection(
+    stream: tokio::net::TcpStream,
+    hot_reload_rx: &mut broadcast::Receiver<HotReloadMessage>,
+) -> Result<()> {
+    let ws_stream = accept_async(stream).await?;
+    info!("Device WebSocket upgraded");
+
+    let (_write, mut read) = ws_stream.split();
+
+    // Listen for messages from the device and hot reload updates
+    loop {
+        tokio::select! {
+            msg = read.next() => {
+                match msg {
+                    Some(Ok(Message::Text(text))) => {
+                        // Device sent a message (e.g., ready, error report)
+                        debug!("Device message: {}", text);
+                    }
+                    Some(Ok(Message::Close(_))) | None => {
+                        info!("Device disconnected");
+                        break;
+                    }
+                    Some(Err(e)) => {
+                        error!("WebSocket error: {}", e);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            result = hot_reload_rx.recv() => {
+                match result {
+                    Ok(msg) => {
+                        // Send hot reload update to device
+                        let json = serde_json::to_string(&msg)?;
+                        // TODO: Send over WebSocket
+                        debug!("Would send to device: {}", json);
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        // Device fell behind, skip
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

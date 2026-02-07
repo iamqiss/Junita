@@ -1,0 +1,102 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Junita",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#decorators"
+    },
+    {
+      "include": "#types"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.junita",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.junita",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.junita",
+          "match": "\\b(if|else|for|while|match|return|break|continue|fn)\\b"
+        },
+        {
+          "name": "keyword.declaration.junita",
+          "match": "\\b(pub|async|await|mut|const|static|let|var)\\b"
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.junita",
+          "match": "@(widget|state|prop|derived|machine|animation|render|paint|spring|effect)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.junita",
+          "match": "\\b(Int|Float|Bool|String|color|Vec|HashMap|Option|Result)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.junita",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.junita",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.junita",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.junita",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.junita",
+          "match": "\\b(\\d+(\\.\\d+)?|0x[0-9a-fA-F]+)\\b"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.junita"
+}

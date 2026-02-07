@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "iconDefinitions": {
+    "_junita_file": {
+      "iconPath": "../../docs/book/src/logo.svg"
+    }
+  },
+  "fileExtensions": {
+    "junita": "_junita_file",
+    "bl": "_junita_file"
+  },
+  "fileNames": {
+    ".junitaproj": "_junita_file"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "name": "junita-dsl",
+  "displayName": "Junita DSL",
+  "description": "Language support for Junita UI Framework (.junita, .bl files) with hot reload integration",
+  "version": "0.0.1",
+  "publisher": "junita",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamqiss/Junita.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "junita",
+    "dsl",
+    "ui",
+    "framework",
+    "hot-reload"
+  ],
+  "activationEvents": [
+    "onLanguage:junita"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "junita",
+        "aliases": [
+          "Junita",
+          "junita"
+        ],
+        "extensions": [
+          ".junita",
+          ".bl"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "../docs/book/src/logo.svg",
+          "dark": "../docs/book/src/logo.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "junita",
+        "scopeName": "source.junita",
+        "path": "./syntaxes/junita.tmLanguage.json"
+      }
+    ],
+    "fileIconThemes": [
+      {
+        "id": "junita-icons",
+        "label": "Junita Icons",
+        "path": "./fileicons/junita-icons.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}

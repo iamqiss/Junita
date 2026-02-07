@@ -1,0 +1,34 @@
+{
+  "comments": {
+    "lineComment": "//"
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*//\\s*#?region",
+      "end": "^\\s*//\\s*#?endregion"
+    }
+  },
+  "indentationRules": {
+    "increaseIndentPattern": "^\\s*(pub\\s+)?(async\\s+)?(fn|struct|enum|impl|trait|mod|@widget|@machine|@animation)\\b.*|.*\\{\\s*$",
+    "decreaseIndentPattern": "^\\s*\\}"
+  }
+}
