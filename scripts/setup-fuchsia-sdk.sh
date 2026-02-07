@@ -1,8 +1,8 @@
 #!/bin/bash
-# Fuchsia SDK Setup Script for Blinc
+# Fuchsia SDK Setup Script for Junita
 #
 # This script installs and configures the Fuchsia SDK and ffx tools
-# required for building Blinc applications targeting Fuchsia OS.
+# required for building Junita applications targeting Fuchsia OS.
 #
 # References:
 # - SDK Documentation: https://fuchsia.dev/fuchsia-src/development/sdk
@@ -25,7 +25,7 @@ FFX_PATH="$SDK_DIR/tools/ffx"
 
 print_header() {
     echo -e "${BLUE}======================================${NC}"
-    echo -e "${BLUE}  Fuchsia SDK Setup for Blinc${NC}"
+    echo -e "${BLUE}  Fuchsia SDK Setup for Junita${NC}"
     echo -e "${BLUE}======================================${NC}"
     echo ""
 }
@@ -357,7 +357,7 @@ setup_environment() {
     # Add environment setup for Bazel SDK
     cat >> "$shell_rc" << EOF
 
-# Fuchsia SDK (added by Blinc setup script)
+# Fuchsia SDK (added by Junita setup script)
 export FUCHSIA_DIR="$FUCHSIA_DIR"
 export FUCHSIA_SDK="$SDK_DIR"
 export FUCHSIA_BIN="\$FUCHSIA_DIR/bin"
@@ -468,7 +468,7 @@ print_summary() {
     echo "3. Run the sample:"
     echo "   tools/bazel run //src/hello_world:pkg.component"
     echo ""
-    echo -e "${BLUE}Build Blinc for Fuchsia:${NC}"
+    echo -e "${BLUE}Build Junita for Fuchsia:${NC}"
     echo "  cargo build --features fuchsia --target x86_64-unknown-fuchsia"
     echo ""
     echo -e "${BLUE}Documentation:${NC}"

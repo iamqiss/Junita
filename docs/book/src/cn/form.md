@@ -7,7 +7,7 @@ Components for building forms: inputs, checkboxes, selects, and more.
 Text input field:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 input()
     .placeholder("Enter your name...")

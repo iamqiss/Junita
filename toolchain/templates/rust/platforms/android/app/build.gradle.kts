@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.blinc.{{project_name_snake}}"
+    namespace = "com.junita.{{project_name_snake}}"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.blinc.{{project_name_snake}}"
+        applicationId = "com.junita.{{project_name_snake}}"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

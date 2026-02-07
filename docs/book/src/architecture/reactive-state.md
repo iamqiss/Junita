@@ -1,6 +1,6 @@
 # Reactive State System
 
-Blinc implements a **push-pull hybrid reactive system** for fine-grained state management without virtual DOM overhead. This is inspired by modern reactive frameworks like Leptos and SolidJS.
+Junita implements a **push-pull hybrid reactive system** for fine-grained state management without virtual DOM overhead. This is inspired by modern reactive frameworks like Leptos and SolidJS.
 
 ## Core Concepts
 
@@ -213,7 +213,7 @@ fn set(&mut self, value: T) {
 
 ## Comparison to Virtual DOM
 
-| Aspect | Virtual DOM | Blinc Reactive |
+| Aspect | Virtual DOM | Junita Reactive |
 |--------|-------------|----------------|
 | State change | Rebuild entire component | Update only affected nodes |
 | Diffing | O(tree size) | O(1) per signal |

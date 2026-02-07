@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=counter
-Comment=A Blinc application
+Comment=A Junita application
 Exec=counter
 Icon=counter
 Terminal=false

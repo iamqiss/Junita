@@ -1,17 +1,17 @@
 # Plugins
 
-Place your local Blinc plugins here. Each plugin should be in its own directory.
+Place your local Junita plugins here. Each plugin should be in its own directory.
 
 ## Creating a Plugin
 
 ```bash
 cd plugins
-blinc plugin new my_plugin
+junita plugin new my_plugin
 ```
 
 ## Using a Plugin
 
-Add to your `.blincproj`:
+Add to your `.junitaproj`:
 
 ```toml
 [[dependencies.plugins]]

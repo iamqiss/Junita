@@ -42,7 +42,7 @@ lto = "thin"
 
 [xcode]
 # Xcode project generation settings
-project_name = "BlincApp"
+project_name = "JunitaApp"
 organization_name = ""
 organization_identifier = "com.example"
 
@@ -54,7 +54,7 @@ swift_version = "5.9"
 
 [signing]
 # Development team ID (from Apple Developer account)
-# Can be set via BLINC_IOS_TEAM_ID env var
+# Can be set via JUNITA_IOS_TEAM_ID env var
 team_id = ""
 
 # Code signing identity
@@ -62,7 +62,7 @@ development_identity = "Apple Development"
 distribution_identity = "Apple Distribution"
 
 # Provisioning profile
-# Can be set via BLINC_IOS_PROVISIONING_PROFILE env var
+# Can be set via JUNITA_IOS_PROVISIONING_PROFILE env var
 provisioning_profile = ""
 
 [simulator]

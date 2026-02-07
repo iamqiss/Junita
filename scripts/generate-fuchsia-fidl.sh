@@ -4,13 +4,13 @@
 #
 # Generates Rust bindings for each FIDL library individually.
 #
-# Output: extensions/blinc_fuchsia_bindings/src/
+# Output: extensions/junita_fuchsia_bindings/src/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-OUTPUT_DIR="$PROJECT_ROOT/extensions/blinc_fuchsia_bindings/src"
+OUTPUT_DIR="$PROJECT_ROOT/extensions/junita_fuchsia_bindings/src"
 
 # Colors
 RED='\033[0;31m'
@@ -103,7 +103,7 @@ done
 
 # Create lib.rs
 cat > "$OUTPUT_DIR/lib.rs" << 'HEADER'
-//! Fuchsia FIDL Bindings for Blinc
+//! Fuchsia FIDL Bindings for Junita
 //!
 //! Auto-generated from Fuchsia SDK FIDL definitions.
 //! Regenerate with: `./scripts/generate-fuchsia-fidl.sh`
@@ -284,4 +284,4 @@ done
 echo ""
 echo "Stub types provided for non-Fuchsia builds."
 echo ""
-echo "Next: cargo check -p blinc_fuchsia_bindings"
+echo "Next: cargo check -p junita_fuchsia_bindings"

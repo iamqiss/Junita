@@ -7,7 +7,7 @@ Components for displaying data: tooltips, popovers, hover cards, charts, and tre
 Brief information on hover:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 tooltip()
     .child(tooltip_trigger()

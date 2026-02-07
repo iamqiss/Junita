@@ -1,8 +1,8 @@
 #!/bin/bash
-# Fuchsia Tools Verification Script for Blinc
+# Fuchsia Tools Verification Script for Junita
 #
 # Verifies that all required Fuchsia development tools are installed
-# and properly configured for Blinc development.
+# and properly configured for Junita development.
 
 # Don't exit on first error - we want to show all checks
 # set -e
@@ -157,7 +157,7 @@ main() {
     if [ $failed -eq 0 ]; then
         echo -e "${GREEN}All required tools are installed!${NC}"
         echo ""
-        echo "You can now build Blinc for Fuchsia:"
+        echo "You can now build Junita for Fuchsia:"
         echo "  cargo build --features fuchsia --target x86_64-unknown-fuchsia"
     else
         echo -e "${RED}Some required tools are missing.${NC}"

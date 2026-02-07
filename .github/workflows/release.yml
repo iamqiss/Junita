@@ -26,28 +26,28 @@ jobs:
           # macOS
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: blinc
-            asset_name: blinc-x86_64-apple-darwin
+            artifact_name: junita
+            asset_name: junita-x86_64-apple-darwin
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: blinc
-            asset_name: blinc-aarch64-apple-darwin
+            artifact_name: junita
+            asset_name: junita-aarch64-apple-darwin
 
           # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: blinc
-            asset_name: blinc-x86_64-unknown-linux-gnu
+            artifact_name: junita
+            asset_name: junita-x86_64-unknown-linux-gnu
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact_name: blinc
-            asset_name: blinc-aarch64-unknown-linux-gnu
+            artifact_name: junita
+            asset_name: junita-aarch64-unknown-linux-gnu
 
           # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: blinc.exe
-            asset_name: blinc-x86_64-pc-windows-msvc.exe
+            artifact_name: junita.exe
+            asset_name: junita-x86_64-pc-windows-msvc.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }} -p blinc_cli
+        run: cargo build --release --target ${{ matrix.target }} -p junita_cli
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows'
@@ -147,7 +147,7 @@ jobs:
         run: |
           cd artifacts
           find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} . \;
-          rm -rf blinc-*/
+          rm -rf junita-*/
           sha256sum *.tar.gz *.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -155,7 +155,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Blinc CLI ${{ steps.version.outputs.version }}
+          name: Junita CLI ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
@@ -168,32 +168,32 @@ jobs:
 
             ### macOS (Apple Silicon)
             ```bash
-            curl -fsSL https://github.com/project-blinc/blinc/releases/download/${{ steps.version.outputs.tag }}/blinc-aarch64-apple-darwin.tar.gz | tar -xz
-            sudo mv blinc /usr/local/bin/
+            curl -fsSL https://github.com/project-junita/junita/releases/download/${{ steps.version.outputs.tag }}/junita-aarch64-apple-darwin.tar.gz | tar -xz
+            sudo mv junita /usr/local/bin/
             ```
 
             ### macOS (Intel)
             ```bash
-            curl -fsSL https://github.com/project-blinc/blinc/releases/download/${{ steps.version.outputs.tag }}/blinc-x86_64-apple-darwin.tar.gz | tar -xz
-            sudo mv blinc /usr/local/bin/
+            curl -fsSL https://github.com/project-junita/junita/releases/download/${{ steps.version.outputs.tag }}/junita-x86_64-apple-darwin.tar.gz | tar -xz
+            sudo mv junita /usr/local/bin/
             ```
 
             ### Linux (x86_64)
             ```bash
-            curl -fsSL https://github.com/project-blinc/blinc/releases/download/${{ steps.version.outputs.tag }}/blinc-x86_64-unknown-linux-gnu.tar.gz | tar -xz
-            sudo mv blinc /usr/local/bin/
+            curl -fsSL https://github.com/project-junita/junita/releases/download/${{ steps.version.outputs.tag }}/junita-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+            sudo mv junita /usr/local/bin/
             ```
 
             ### Linux (ARM64)
             ```bash
-            curl -fsSL https://github.com/project-blinc/blinc/releases/download/${{ steps.version.outputs.tag }}/blinc-aarch64-unknown-linux-gnu.tar.gz | tar -xz
-            sudo mv blinc /usr/local/bin/
+            curl -fsSL https://github.com/project-junita/junita/releases/download/${{ steps.version.outputs.tag }}/junita-aarch64-unknown-linux-gnu.tar.gz | tar -xz
+            sudo mv junita /usr/local/bin/
             ```
 
             ### Windows
-            Download `blinc-x86_64-pc-windows-msvc.zip`, extract, and add to PATH.
+            Download `junita-x86_64-pc-windows-msvc.zip`, extract, and add to PATH.
 
             ## Verify Installation
             ```bash
-            blinc doctor
+            junita doctor
             ```

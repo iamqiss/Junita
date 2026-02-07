@@ -1,0 +1,41 @@
+[package]
+name = "junita_text"
+description = "High-quality text rendering for Junita UI framework"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_text"
+rust-version.workspace = true
+keywords = ["ui", "gui", "text", "font", "junita"]
+categories = ["gui", "text-processing"]
+
+[dependencies]
+junita_core = { path = "../junita_core", version = "0.1.12" }
+
+# Font parsing
+ttf-parser = { workspace = true }
+
+# Text shaping (HarfBuzz)
+rustybuzz = { workspace = true }
+
+# Font discovery
+fontdb = { workspace = true }
+
+# Glyph rasterization (swash - high quality font rasterizer)
+swash = "0.1"
+
+# Unicode handling
+unicode-bidi = { workspace = true }
+unicode-linebreak = { workspace = true }
+
+# HTML entity decoding
+html-escape = "0.2"
+
+# Utilities
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rustc-hash = { workspace = true }
+lru = { workspace = true }
+
+[dev-dependencies]

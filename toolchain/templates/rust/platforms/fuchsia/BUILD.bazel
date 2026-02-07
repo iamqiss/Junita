@@ -1,9 +1,9 @@
-# Copyright 2024 The Blinc Authors. All rights reserved.
+# Copyright 2024 The Junita Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license.
 #
-# BUILD.bazel - Bazel build file for Blinc Fuchsia applications
+# BUILD.bazel - Bazel build file for Junita Fuchsia applications
 #
-# This file is for building Blinc apps using the Fuchsia SDK Bazel workflow.
+# This file is for building Junita apps using the Fuchsia SDK Bazel workflow.
 # Use this when working with the sdk-samples repository approach.
 #
 # Prerequisites:
@@ -35,7 +35,7 @@ package(default_visibility = ["//visibility:public"])
 # Component manifest
 fuchsia_component_manifest(
     name = "manifest",
-    src = "meta/blinc_app.cml",
+    src = "meta/junita_app.cml",
     includes = [
         "@fuchsia_sdk//pkg/syslog:client",
     ],
@@ -45,7 +45,7 @@ fuchsia_component_manifest(
 # Uncomment if you have a C++ entry point that calls into Rust
 #
 # fuchsia_cc_binary(
-#     name = "blinc_app_bin",
+#     name = "junita_app_bin",
 #     srcs = ["src/main.cc"],
 #     deps = [
 #         "@fuchsia_sdk//pkg/async-cpp",
@@ -63,18 +63,18 @@ fuchsia_component(
     name = "component",
     manifest = ":manifest",
     # Binary comes from cargo build, added via fuchsia_package resources
-    # deps = [":blinc_app_bin"],  # Uncomment if using cc_binary above
+    # deps = [":junita_app_bin"],  # Uncomment if using cc_binary above
 )
 
 # Package the component
 fuchsia_package(
     name = "pkg",
-    package_name = "blinc_app",
+    package_name = "junita_app",
     components = [":component"],
     # Include the pre-built Rust binary
     resources = [
         # Path to cargo-built binary - update after cargo build
-        # "//path/to/target/x86_64-unknown-fuchsia/release/blinc_app:bin/blinc_app",
+        # "//path/to/target/x86_64-unknown-fuchsia/release/junita_app:bin/junita_app",
     ],
 )
 
@@ -87,14 +87,14 @@ fuchsia_package(
 #
 # 2. Create package manually with ffx:
 #    ffx package build \
-#      --published-name blinc_app \
+#      --published-name junita_app \
 #      --api-level HEAD \
-#      target/x86_64-unknown-fuchsia/release/blinc_app \
-#      meta/blinc_app.cml
+#      target/x86_64-unknown-fuchsia/release/junita_app \
+#      meta/junita_app.cml
 #
 # 3. Publish to repository:
 #    ffx repository server start
 #    ffx repository publish
 #
 # 4. Run:
-#    ffx component run fuchsia-pkg://fuchsia.com/blinc_app#meta/blinc_app.cm
+#    ffx component run fuchsia-pkg://fuchsia.com/junita_app#meta/junita_app.cm

@@ -1,0 +1,19 @@
+[package]
+name = "junita_macros"
+description = "Procedural macros for Junita UI framework"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_macros"
+rust-version.workspace = true
+keywords = ["ui", "gui", "macros", "junita"]
+categories = ["gui", "development-tools::procedural-macro-helpers"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }

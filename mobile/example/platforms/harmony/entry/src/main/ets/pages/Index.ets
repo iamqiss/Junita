@@ -1,29 +1,29 @@
-import blinc from 'libexample.so'
+import junita from 'libexample.so'
 
 @Entry
 @Component
 struct Index {
-  private blincContext: number = 0
+  private junitaContext: number = 0
 
   build() {
     Column() {
       XComponent({
-        id: 'blinc_canvas',
+        id: 'junita_canvas',
         type: XComponentType.SURFACE,
         libraryname: 'example'
       })
       .width('100%')
       .height('100%')
       .onLoad((xComponentContext) => {
-        console.info('[Blinc] XComponent loaded')
-        // Initialize Blinc native module
-        this.blincContext = blinc.init(xComponentContext)
+        console.info('[Junita] XComponent loaded')
+        // Initialize Junita native module
+        this.junitaContext = junita.init(xComponentContext)
       })
       .onDestroy(() => {
-        console.info('[Blinc] XComponent destroyed')
-        if (this.blincContext !== 0) {
-          blinc.destroy(this.blincContext)
-          this.blincContext = 0
+        console.info('[Junita] XComponent destroyed')
+        if (this.junitaContext !== 0) {
+          junita.destroy(this.junitaContext)
+          this.junitaContext = 0
         }
       })
     }

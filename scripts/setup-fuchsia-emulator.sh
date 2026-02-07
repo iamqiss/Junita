@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# setup-fuchsia-emulator.sh - Set up Fuchsia Emulator (FEMU) for Blinc development
+# setup-fuchsia-emulator.sh - Set up Fuchsia Emulator (FEMU) for Junita development
 #
-# This script sets up the Fuchsia emulator environment for testing Blinc apps.
+# This script sets up the Fuchsia emulator environment for testing Junita apps.
 # Requires the Fuchsia SDK to be installed first (run setup-fuchsia-sdk.sh).
 #
 # Usage:
@@ -240,7 +240,7 @@ show_usage_instructions() {
     echo "  $FFX component run fuchsia-pkg://fuchsia.com/your_package#meta/your_component.cm"
     echo
     echo "  # View logs"
-    echo "  $FFX log --filter blinc"
+    echo "  $FFX log --filter junita"
     echo
     echo "  # Stop emulator"
     echo "  $FFX emu stop"
@@ -251,7 +251,7 @@ show_usage_instructions() {
     info "Documentation:"
     echo "  https://fuchsia.dev/fuchsia-src/development/build/emulator"
     echo
-    info "Building Blinc for Fuchsia:"
+    info "Building Junita for Fuchsia:"
     echo "  cargo build --target x86_64-unknown-fuchsia --features fuchsia"
     echo
 }
@@ -260,7 +260,7 @@ show_usage_instructions() {
 main() {
     echo
     info "=========================================="
-    info "Fuchsia Emulator Setup for Blinc"
+    info "Fuchsia Emulator Setup for Junita"
     info "=========================================="
     echo
 

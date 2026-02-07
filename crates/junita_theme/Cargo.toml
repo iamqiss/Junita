@@ -1,0 +1,34 @@
+[package]
+name = "junita_theme"
+description = "Theming system for Junita UI framework - colors, typography, and design tokens"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_theme"
+rust-version.workspace = true
+keywords = ["ui", "gui", "theme", "design", "junita"]
+categories = ["gui"]
+
+[dependencies]
+junita_core = { path = "../junita_core", version = "0.1.12" }
+junita_animation = { path = "../junita_animation", version = "0.1.12" }
+
+# Utilities
+tracing = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+# Data structures
+rustc-hash = { workspace = true }
+
+# Platform-specific dependencies for color scheme detection
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true, optional = true }
+objc2-foundation = { workspace = true, optional = true }
+
+[features]
+default = []
+platform-macos = ["objc2", "objc2-foundation"]
+# Enable system color scheme watcher (polls for system theme changes)
+watcher = []

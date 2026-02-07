@@ -7,7 +7,7 @@ Components for user feedback: alerts, badges, progress indicators, and toasts.
 Display important messages:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 alert()
     .child(alert_title("Heads up!"))

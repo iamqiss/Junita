@@ -1,8 +1,8 @@
 #!/bin/bash
-# HarmonyOS Tools Verification Script for Blinc
+# HarmonyOS Tools Verification Script for Junita
 #
 # Verifies that all required HarmonyOS/OpenHarmony development tools are installed
-# and properly configured for Blinc development.
+# and properly configured for Junita development.
 
 # Don't exit on first error - we want to show all checks
 # set -e
@@ -214,7 +214,7 @@ main() {
     if [ "$hdc_available" = true ] && [ "$ndk_available" = true ]; then
         echo -e "${GREEN}OpenHarmony SDK is installed!${NC}"
         echo ""
-        echo "Build Blinc for HarmonyOS:"
+        echo "Build Junita for HarmonyOS:"
         echo "  cargo build --features harmony"
         echo ""
         echo "Use HDC to connect devices:"

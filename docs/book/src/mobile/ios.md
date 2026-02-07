@@ -1,6 +1,6 @@
 # iOS Development
 
-This guide covers setting up your environment and building Blinc apps for iOS.
+This guide covers setting up your environment and building Junita apps for iOS.
 
 ## Prerequisites
 
@@ -71,7 +71,7 @@ cp target/aarch64-apple-ios-sim/$TARGET_DIR/lib${PROJECT_NAME}.a \
 
 ### Xcode
 
-1. Open `platforms/ios/BlincApp.xcodeproj`
+1. Open `platforms/ios/JunitaApp.xcodeproj`
 2. Select your target (device or simulator)
 3. Press Cmd+R to build and run
 
@@ -85,8 +85,8 @@ name = "my_app"
 crate-type = ["cdylib", "staticlib"]
 
 [target.'cfg(target_os = "ios")'.dependencies]
-blinc_app = { version = "0.1", features = ["ios"] }
-blinc_platform_ios = "0.1"
+junita_app = { version = "0.1", features = ["ios"] }
+junita_platform_ios = "0.1"
 ```
 
 ### Xcode Build Settings
@@ -99,7 +99,7 @@ In your Xcode project:
 
 2. **Set the bridging header**:
    - Build Settings → Swift Compiler - General
-   - Objective-C Bridging Header: `BlincApp/Blinc-Bridging-Header.h`
+   - Objective-C Bridging Header: `JunitaApp/Junita-Bridging-Header.h`
 
 3. **Add required frameworks**:
    - Metal.framework
@@ -110,25 +110,25 @@ In your Xcode project:
 
 ### Bridging Header
 
-The bridging header (`Blinc-Bridging-Header.h`) declares the C FFI functions:
+The bridging header (`Junita-Bridging-Header.h`) declares the C FFI functions:
 
 ```c
 // Context lifecycle
-IOSRenderContext* blinc_create_context(uint32_t width, uint32_t height, double scale);
-void blinc_destroy_context(IOSRenderContext* ctx);
+IOSRenderContext* junita_create_context(uint32_t width, uint32_t height, double scale);
+void junita_destroy_context(IOSRenderContext* ctx);
 
 // Rendering
-bool blinc_needs_render(IOSRenderContext* ctx);
-void blinc_build_frame(IOSRenderContext* ctx);
-bool blinc_render_frame(IOSGpuRenderer* gpu);
+bool junita_needs_render(IOSRenderContext* ctx);
+void junita_build_frame(IOSRenderContext* ctx);
+bool junita_render_frame(IOSGpuRenderer* gpu);
 
 // Input
-void blinc_handle_touch(IOSRenderContext* ctx, uint64_t id, float x, float y, int32_t phase);
+void junita_handle_touch(IOSRenderContext* ctx, uint64_t id, float x, float y, int32_t phase);
 ```
 
 ### View Controller
 
-The `BlincViewController` manages:
+The `JunitaViewController` manages:
 
 - CADisplayLink for 60fps frame timing
 - Metal layer for GPU rendering
@@ -138,7 +138,7 @@ The `BlincViewController` manages:
 
 iOS touch events are routed through the view controller:
 
-| iOS Phase | Blinc Event |
+| iOS Phase | Junita Event |
 |-----------|-------------|
 | touchesBegan | pointer_down |
 | touchesMoved | pointer_move |
@@ -157,7 +157,7 @@ clamped to 0.90..1.10.
 View Rust logs in Xcode's console or use Console.app with a filter:
 
 ```
-subsystem:com.blinc.my_app
+subsystem:com.junita.my_app
 ```
 
 ### Common Issues
@@ -178,7 +178,7 @@ Run the build script first:
 
 **Touch events not working**
 
-1. Verify `blinc_create_context` succeeds (check console logs)
+1. Verify `junita_create_context` succeeds (check console logs)
 2. Ensure `ios_app_init()` is called before creating the context
 3. Check that touch coordinates are in logical points, not pixels
 

@@ -249,18 +249,18 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }} -p blinc_cli
+        run: cargo build --release --target ${{ matrix.target }} -p junita_cli
 
       - name: Upload artifact (Unix)
         if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: blinc-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/blinc
+          name: junita-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/junita
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: blinc-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/blinc.exe
+          name: junita-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/junita.exe

@@ -44,7 +44,7 @@ DerivedData/
 # HarmonyOS build artifacts
 **/.cxx
 
-# Compiled Blinc
+# Compiled Junita
 *.zbc
 *.zrtl
 

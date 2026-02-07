@@ -1,0 +1,21 @@
+[package]
+name = "junita_fidl"
+description = "FIDL wire format encoding/decoding for Junita Fuchsia SDK"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_fidl"
+rust-version.workspace = true
+keywords = ["fuchsia", "fidl", "ipc", "junita"]
+categories = ["encoding", "os::fuchsia-api-bindings"]
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+
+[dependencies]
+junita_fuchsia_zircon = { path = "../junita_fuchsia_zircon", version = "0.1.12" }
+bitflags = "2"

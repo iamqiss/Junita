@@ -2,17 +2,17 @@
 
 ## Prerequisites
 
-Blinc requires:
+Junita requires:
 - **Rust 1.70+** (for stable async and other features)
 - A GPU with Vulkan, Metal, or DX12 support
 
-## Adding Blinc to Your Project
+## Adding Junita to Your Project
 
-Add `blinc_app` to your `Cargo.toml`:
+Add `junita_app` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blinc_app = { version = "0.1", features = ["windowed"] }
+junita_app = { version = "0.1", features = ["windowed"] }
 ```
 
 The `windowed` feature enables desktop windowing support. For headless rendering (e.g., server-side), omit this feature.
@@ -30,8 +30,8 @@ Create a simple test application:
 
 ```rust
 // src/main.rs
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
 
 fn main() -> Result<()> {
     WindowedApp::run(WindowConfig::default(), |ctx| {
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
             .h(ctx.height)
             .bg(Color::rgba(0.1, 0.1, 0.15, 1.0))
             .flex_center()
-            .child(text("Blinc is working!").size(32.0).color(Color::WHITE))
+            .child(text("Junita is working!").size(32.0).color(Color::WHITE))
     })
 }
 ```
@@ -51,7 +51,7 @@ Run with:
 cargo run
 ```
 
-You should see a window with "Blinc is working!" displayed in the center.
+You should see a window with "Junita is working!" displayed in the center.
 
 ## Recommended Dev Dependencies
 
@@ -77,10 +77,10 @@ fn main() -> Result<()> {
 ## Platform-Specific Notes
 
 ### macOS
-No additional setup required. Blinc uses Metal for GPU rendering.
+No additional setup required. Junita uses Metal for GPU rendering.
 
 ### Windows
-Ensure you have up-to-date GPU drivers. Blinc uses DX12 by default, falling back to Vulkan.
+Ensure you have up-to-date GPU drivers. Junita uses DX12 by default, falling back to Vulkan.
 
 ### Linux
 Install Vulkan development libraries:

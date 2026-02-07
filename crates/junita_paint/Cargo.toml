@@ -1,0 +1,30 @@
+[package]
+name = "junita_paint"
+description = "Junita Paint/Canvas API - 2D drawing primitives and path rendering"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_paint"
+rust-version.workspace = true
+keywords = ["ui", "gui", "paint", "canvas", "junita"]
+categories = ["gui", "graphics"]
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+
+[dependencies]
+# Core types (unified with junita_core)
+junita_core = { path = "../junita_core", version = "0.1.12" }
+
+# GPU types (shared with junita_gpu)
+bytemuck.workspace = true
+
+# Data structures
+smallvec.workspace = true
+
+# Logging
+tracing.workspace = true

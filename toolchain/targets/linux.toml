@@ -62,8 +62,8 @@ pacman = [
 
 [desktop]
 # Desktop entry settings
-name = "Blinc App"
-comment = "A Blinc Application"
+name = "Junita App"
+comment = "A Junita Application"
 categories = ["Development"]
 keywords = []
 icon = ""
@@ -78,7 +78,7 @@ update_info = ""
 
 [flatpak]
 # Flatpak settings
-app_id = "com.example.BlincApp"
+app_id = "com.example.JunitaApp"
 runtime = "org.freedesktop.Platform"
 runtime_version = "23.08"
 sdk = "org.freedesktop.Sdk"

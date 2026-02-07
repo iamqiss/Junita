@@ -68,10 +68,10 @@ debug_store_password = "android"
 debug_key_password = "android"
 
 # Release signing configured via environment variables:
-# BLINC_ANDROID_KEYSTORE_PATH
-# BLINC_ANDROID_KEY_ALIAS
-# BLINC_ANDROID_STORE_PASSWORD
-# BLINC_ANDROID_KEY_PASSWORD
+# JUNITA_ANDROID_KEYSTORE_PATH
+# JUNITA_ANDROID_KEY_ALIAS
+# JUNITA_ANDROID_STORE_PASSWORD
+# JUNITA_ANDROID_KEY_PASSWORD
 
 [emulator]
 # Default emulator for development

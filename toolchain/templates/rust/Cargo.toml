@@ -14,21 +14,21 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [dependencies]
-blinc_app = { path = "{{blinc_path}}/crates/blinc_app" }
-blinc_core = { path = "{{blinc_path}}/crates/blinc_core" }
-blinc_layout = { path = "{{blinc_path}}/crates/blinc_layout" }
+junita_app = { path = "{{junita_path}}/crates/junita_app" }
+junita_core = { path = "{{junita_path}}/crates/junita_core" }
+junita_layout = { path = "{{junita_path}}/crates/junita_layout" }
 
 [target.'cfg(target_os = "android")'.dependencies]
-blinc_platform_android = { path = "{{blinc_path}}/extensions/blinc_platform_android" }
+junita_platform_android = { path = "{{junita_path}}/extensions/junita_platform_android" }
 android-activity = { version = "0.6", features = ["native-activity"] }
 log = "0.4"
 android_logger = "0.14"
 
 [target.'cfg(target_os = "ios")'.dependencies]
-blinc_platform_ios = { path = "{{blinc_path}}/extensions/blinc_platform_ios" }
+junita_platform_ios = { path = "{{junita_path}}/extensions/junita_platform_ios" }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-blinc_platform_desktop = { path = "{{blinc_path}}/extensions/blinc_platform_desktop" }
+junita_platform_desktop = { path = "{{junita_path}}/extensions/junita_platform_desktop" }
 
 [features]
 default = ["desktop"]
@@ -46,7 +46,7 @@ opt-level = 1
 
 # Android-specific configuration
 [package.metadata.android]
-package = "com.blinc.{{project_name_snake}}"
+package = "com.junita.{{project_name_snake}}"
 apk_label = "{{project_name}}"
 target_sdk_version = 34
 min_sdk_version = 24

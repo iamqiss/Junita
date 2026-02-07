@@ -29,12 +29,12 @@ if $ADB devices | grep -q "device$"; then
 
     # Step 4: Start the app
     echo "Starting app..."
-    $ADB shell am start -n com.blinc.example/.MainActivity
+    $ADB shell am start -n com.junita.example/.MainActivity
 
     # Step 5: Show logs
     echo "Showing logs (Ctrl+C to exit)..."
     $ADB logcat -c  # Clear old logs
-    $ADB logcat -s Blinc:D RustStdoutStderr:D
+    $ADB logcat -s Junita:D RustStdoutStderr:D
 else
     echo "No device connected. APK is at:"
     echo "  platforms/android/app/build/outputs/apk/debug/app-debug.apk"

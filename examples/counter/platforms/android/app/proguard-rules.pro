@@ -1,6 +1,6 @@
-# Blinc ProGuard rules
-# Keep Blinc runtime classes
--keep class blinc.** { *; }
+# Junita ProGuard rules
+# Keep Junita runtime classes
+-keep class junita.** { *; }
 
 # Keep native methods
 -keepclasseswithmembernames class * {

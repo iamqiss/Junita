@@ -1,8 +1,8 @@
 # Introduction
 
-**Blinc** is a GPU-accelerated, reactive UI framework for Rust. It provides a declarative, component-based approach to building high-performance user interfaces with smooth animations and modern visual effects.
+**Junita** is a GPU-accelerated, reactive UI framework for Rust. It provides a declarative, component-based approach to building high-performance user interfaces with smooth animations and modern visual effects.
 
-## Why Blinc?
+## Why Junita?
 
 - **GPU-Accelerated Rendering** - All rendering is done on the GPU via wgpu, enabling smooth 60fps animations and complex visual effects like glass materials and shadows.
 
@@ -40,10 +40,10 @@ div()
 ```
 
 ### Type-Safe Animations
-The `BlincComponent` derive macro generates type-safe animation hooks:
+The `JunitaComponent` derive macro generates type-safe animation hooks:
 
 ```rust
-#[derive(BlincComponent)]
+#[derive(JunitaComponent)]
 struct MyCard {
     #[animation]
     scale: f32,
@@ -71,13 +71,13 @@ div()
 ┌─────────────────────────────────────────────────────┐
 │                   Your Application                   │
 ├─────────────────────────────────────────────────────┤
-│  blinc_app   │  WindowedApp, Context, State Hooks   │
+│  junita_app   │  WindowedApp, Context, State Hooks   │
 ├──────────────┼──────────────────────────────────────┤
-│  blinc_layout│  Elements, Flexbox, Event Routing    │
+│  junita_layout│  Elements, Flexbox, Event Routing    │
 ├──────────────┼──────────────────────────────────────┤
-│  blinc_animation │  Springs, Timelines, Motion      │
+│  junita_animation │  Springs, Timelines, Motion      │
 ├──────────────┼──────────────────────────────────────┤
-│  blinc_gpu   │  Render Pipeline, Materials          │
+│  junita_gpu   │  Render Pipeline, Materials          │
 ├──────────────┼──────────────────────────────────────┤
 │  wgpu        │  GPU Abstraction Layer               │
 └─────────────────────────────────────────────────────┘
@@ -85,11 +85,11 @@ div()
 
 ## Quick Example
 
-Here's a minimal Blinc application:
+Here's a minimal Junita application:
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
 
 fn main() -> Result<()> {
     WindowedApp::run(WindowConfig::default(), |ctx| {
@@ -103,7 +103,7 @@ fn main() -> Result<()> {
                     .glass()
                     .rounded(16.0)
                     .p(32.0)
-                    .child(text("Hello, Blinc!").size(24.0).color(Color::WHITE))
+                    .child(text("Hello, Junita!").size(24.0).color(Color::WHITE))
             )
     })
 }

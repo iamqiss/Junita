@@ -1,40 +1,40 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/blinc_app",
-    "crates/blinc_cli",
-    "crates/blinc_core",
-    "crates/blinc_animation",
-    "crates/blinc_image",
-    "crates/blinc_layout",
-    "crates/blinc_gpu",
-    "crates/blinc_macros",
-    "crates/blinc_paint",
-    "crates/blinc_platform",
-    "crates/blinc_recorder",
-    "crates/blinc_text",
-    "crates/blinc_svg",
-    "crates/blinc_theme",
-    "crates/blinc_cn",
-    "crates/blinc_icons",
-    "crates/blinc_debugger",
-    "crates/blinc_runtime",
-    "crates/blinc_test_suite",
-    "extensions/blinc_platform_desktop",
-    "extensions/blinc_platform_android",
-    "extensions/blinc_platform_ios",
-    "extensions/blinc_platform_harmony",
+    "crates/junita_app",
+    "crates/junita_cli",
+    "crates/junita_core",
+    "crates/junita_animation",
+    "crates/junita_image",
+    "crates/junita_layout",
+    "crates/junita_gpu",
+    "crates/junita_macros",
+    "crates/junita_paint",
+    "crates/junita_platform",
+    "crates/junita_recorder",
+    "crates/junita_text",
+    "crates/junita_svg",
+    "crates/junita_theme",
+    "crates/junita_cn",
+    "crates/junita_icons",
+    "crates/junita_debugger",
+    "crates/junita_runtime",
+    "crates/junita_test_suite",
+    "extensions/junita_platform_desktop",
+    "extensions/junita_platform_android",
+    "extensions/junita_platform_ios",
+    "extensions/junita_platform_harmony",
 ]
 
 # Platform-specific crates are included but have target-gated dependencies
-# Build for Android: source scripts/android-env.sh && cargo build --target aarch64-linux-android -p blinc_platform_android
-# Build for iOS: cargo build --target aarch64-apple-ios -p blinc_platform_ios
+# Build for Android: source scripts/android-env.sh && cargo build --target aarch64-linux-android -p junita_platform_android
+# Build for iOS: cargo build --target aarch64-apple-ios -p junita_platform_ios
 
 [workspace.package]
 version = "0.1.12"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/project-blinc/Blinc"
+repository = "https://github.com/project-junita/Junita"
 rust-version = "1.75"
 
 [workspace.dependencies]

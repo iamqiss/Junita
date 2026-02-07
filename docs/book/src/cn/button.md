@@ -5,7 +5,7 @@ Buttons trigger actions or events.
 ## Basic Usage
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 button("Click me")
     .on_click(|| println!("Clicked!"))
@@ -54,7 +54,7 @@ button("").size(ButtonSize::Icon).icon(icons::SETTINGS)
 ## With Icons
 
 ```rust
-use blinc_icons::icons;
+use junita_icons::icons;
 
 // Icon before text
 button("Settings")

@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "Blinc UI Example"
+      "value": "Junita UI Example"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Blinc Example Application"
+      "value": "Junita Example Application"
     },
     {
       "name": "EntryAbility_label",
-      "value": "Blinc Example"
+      "value": "Junita Example"
     }
   ]
 }

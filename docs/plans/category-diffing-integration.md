@@ -86,7 +86,7 @@ Store only hashes, use them to detect changes, but rebuild entire subtree on any
 
 ### Phase 1: Store Original Elements in RenderNode
 
-**File: `crates/blinc_layout/src/renderer.rs`**
+**File: `crates/junita_layout/src/renderer.rs`**
 
 ```rust
 pub struct RenderNode {
@@ -107,7 +107,7 @@ pub struct RenderNode {
 
 ### Phase 2: Add Targeted Update API to RenderTree
 
-**File: `crates/blinc_layout/src/renderer.rs`**
+**File: `crates/junita_layout/src/renderer.rs`**
 
 ```rust
 impl RenderTree {
@@ -163,12 +163,12 @@ impl RenderTree {
 
 ### Phase 3: Wire mark_dirty() to Use Diffing
 
-**File: `crates/blinc_layout/src/selector/handle.rs`**
+**File: `crates/junita_layout/src/selector/handle.rs`**
 
 Current (problematic):
 ```rust
 pub fn mark_dirty(&self) {
-    if let Some(ctx) = BlincContextState::try_get() {
+    if let Some(ctx) = JunitaContextState::try_get() {
         ctx.request_rebuild();  // Full rebuild!
     }
 }
@@ -201,7 +201,7 @@ pub fn mark_visual_dirty(&self, new_props: RenderProps) {
 
 ### Phase 4: Add Diffed Update Queue to stateful.rs
 
-**File: `crates/blinc_layout/src/stateful.rs`**
+**File: `crates/junita_layout/src/stateful.rs`**
 
 ```rust
 /// Pending diffed update - element update with category detection
@@ -234,18 +234,18 @@ pub fn has_pending_diffed_updates() -> bool {
 
 ### Phase 5: Process Diffed Updates in Event Loop
 
-**File: `crates/blinc_app/src/windowed.rs`**
+**File: `crates/junita_app/src/windowed.rs`**
 
 Add to the `take_needs_redraw()` block:
 
 ```rust
-if blinc_layout::take_needs_redraw() {
+if junita_layout::take_needs_redraw() {
     // Existing: Process prop updates
-    let prop_updates = blinc_layout::take_pending_prop_updates();
+    let prop_updates = junita_layout::take_pending_prop_updates();
     // ...apply prop updates...
 
     // NEW: Process diffed updates with category detection
-    let diffed_updates = blinc_layout::take_pending_diffed_updates();
+    let diffed_updates = junita_layout::take_pending_diffed_updates();
     let mut needs_layout_from_diff = false;
 
     for update in diffed_updates {
@@ -259,7 +259,7 @@ if blinc_layout::take_needs_redraw() {
     }
 
     // Existing: Process subtree rebuilds
-    let had_subtree_rebuilds = blinc_layout::has_pending_subtree_rebuilds();
+    let had_subtree_rebuilds = junita_layout::has_pending_subtree_rebuilds();
     tree.process_pending_subtree_rebuilds();
 
     // Recompute layout if needed
@@ -369,26 +369,26 @@ ctx.query("complex-widget").mark_dirty();
 
 ## Files to Modify
 
-1. **`crates/blinc_layout/src/renderer.rs`**
+1. **`crates/junita_layout/src/renderer.rs`**
    - Add `original_div` field to `RenderNode`
    - Add `update_node_diffed()` method
    - Add `store_original_div()` / `get_original_div()` helpers
 
-2. **`crates/blinc_layout/src/stateful.rs`**
+2. **`crates/junita_layout/src/stateful.rs`**
    - Add `PendingDiffedUpdate` struct
    - Add `queue_diffed_update()` function
    - Add `take_pending_diffed_updates()` function
 
-3. **`crates/blinc_layout/src/selector/handle.rs`**
+3. **`crates/junita_layout/src/selector/handle.rs`**
    - Add `mark_dirty_with()` method
    - Add `mark_visual_dirty()` method
    - Keep existing `mark_dirty()` as fallback
 
-4. **`crates/blinc_app/src/windowed.rs`**
+4. **`crates/junita_app/src/windowed.rs`**
    - Process diffed updates in event loop
    - Track layout needs from diffed updates
 
-5. **`crates/blinc_layout/src/lib.rs`**
+5. **`crates/junita_layout/src/lib.rs`**
    - Export new public APIs
 
 ---

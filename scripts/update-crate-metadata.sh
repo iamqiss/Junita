@@ -1,36 +1,36 @@
 #!/bin/bash
-# Script to update metadata for all Blinc crates
+# Script to update metadata for all Junita crates
 # Usage: ./scripts/update-crate-metadata.sh
 
 set -e
 
 VERSION="0.1.1"
-REPO="https://github.com/project-blinc/Blinc"
+REPO="https://github.com/project-junita/Junita"
 
 # List of all crates to update
 CRATES=(
-    "crates/blinc_animation"
-    "crates/blinc_app"
-    "crates/blinc_cli"
-    "crates/blinc_cn"
-    "crates/blinc_core"
-    "crates/blinc_debugger"
-    "crates/blinc_gpu"
-    "crates/blinc_icons"
-    "crates/blinc_image"
-    "crates/blinc_layout"
-    "crates/blinc_macros"
-    "crates/blinc_paint"
-    "crates/blinc_platform"
-    "crates/blinc_recorder"
-    "crates/blinc_runtime"
-    "crates/blinc_svg"
-    "crates/blinc_test_suite"
-    "crates/blinc_text"
-    "crates/blinc_theme"
-    "extensions/blinc_platform_android"
-    "extensions/blinc_platform_desktop"
-    "extensions/blinc_platform_ios"
+    "crates/junita_animation"
+    "crates/junita_app"
+    "crates/junita_cli"
+    "crates/junita_cn"
+    "crates/junita_core"
+    "crates/junita_debugger"
+    "crates/junita_gpu"
+    "crates/junita_icons"
+    "crates/junita_image"
+    "crates/junita_layout"
+    "crates/junita_macros"
+    "crates/junita_paint"
+    "crates/junita_platform"
+    "crates/junita_recorder"
+    "crates/junita_runtime"
+    "crates/junita_svg"
+    "crates/junita_test_suite"
+    "crates/junita_text"
+    "crates/junita_theme"
+    "extensions/junita_platform_android"
+    "extensions/junita_platform_desktop"
+    "extensions/junita_platform_ios"
 )
 
 echo "Updating metadata for all crates..."
@@ -64,10 +64,10 @@ documentation = \"https://docs.rs/$crate_name\"
         fi
 
         # Add version to internal dependencies
-        sed -i '' "s/blinc_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\" }/blinc_\\1 = { path = \"\\2\", version = \"$VERSION\" }/g" "$cargo_file"
-        sed -i '' "s/blinc_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", optional = true }/blinc_\\1 = { path = \"\\2\", version = \"$VERSION\", optional = true }/g" "$cargo_file"
-        sed -i '' "s/blinc_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", default-features = false }/blinc_\\1 = { path = \"\\2\", version = \"$VERSION\", default-features = false }/g" "$cargo_file"
-        sed -i '' "s/blinc_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", default-features = false, features = \\[\\([^]]*\\)\\] }/blinc_\\1 = { path = \"\\2\", version = \"$VERSION\", default-features = false, features = [\\3] }/g" "$cargo_file"
+        sed -i '' "s/junita_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\" }/junita_\\1 = { path = \"\\2\", version = \"$VERSION\" }/g" "$cargo_file"
+        sed -i '' "s/junita_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", optional = true }/junita_\\1 = { path = \"\\2\", version = \"$VERSION\", optional = true }/g" "$cargo_file"
+        sed -i '' "s/junita_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", default-features = false }/junita_\\1 = { path = \"\\2\", version = \"$VERSION\", default-features = false }/g" "$cargo_file"
+        sed -i '' "s/junita_\\([a-z_]*\\) = { path = \"\\([^\"]*\\)\", default-features = false, features = \\[\\([^]]*\\)\\] }/junita_\\1 = { path = \"\\2\", version = \"$VERSION\", default-features = false, features = [\\3] }/g" "$cargo_file"
     else
         echo "Warning: $cargo_file not found"
     fi

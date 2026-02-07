@@ -1,0 +1,24 @@
+# Changelog
+
+All notable changes to `junita_app` will be documented in this file.
+
+## [0.1.12] - 2025-01-19
+
+### Added
+- Momentum scrolling for touch devices with velocity tracking
+- `dispatch_scroll_chain_with_time()` method for mobile scroll dispatch with time-based velocity
+- Single-threaded animation scheduler for mobile efficiency
+
+### Changed
+- Android render loop now uses vsync for frame pacing instead of manual timing
+- Non-blocking poll when animating, 100ms idle timeout for power saving
+- Re-enabled scroll physics for bounce animations on Android
+
+### Fixed
+- Animation smoothness on Android by removing mutex contention between threads
+- Double-waiting issue that was cutting frame rate in half
+- Added expected cfg values for fuchsia and ohos targets to fix CI warnings
+
+## [0.1.1] - Initial Release
+
+- Initial public release with desktop, Android, and iOS support

@@ -1,13 +1,13 @@
 [book]
-authors = ["Blinc Contributors"]
+authors = ["Junita Contributors"]
 language = "en"
 src = "src"
-title = "Blinc UI Framework"
+title = "Junita UI Framework"
 description = "A GPU-accelerated, reactive UI framework for Rust"
 
 [build]
 build-dir = "../../target/book"
 
 [output.html]
-git-repository-url = "https://github.com/user/blinc"
-edit-url-template = "https://github.com/user/blinc/edit/main/docs/book/{path}"
+git-repository-url = "https://github.com/user/junita"
+edit-url-template = "https://github.com/user/junita/edit/main/docs/book/{path}"

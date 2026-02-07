@@ -1,6 +1,6 @@
 # State Management
 
-Blinc uses **Stateful elements** as the primary way to manage UI state. Stateful elements handle state transitions automatically without rebuilding the entire UI tree.
+Junita uses **Stateful elements** as the primary way to manage UI state. Stateful elements handle state transitions automatically without rebuilding the entire UI tree.
 
 ## Stateful Elements
 
@@ -9,7 +9,7 @@ Blinc uses **Stateful elements** as the primary way to manage UI state. Stateful
 ### Basic Usage
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 fn feature_card(label: &str, accent: Color) -> impl ElementBuilder {
     let label = label.to_string();
@@ -105,7 +105,7 @@ stateful::<ButtonState>()
 Use `ctx.event()` to access the event that triggered the callback:
 
 ```rust
-use blinc_core::events::event_types::*;
+use junita_core::events::event_types::*;
 
 stateful::<ButtonState>()
     .on_state(|ctx| {
@@ -361,7 +361,7 @@ The `configure()` method is idempotent - it only runs the configuration closure 
 
 ## Built-in State Types
 
-Blinc provides common state types with automatic transitions:
+Junita provides common state types with automatic transitions:
 
 ### ButtonState
 
@@ -398,8 +398,8 @@ stateful::<NoState>()
 Define your own state enum for complex interactions:
 
 ```rust
-use blinc_layout::stateful::StateTransitions;
-use blinc_core::events::event_types::*;
+use junita_layout::stateful::StateTransitions;
+use junita_core::events::event_types::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 enum DragState {

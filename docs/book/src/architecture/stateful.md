@@ -1,6 +1,6 @@
 # Stateful Elements & FSM
 
-Blinc uses **Finite State Machines (FSM)** to manage interactive UI state. This provides predictable state transitions for widgets like buttons, checkboxes, and text fields.
+Junita uses **Finite State Machines (FSM)** to manage interactive UI state. This provides predictable state transitions for widgets like buttons, checkboxes, and text fields.
 
 ## Finite State Machines
 
@@ -65,8 +65,8 @@ Transitions can be conditional:
 For type-safe state definitions, implement `StateTransitions`:
 
 ```rust
-use blinc_layout::stateful::StateTransitions;
-use blinc_core::events::event_types::*;
+use junita_layout::stateful::StateTransitions;
+use junita_core::events::event_types::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 enum ButtonState {
@@ -122,7 +122,7 @@ DRAG_END         // Drag completed
 ### Creating Stateful Elements
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 fn interactive_card() -> impl ElementBuilder {
     stateful::<ButtonState>()

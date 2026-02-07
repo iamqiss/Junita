@@ -1,6 +1,6 @@
 # Android Development
 
-This guide covers setting up your environment and building Blinc apps for Android.
+This guide covers setting up your environment and building Junita apps for Android.
 
 ## Prerequisites
 
@@ -76,8 +76,8 @@ name = "my_app"
 crate-type = ["cdylib", "staticlib"]
 
 [target.'cfg(target_os = "android")'.dependencies]
-blinc_app = { version = "0.1", features = ["android"] }
-blinc_platform_android = "0.1"
+junita_app = { version = "0.1", features = ["android"] }
+junita_platform_android = "0.1"
 android-activity = { version = "0.6", features = ["native-activity"] }
 log = "0.4"
 android_logger = "0.14"
@@ -117,7 +117,7 @@ android_logger = "0.14"
 
 Android touch events are automatically routed to your UI. The touch phases map as follows:
 
-| Android Action | Blinc Event |
+| Android Action | Junita Event |
 |---------------|-------------|
 | ACTION_DOWN   | pointer_down |
 | ACTION_MOVE   | pointer_move |
@@ -132,7 +132,7 @@ and per-frame scale delta. One-finger drag scrolling is unchanged.
 ### View Logs
 
 ```bash
-adb logcat | grep -E "(blinc|BlincApp)"
+adb logcat | grep -E "(junita|JunitaApp)"
 ```
 
 ### Common Issues

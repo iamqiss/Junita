@@ -151,7 +151,7 @@ def create_wiki_pages(chapters: list, page_map: dict):
 def create_home_page(chapters: list, page_map: dict):
     """Create the Home.md wiki page with navigation."""
 
-    content = """# Blinc UI Framework
+    content = """# Junita UI Framework
 
 A GPU-accelerated, reactive UI framework for Rust.
 

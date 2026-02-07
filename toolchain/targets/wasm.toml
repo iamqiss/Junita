@@ -55,7 +55,7 @@ crates = [
 template = "default"
 
 # Canvas settings
-canvas_id = "blinc-canvas"
+canvas_id = "junita-canvas"
 canvas_parent = "body"
 
 # Fullscreen by default
@@ -84,13 +84,13 @@ preferred_features = [
 # HTML meta tags
 viewport = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
 theme_color = "#000000"
-description = "A Blinc Application"
+description = "A Junita Application"
 
 [pwa]
 # Progressive Web App settings
 enabled = true
-name = "Blinc App"
-short_name = "Blinc"
+name = "Junita App"
+short_name = "Junita"
 display = "standalone"
 orientation = "any"
 background_color = "#000000"

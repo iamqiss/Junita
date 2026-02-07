@@ -1,6 +1,6 @@
 # Fuchsia Platform Template
 
-This directory contains templates for building Blinc applications on Fuchsia OS.
+This directory contains templates for building Junita applications on Fuchsia OS.
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ ffx component run fuchsia-pkg://fuchsia.com/your_app#meta/your_app.cm
 ```
 fuchsia/
 ├── meta/
-│   └── blinc_app.cml     # Component manifest template
+│   └── junita_app.cml     # Component manifest template
 ├── BUILD.gn              # GN build file (fx build workflow)
 ├── BUILD.bazel           # Bazel build file (SDK samples workflow)
 └── README.md             # This file
@@ -41,7 +41,7 @@ fuchsia/
 
 ## Build Workflows
 
-### Option 1: Cargo + Manual Packaging (Recommended for Blinc)
+### Option 1: Cargo + Manual Packaging (Recommended for Junita)
 
 This is the simplest workflow for Rust-first development:
 
@@ -54,10 +54,10 @@ ffx package build \
   --published-name my_app \
   --api-level HEAD \
   target/x86_64-unknown-fuchsia/release/my_app \
-  meta/blinc_app.cml
+  meta/junita_app.cml
 
 # Run
-ffx component run fuchsia-pkg://fuchsia.com/my_app#meta/blinc_app.cm
+ffx component run fuchsia-pkg://fuchsia.com/my_app#meta/junita_app.cm
 ```
 
 ### Option 2: Bazel SDK Workflow
@@ -78,12 +78,12 @@ For integration with a full Fuchsia source checkout:
 ```bash
 fx set core.x64 --with //path/to/my_app
 fx build
-fx component run fuchsia-pkg://fuchsia.com/my_app#meta/blinc_app.cm
+fx component run fuchsia-pkg://fuchsia.com/my_app#meta/junita_app.cm
 ```
 
 ## Component Manifest
 
-The `meta/blinc_app.cml` file defines your Fuchsia component. Key sections:
+The `meta/junita_app.cml` file defines your Fuchsia component. Key sections:
 
 - **program**: Specifies the binary to run
 - **capabilities**: What your component provides (ViewProvider for GUI apps)

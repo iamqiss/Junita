@@ -1,8 +1,8 @@
 //! {{project_name}}
 //!
-//! A Blinc UI application with desktop, Android, and iOS support.
+//! A Junita UI application with desktop, Android, and iOS support.
 
-use blinc_app::prelude::*;
+use junita_app::prelude::*;
 
 /// Main application UI
 fn app_ui(ctx: &mut WindowedContext) -> impl ElementBuilder {
@@ -79,7 +79,7 @@ fn android_main(app: AndroidApp) {
 
     log::info!("Starting {{project_name}} on Android");
 
-    blinc_app::AndroidApp::run(app, app_ui).expect("Failed to run Android app");
+    junita_app::AndroidApp::run(app, app_ui).expect("Failed to run Android app");
 }
 
 // Dummy main for Android (required by Rust but not used)
@@ -93,21 +93,21 @@ fn main() {}
 #[cfg(target_os = "ios")]
 fn main() {
     // iOS entry is handled via C FFI from Swift
-    // See platforms/ios/BlincApp/AppDelegate.swift
+    // See platforms/ios/JunitaApp/AppDelegate.swift
 }
 
 /// iOS: Create render context (called from Swift)
 #[cfg(target_os = "ios")]
 #[no_mangle]
-pub extern "C" fn create_blinc_app(
+pub extern "C" fn create_junita_app(
     width: u32,
     height: u32,
     scale_factor: f64,
 ) -> *mut std::ffi::c_void {
-    match blinc_app::IOSApp::create(width, height, scale_factor, app_ui) {
+    match junita_app::IOSApp::create(width, height, scale_factor, app_ui) {
         Ok(app) => Box::into_raw(Box::new(app)) as *mut std::ffi::c_void,
         Err(e) => {
-            eprintln!("Failed to create Blinc app: {:?}", e);
+            eprintln!("Failed to create Junita app: {:?}", e);
             std::ptr::null_mut()
         }
     }

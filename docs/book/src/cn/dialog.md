@@ -5,7 +5,7 @@ Dialogs display content in a modal overlay that requires user interaction.
 ## Basic Usage
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 let is_open = use_state(false);
 

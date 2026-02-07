@@ -108,7 +108,7 @@ div()
 
 ### Phase 1: OverlayManager API Changes
 
-**Files:** `crates/blinc_layout/src/widgets/overlay.rs`
+**Files:** `crates/junita_layout/src/widgets/overlay.rs`
 
 1. **Add `build_overlay_layer()` method**
    - Returns `Option<Div>` instead of `Option<RenderTree>`
@@ -129,7 +129,7 @@ div()
 
 ### Phase 2: Windowed App Integration
 
-**Files:** `crates/blinc_app/src/windowed.rs`
+**Files:** `crates/junita_app/src/windowed.rs`
 
 1. **Modify tree building (PHASE 2)**
    ```rust
@@ -163,7 +163,7 @@ div()
 
 ### Phase 3: Subtree Rebuild for Overlay Changes
 
-**Files:** `crates/blinc_layout/src/stateful.rs`, `crates/blinc_layout/src/widgets/overlay.rs`
+**Files:** `crates/junita_layout/src/stateful.rs`, `crates/junita_layout/src/widgets/overlay.rs`
 
 1. **Track overlay layer node ID**
    - When overlay layer is built, store its LayoutNodeId
@@ -186,7 +186,7 @@ div()
 
 ### Phase 4: Backdrop and Positioning
 
-**Files:** `crates/blinc_layout/src/widgets/overlay.rs`
+**Files:** `crates/junita_layout/src/widgets/overlay.rs`
 
 1. **Backdrop as Div with event handler**
    ```rust
@@ -217,7 +217,7 @@ div()
 
 ### Phase 5: Motion Animation Integration
 
-**Files:** `crates/blinc_layout/src/widgets/overlay.rs`, `crates/blinc_layout/src/motion.rs`
+**Files:** `crates/junita_layout/src/widgets/overlay.rs`, `crates/junita_layout/src/motion.rs`
 
 1. **Preserve OVERLAY_CLOSING mechanism**
    - Still set flag before building closing overlay content

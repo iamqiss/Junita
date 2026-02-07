@@ -1,11 +1,11 @@
 # Markdown Rendering
 
-Blinc includes a built-in markdown renderer that converts CommonMark + GFM markdown to native layout elements.
+Junita includes a built-in markdown renderer that converts CommonMark + GFM markdown to native layout elements.
 
 ## Basic Usage
 
 ```rust
-use blinc_layout::markdown::markdown;
+use junita_layout::markdown::markdown;
 
 // Render markdown to a Div
 let content = markdown(r#"
@@ -28,7 +28,7 @@ div()
 The renderer supports light and dark themes:
 
 ```rust
-use blinc_layout::markdown::{markdown, markdown_light, markdown_with_config, MarkdownConfig};
+use junita_layout::markdown::{markdown, markdown_light, markdown_with_config, MarkdownConfig};
 
 // Dark theme (default) - for dark backgrounds
 let dark_content = markdown("# Dark Theme");
@@ -119,7 +119,7 @@ Fenced code blocks with optional language:
 markdown(r#"
 ```rust
 fn main() {
-    println!("Hello, Blinc!");
+    println!("Hello, Junita!");
 }
 ```
 "#)
@@ -176,8 +176,8 @@ markdown(r#"
 Customize the renderer with `MarkdownConfig`:
 
 ```rust
-use blinc_layout::markdown::{markdown_with_config, MarkdownConfig};
-use blinc_core::Color;
+use junita_layout::markdown::{markdown_with_config, MarkdownConfig};
+use junita_core::Color;
 
 let config = MarkdownConfig {
     // Typography sizes
@@ -227,7 +227,7 @@ let light = MarkdownConfig::light();
 A full markdown editor with live preview is available in the examples:
 
 ```bash
-cargo run -p blinc_app --example markdown_demo --features windowed
+cargo run -p junita_app --example markdown_demo --features windowed
 ```
 
 This demonstrates:

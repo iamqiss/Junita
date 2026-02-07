@@ -1,14 +1,14 @@
 # Your First App
 
-Let's build a simple counter application to learn Blinc fundamentals.
+Let's build a simple counter application to learn Junita fundamentals.
 
 ## The Basic Structure
 
-Every Blinc windowed application follows this pattern:
+Every Junita windowed application follows this pattern:
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
 
 fn main() -> Result<()> {
     WindowedApp::run(WindowConfig::default(), |ctx| {
@@ -38,8 +38,8 @@ Let's create a counter with increment and decrement buttons.
 ### Step 1: Window Configuration
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
 
 fn main() -> Result<()> {
     let config = WindowConfig {
@@ -70,10 +70,10 @@ fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ### Step 3: Building the Layout with Stateful Elements
 
-The key insight in Blinc is that UI doesn't rebuild on every state change. Instead, we use `stateful(handle)` with `.deps()` to react to state changes:
+The key insight in Junita is that UI doesn't rebuild on every state change. Instead, we use `stateful(handle)` with `.deps()` to react to state changes:
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn build_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     let count = ctx.use_state_keyed("counter", || 0i32);
@@ -178,9 +178,9 @@ fn counter_button(
 Here's the full counter application:
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
-use blinc_layout::stateful::stateful;
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
+use junita_layout::stateful::stateful;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -278,7 +278,7 @@ fn counter_button(
 }
 ```
 
-> **Tip:** For more examples, explore the `crates/blinc_app/examples/` directory which includes
+> **Tip:** For more examples, explore the `crates/junita_app/examples/` directory which includes
 > `windowed.rs`, `canvas_demo.rs`, `motion_demo.rs`, and more.
 
 ## Key Concepts Learned

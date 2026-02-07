@@ -7,7 +7,7 @@ Components for navigation: tabs, menus, breadcrumbs, and sidebars.
 Organize content into tabbed sections:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 tabs()
     .value(active_tab)

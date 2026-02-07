@@ -49,9 +49,9 @@ long_path_aware = true
 file_version = "1.0.0.0"
 product_version = "1.0.0.0"
 company_name = ""
-file_description = "Blinc Application"
-product_name = "BlincApp"
-original_filename = "blincapp.exe"
+file_description = "Junita Application"
+product_name = "JunitaApp"
+original_filename = "junitaapp.exe"
 
 [icon]
 # Path to .ico file
@@ -69,7 +69,7 @@ publisher_display_name = ""
 certificate = ""
 
 # Certificate password
-# Can be set via BLINC_WINDOWS_CERT_PASSWORD env var
+# Can be set via JUNITA_WINDOWS_CERT_PASSWORD env var
 password = ""
 
 # Timestamp server for signature

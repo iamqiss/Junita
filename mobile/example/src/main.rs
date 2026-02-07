@@ -1,12 +1,12 @@
 //! Example
 //!
-//! A Blinc UI application with desktop, Android, iOS, and HarmonyOS support.
+//! A Junita UI application with desktop, Android, iOS, and HarmonyOS support.
 //! Demonstrates counter interactions and keyframe canvas animations.
 
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
-use blinc_core::reactive::State;
-use blinc_core::{Brush, DrawContext, Gradient};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
+use junita_core::reactive::State;
+use junita_core::{Brush, DrawContext, Gradient};
 use std::f32::consts::PI;
 use std::sync::Arc;
 
@@ -120,7 +120,7 @@ fn spinning_loader_demo(ctx: &WindowedContext) -> Div {
                         len + thickness,
                         thickness,
                     ),
-                    blinc_core::CornerRadius::uniform(thickness / 2.0),
+                    junita_core::CornerRadius::uniform(thickness / 2.0),
                     Brush::Solid(Color::rgba(0.4, 0.8, 1.0, alpha)),
                 );
             }
@@ -175,7 +175,7 @@ fn pulsing_dots_demo(ctx: &WindowedContext) -> Div {
 
                 ctx.fill_rect(
                     Rect::new(x - r, cy - r, r * 2.0, r * 2.0),
-                    blinc_core::CornerRadius::uniform(r),
+                    junita_core::CornerRadius::uniform(r),
                     Brush::Solid(Color::rgba(0.4, 1.0, 0.8, opacity)),
                 );
             }
@@ -217,7 +217,7 @@ fn progress_bar_demo(ctx: &WindowedContext) -> Div {
                 // Background
                 ctx.fill_rect(
                     Rect::new(bar_x, bar_y, bar_width, bar_height),
-                    blinc_core::CornerRadius::uniform(6.0),
+                    junita_core::CornerRadius::uniform(6.0),
                     Brush::Solid(Color::rgba(0.2, 0.2, 0.25, 1.0)),
                 );
 
@@ -226,7 +226,7 @@ fn progress_bar_demo(ctx: &WindowedContext) -> Div {
                 if fill_width > 0.0 {
                     ctx.fill_rect(
                         Rect::new(bar_x, bar_y, fill_width, bar_height),
-                        blinc_core::CornerRadius::uniform(6.0),
+                        junita_core::CornerRadius::uniform(6.0),
                         Brush::Gradient(Gradient::linear(
                             Point::new(bar_x, bar_y),
                             Point::new(bar_x + fill_width, bar_y),
@@ -300,7 +300,7 @@ fn bouncing_ball_demo(ctx: &WindowedContext) -> Div {
                     shadow_width,
                     shadow_height,
                 ),
-                blinc_core::CornerRadius::uniform(shadow_height / 2.0),
+                junita_core::CornerRadius::uniform(shadow_height / 2.0),
                 Brush::Solid(Color::rgba(0.0, 0.0, 0.0, 0.3 * shadow_scale)),
             );
 
@@ -314,7 +314,7 @@ fn bouncing_ball_demo(ctx: &WindowedContext) -> Div {
                     ball_width,
                     ball_height,
                 ),
-                blinc_core::CornerRadius::uniform(ball_height.min(ball_width) / 2.0),
+                junita_core::CornerRadius::uniform(ball_height.min(ball_width) / 2.0),
                 Brush::Gradient(Gradient::linear(
                     Point::new(cx - ball_width / 2.0, y - ball_height / 2.0),
                     Point::new(cx + ball_width / 2.0, y + ball_height / 2.0),
@@ -416,7 +416,7 @@ fn app_ui(ctx: &mut WindowedContext) -> impl ElementBuilder {
                     .py(15.0)
                     // Header
                     .child(
-                        text("Blinc Mobile Example")
+                        text("Junita Mobile Example")
                             .align(TextAlign::Center)
                             .size(28.0)
                             .weight(FontWeight::Bold)
@@ -448,7 +448,7 @@ fn main() -> Result<()> {
         .init();
 
     let config = WindowConfig {
-        title: "Blinc Mobile Example".to_string(),
+        title: "Junita Mobile Example".to_string(),
         width: 400,
         height: 700,
         ..Default::default()
@@ -478,7 +478,7 @@ fn android_main(app: AndroidApp) {
 
     log::info!("Starting example on Android");
 
-    blinc_app::AndroidApp::run(app, |ctx| app_ui(ctx)).expect("Failed to run Android app");
+    junita_app::AndroidApp::run(app, |ctx| app_ui(ctx)).expect("Failed to run Android app");
 }
 
 #[cfg(target_os = "android")]
@@ -494,7 +494,7 @@ fn main() {}
 /// iOS initialization function - called from Swift during app launch
 ///
 /// This registers the Rust UI builder so that each frame can build the UI.
-/// Must be called before blinc_create_context.
+/// Must be called before junita_create_context.
 #[cfg(target_os = "ios")]
 #[no_mangle]
 pub extern "C" fn ios_app_init() {
@@ -504,11 +504,11 @@ pub extern "C" fn ios_app_init() {
         .with_writer(std::io::stderr)
         .try_init();
 
-    eprintln!("[Blinc] ios_app_init called - registering UI builder");
+    eprintln!("[Junita] ios_app_init called - registering UI builder");
 
-    blinc_app::ios::register_rust_ui_builder(|ctx| app_ui(ctx));
+    junita_app::ios::register_rust_ui_builder(|ctx| app_ui(ctx));
 
-    eprintln!("[Blinc] UI builder registered");
+    eprintln!("[Junita] UI builder registered");
 }
 
 // =============================================================================
@@ -531,8 +531,8 @@ pub extern "C" fn napi_register_module() {
         .with_max_level(tracing::Level::INFO)
         .try_init();
 
-    tracing::info!("Blinc HarmonyOS module registered");
+    tracing::info!("Junita HarmonyOS module registered");
 
     // TODO: Register N-API functions for XComponent callbacks
-    // blinc_platform_harmony::napi_bridge::register_module()
+    // junita_platform_harmony::napi_bridge::register_module()
 }

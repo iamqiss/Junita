@@ -1,11 +1,11 @@
 # Scroll Containers
 
-Blinc provides scroll containers with WebKit-style momentum scrolling and bounce physics.
+Junita provides scroll containers with WebKit-style momentum scrolling and bounce physics.
 
 ## Basic Scroll
 
 ```rust
-use blinc_layout::widgets::scroll::scroll;
+use junita_layout::widgets::scroll::scroll;
 
 fn scrollable_content() -> impl ElementBuilder {
     scroll()
@@ -22,7 +22,7 @@ fn scrollable_content() -> impl ElementBuilder {
 ## Scroll Without Bounce
 
 ```rust
-use blinc_layout::widgets::scroll::scroll_no_bounce;
+use junita_layout::widgets::scroll::scroll_no_bounce;
 
 scroll_no_bounce()
     .h(400.0)
@@ -32,8 +32,8 @@ scroll_no_bounce()
 ## Scroll Configuration
 
 ```rust
-use blinc_layout::widgets::scroll::{Scroll, ScrollConfig, ScrollDirection};
-use blinc_animation::SpringConfig;
+use junita_layout::widgets::scroll::{Scroll, ScrollConfig, ScrollDirection};
+use junita_animation::SpringConfig;
 
 Scroll::with_config(ScrollConfig {
     bounce_enabled: true,
@@ -187,14 +187,14 @@ fn nested_scroll_example() -> impl ElementBuilder {
 
 ## Programmatic Scroll Control
 
-Blinc provides a powerful selector API for programmatic scroll control through `ScrollRef`. This allows you to scroll to specific elements, positions, or the top/bottom of content.
+Junita provides a powerful selector API for programmatic scroll control through `ScrollRef`. This allows you to scroll to specific elements, positions, or the top/bottom of content.
 
 ### Creating a ScrollRef
 
 Use `ctx.use_scroll_ref()` to create a persistent scroll reference:
 
 ```rust
-use blinc_layout::selector::{ScrollRef, ScrollOptions, ScrollBehavior, ScrollBlock};
+use junita_layout::selector::{ScrollRef, ScrollOptions, ScrollBehavior, ScrollBlock};
 
 fn my_component(ctx: &WindowedContext) -> impl ElementBuilder {
     // Create a ScrollRef - persists across rebuilds
@@ -303,9 +303,9 @@ let progress = scroll_ref.scroll_progress();
 Here's a complete example of a horizontal carousel with clickable navigation dots:
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_layout::selector::{ScrollBehavior, ScrollBlock, ScrollOptions, ScrollRef};
-use blinc_layout::units::px;  // Semantic unit for raw pixels
+use junita_app::prelude::*;
+use junita_layout::selector::{ScrollBehavior, ScrollBlock, ScrollOptions, ScrollRef};
+use junita_layout::units::px;  // Semantic unit for raw pixels
 
 fn carousel(ctx: &WindowedContext) -> impl ElementBuilder {
     let scroll_ref = ctx.use_scroll_ref("carousel_scroll");

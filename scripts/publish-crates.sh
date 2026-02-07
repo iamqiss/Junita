@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to publish all Blinc crates to crates.io in dependency order
+# Script to publish all Junita crates to crates.io in dependency order
 # Usage: ./scripts/publish-crates.sh
 #
 # Note: crates.io has a rate limit of ~1 new crate per 10 minutes for new publishers
@@ -15,14 +15,14 @@ fi
 WAIT_TIME=610  # 10 minutes + buffer
 
 # Publish order (respects dependency graph)
-# Note: blinc_core has blinc_animation as dev-dep only, so core goes first
-PHASE1=(blinc_macros blinc_platform blinc_icons blinc_core)
-PHASE2=(blinc_animation blinc_paint blinc_svg blinc_text)
-PHASE3=(blinc_theme blinc_image blinc_gpu)
-PHASE4=(blinc_layout blinc_cn)
-PHASE5=(blinc_platform_desktop blinc_platform_android blinc_platform_ios)
-PHASE6=(blinc_app)
-PHASE7=(blinc_cli)
+# Note: junita_core has junita_animation as dev-dep only, so core goes first
+PHASE1=(junita_macros junita_platform junita_icons junita_core)
+PHASE2=(junita_animation junita_paint junita_svg junita_text)
+PHASE3=(junita_theme junita_image junita_gpu)
+PHASE4=(junita_layout junita_cn)
+PHASE5=(junita_platform_desktop junita_platform_android junita_platform_ios)
+PHASE6=(junita_app)
+PHASE7=(junita_cli)
 
 publish_crate() {
     local crate=$1
@@ -62,7 +62,7 @@ publish_phase() {
     done
 }
 
-echo "Starting Blinc crate publishing..."
+echo "Starting Junita crate publishing..."
 echo "This will take approximately $((($WAIT_TIME * 17) / 60)) minutes due to rate limiting."
 echo ""
 

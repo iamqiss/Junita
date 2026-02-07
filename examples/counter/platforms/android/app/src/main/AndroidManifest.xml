@@ -5,7 +5,7 @@
         android:allowBackup="true"
         android:label="counter"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Blinc">
+        android:theme="@style/Theme.Junita">
 
         <activity
             android:name=".MainActivity"

@@ -32,10 +32,10 @@
 
 # Components
 
-- [BlincComponent Macro](./components/blinc-component.md)
+- [JunitaComponent Macro](./components/junita-component.md)
 - [Building Reusable Components](./components/reusable.md)
 
-# Component Library (blinc_cn)
+# Component Library (junita_cn)
 
 - [Overview](./cn/overview.md)
 - [Button](./cn/button.md)

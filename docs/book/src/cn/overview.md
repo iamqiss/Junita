@@ -1,20 +1,20 @@
 # Component Library Overview
 
-`blinc_cn` is a comprehensive component library for Blinc UI, inspired by [shadcn/ui](https://ui.shadcn.com/). It provides 40+ production-ready, themeable components built on top of `blinc_layout`.
+`junita_cn` is a comprehensive component library for Junita UI, inspired by [shadcn/ui](https://ui.shadcn.com/). It provides 40+ production-ready, themeable components built on top of `junita_layout`.
 
 ## Installation
 
-Add `blinc_cn` to your `Cargo.toml`:
+Add `junita_cn` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blinc_cn = { path = "path/to/blinc_cn" }
+junita_cn = { path = "path/to/junita_cn" }
 ```
 
 ## Quick Start
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 fn build_ui() -> impl ElementBuilder {
     div()
@@ -25,7 +25,7 @@ fn build_ui() -> impl ElementBuilder {
             card()
                 .child(card_header()
                     .child(card_title("Welcome"))
-                    .child(card_description("Get started with blinc_cn")))
+                    .child(card_description("Get started with junita_cn")))
                 .child(card_content()
                     .child(text("Beautiful, accessible components.")))
                 .child(card_footer()
@@ -88,7 +88,7 @@ Components include keyboard navigation and proper semantics:
 Import common components with the prelude:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 // Includes:
 // - All component builders (button, card, dialog, etc.)

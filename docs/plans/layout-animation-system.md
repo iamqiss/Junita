@@ -55,7 +55,7 @@ div()
 #### 1.1 LayoutAnimationConfig
 
 ```rust
-// crates/blinc_layout/src/layout_animation.rs
+// crates/junita_layout/src/layout_animation.rs
 
 /// Configuration for which properties to animate
 #[derive(Clone, Debug)]

@@ -5,7 +5,7 @@ The `motion()` element provides declarative enter/exit animations for content. I
 ## Basic Usage
 
 ```rust
-use blinc_layout::motion::motion;
+use junita_layout::motion::motion;
 
 motion()
     .fade_in(300)     // Duration in milliseconds
@@ -35,7 +35,7 @@ motion()
 ### Slide
 
 ```rust
-use blinc_layout::motion::SlideDirection;
+use junita_layout::motion::SlideDirection;
 
 motion()
     .slide_in(SlideDirection::Left, 300)
@@ -87,7 +87,7 @@ motion()
 Animate list items with delays between each:
 
 ```rust
-use blinc_layout::motion::{motion, StaggerConfig, AnimationPreset};
+use junita_layout::motion::{motion, StaggerConfig, AnimationPreset};
 
 let items = vec!["Item 1", "Item 2", "Item 3", "Item 4"];
 
@@ -221,7 +221,7 @@ fn card_list(ctx: &WindowedContext) -> impl ElementBuilder {
 Use a custom state type for page navigation:
 
 ```rust
-use blinc_layout::stateful::{stateful, StateTransitions};
+use junita_layout::stateful::{stateful, StateTransitions};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Page {

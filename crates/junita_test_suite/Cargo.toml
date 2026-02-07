@@ -1,0 +1,53 @@
+[package]
+name = "junita_test_suite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_test_suite"
+rust-version.workspace = true
+description = "Visual test suite for Junita UI framework rendering capabilities"
+
+[lib]
+crate-type = ["lib"]
+
+[[bin]]
+name = "junita-visual-tests"
+path = "src/main.rs"
+
+[features]
+default = []
+# Enable interactive window tests (requires display)
+interactive = []
+
+[dependencies]
+# Core Junita crates
+junita_core = { path = "../junita_core", version = "0.1.12" }
+junita_gpu = { path = "../junita_gpu", version = "0.1.12" }
+junita_layout = { path = "../junita_layout", version = "0.1.12" }
+junita_paint = { path = "../junita_paint", version = "0.1.12" }
+junita_text = { path = "../junita_text", version = "0.1.12" }
+junita_svg = { path = "../junita_svg", version = "0.1.12" }
+
+# GPU and windowing
+wgpu.workspace = true
+winit.workspace = true
+raw-window-handle.workspace = true
+pollster.workspace = true
+
+# Utilities
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+
+# Image comparison for visual regression tests
+image = "0.25"
+png = "0.17"
+
+# Benchmarks (uncomment when ready)
+# [dev-dependencies]
+# criterion.workspace = true
+#
+# [[bench]]
+# name = "render_benchmarks"
+# harness = false

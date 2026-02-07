@@ -1,0 +1,84 @@
+[package]
+name = "junita_app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_app"
+rust-version.workspace = true
+description = "Junita application framework with clean layout and rendering API"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("fuchsia", "ohos"))', 'cfg(target_env, values("ohos"))'] }
+
+[lib]
+# rlib: Rust library for normal use
+# staticlib: C static library for iOS/Android linking
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+junita_core = { path = "../junita_core", version = "0.1.12" }
+junita_layout = { path = "../junita_layout", version = "0.1.12" }
+junita_gpu = { path = "../junita_gpu", version = "0.1.12", default-features = false }
+junita_svg = { path = "../junita_svg", version = "0.1.12" }
+junita_text = { path = "../junita_text", version = "0.1.12" }
+junita_image = { path = "../junita_image", version = "0.1.12" }
+junita_platform = { path = "../junita_platform", version = "0.1.12" }
+junita_animation = { path = "../junita_animation", version = "0.1.12" }
+junita_macros = { path = "../junita_macros", version = "0.1.12" }
+junita_theme = { path = "../junita_theme", version = "0.1.12" }
+
+# GPU
+wgpu.workspace = true
+
+# Windowing (optional - used by windowed feature)
+winit = { workspace = true, optional = true }
+raw-window-handle = { workspace = true }
+
+# Async
+pollster.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Data structures
+lru = { workspace = true }
+
+# Desktop platform - exclude mobile/embedded targets
+[target.'cfg(not(any(target_os = "android", target_os = "ios", target_os = "fuchsia")))'.dependencies]
+junita_platform_desktop = { path = "../../extensions/junita_platform_desktop", version = "0.1.12", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+junita_platform_android = { path = "../../extensions/junita_platform_android", version = "0.1.12", optional = true }
+android-activity = { workspace = true, optional = true }
+ndk = { workspace = true, optional = true }
+jni = { workspace = true, optional = true }
+android_logger = { version = "0.14", optional = true }
+log = { version = "0.4", optional = true }
+tracing-android = { version = "0.2", optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+junita_platform_ios = { path = "../../extensions/junita_platform_ios", version = "0.1.12", optional = true }
+
+
+# HarmonyOS uses "ohos" as target_os
+# [target.'cfg(target_os = "ohos")'.dependencies]
+# junita_platform_harmony = { path = "../../extensions/junita_platform_harmony", version = "0.1.12", optional = true }
+
+[dev-dependencies]
+image.workspace = true
+tracing-subscriber.workspace = true
+junita_cn = { path = "../junita_cn", version = "0.1.12" }
+
+[features]
+default = ["windowed"]
+windowed = ["winit", "junita_platform_desktop", "junita_gpu/desktop"]
+android = ["junita_platform_android", "android-activity", "ndk", "jni", "android_logger", "log", "tracing-android", "tracing-subscriber", "junita_gpu/android"]
+ios = ["junita_platform_ios", "junita_gpu/ios"]
+harmony = ["junita_gpu/harmony"]  # junita_platform_harmony when target is available
+fuchsia = []

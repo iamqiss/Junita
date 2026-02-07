@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.blinc.example"
+    namespace = "com.junita.example"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.blinc.example"
+        applicationId = "com.junita.example"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

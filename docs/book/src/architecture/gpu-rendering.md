@@ -1,6 +1,6 @@
 # GPU Rendering
 
-Blinc uses GPU-accelerated rendering via wgpu with **Signed Distance Field (SDF)** shaders for smooth, resolution-independent UI primitives.
+Junita uses GPU-accelerated rendering via wgpu with **Signed Distance Field (SDF)** shaders for smooth, resolution-independent UI primitives.
 
 ## Signed Distance Fields
 
@@ -120,7 +120,7 @@ fn shadow_alpha(distance: f32, blur_radius: f32) -> f32 {
 
 ## Glass Effects
 
-Blinc implements Apple-style frosted glass (vibrancy) with backdrop blur:
+Junita implements Apple-style frosted glass (vibrancy) with backdrop blur:
 
 ### Glass Types
 
@@ -224,7 +224,7 @@ Benefits:
 
 ## MSAA Support
 
-Blinc supports multi-sample anti-aliasing:
+Junita supports multi-sample anti-aliasing:
 
 | Sample Count | Quality | Performance |
 |--------------|---------|-------------|

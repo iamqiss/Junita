@@ -1,10 +1,10 @@
-# Blinc
+# Junita
 
-[![Build Status](https://github.com/project-blinc/Blinc/actions/workflows/ci.yml/badge.svg)](https://github.com/project-blinc/Blinc/actions/workflows/ci.yml)
-[![Tests](https://github.com/project-blinc/Blinc/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/project-blinc/Blinc/actions/workflows/ci.yml)
+[![Build Status](https://github.com/project-junita/Junita/actions/workflows/ci.yml/badge.svg)](https://github.com/project-junita/Junita/actions/workflows/ci.yml)
+[![Tests](https://github.com/project-junita/Junita/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/project-junita/Junita/actions/workflows/ci.yml)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Blinc Book](https://img.shields.io/badge/Blinc_Book-blue.svg?logo=gitbook&logoColor=white)](https://project-blinc.github.io/Blinc)
+[![Junita Book](https://img.shields.io/badge/Junita_Book-blue.svg?logo=gitbook&logoColor=white)](https://project-junita.github.io/Junita)
 
 ![Logo](logo.svg)
 
@@ -30,16 +30,16 @@
 
 ```bash
 # Build from source
-git clone https://github.com/project-blinc/Blinc
-cd Blinc
+git clone https://github.com/project-junita/Junita
+cd Junita
 cargo build --release
 ```
 
 ### Hello World
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_app::windowed::WindowedApp;
+use junita_app::prelude::*;
+use junita_app::windowed::WindowedApp;
 
 fn main() -> Result<()> {
     WindowedApp::run(WindowConfig::default(), |ctx| {
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
             .bg([0.1, 0.1, 0.15, 1.0])
             .flex_center()
             .child(
-                text("Hello Blinc!")
+                text("Hello Junita!")
                     .size(48.0)
                     .color([1.0, 1.0, 1.0, 1.0])
             )
@@ -117,25 +117,25 @@ div()
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                           blinc_app                                  │
-│          High-level API: BlincApp, WindowedApp, RenderContext        │
+│                           junita_app                                  │
+│          High-level API: JunitaApp, WindowedApp, RenderContext        │
 ├─────────────────────────────────────────────────────────────────────┤
-│  blinc_layout         │  blinc_gpu           │  blinc_paint          │
+│  junita_layout         │  junita_gpu           │  junita_paint          │
 │  Flexbox (Taffy)      │  SDF Rendering       │  Canvas API           │
 │  Element Builders     │  Glass/Blur          │  Paths/Shapes         │
 │  RenderTree           │  MSAA                │  Transforms           │
 ├─────────────────────────────────────────────────────────────────────┤
-│  blinc_text           │  blinc_svg           │  blinc_image          │
+│  junita_text           │  junita_svg           │  junita_image          │
 │  Font Loading         │  SVG Parsing         │  Image Decoding       │
 │  Text Shaping         │  Vector Rendering    │  Texture Management   │
 │  Glyph Atlas          │  Fill/Stroke         │  Cross-platform Load  │
 ├─────────────────────────────────────────────────────────────────────┤
-│  blinc_core           │  blinc_animation     │  blinc_platform       │
+│  junita_core           │  junita_animation     │  junita_platform       │
 │  Signals/Reactivity   │  Springs (RK4)       │  Window/Event Traits  │
 │  State Machines       │  Keyframes           │  Input Events         │
 │  Brush/Color Types    │  Timelines           │  Asset Loading        │
 ├─────────────────────────────────────────────────────────────────────┤
-│     blinc_platform_desktop    │  blinc_platform_android  │   _ios   │
+│     junita_platform_desktop    │  junita_platform_android  │   _ios   │
 │     winit + wgpu              │  NDK + Vulkan            │  UIKit   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -146,53 +146,53 @@ div()
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_app**](crates/blinc_app/README.md) | High-level app framework with windowed runner |
-| [**blinc_core**](crates/blinc_core/README.md) | Reactive signals, state machines, brush types |
-| [**blinc_layout**](crates/blinc_layout/README.md) | Flexbox layout engine with GPUI-style builders |
-| [**blinc_gpu**](crates/blinc_gpu/README.md) | GPU rendering: SDF shapes, glass effects, MSAA |
+| [**junita_app**](crates/junita_app/README.md) | High-level app framework with windowed runner |
+| [**junita_core**](crates/junita_core/README.md) | Reactive signals, state machines, brush types |
+| [**junita_layout**](crates/junita_layout/README.md) | Flexbox layout engine with GPUI-style builders |
+| [**junita_gpu**](crates/junita_gpu/README.md) | GPU rendering: SDF shapes, glass effects, MSAA |
 
 ### Rendering & Media
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_paint**](crates/blinc_paint/README.md) | Canvas/paint API for custom drawing |
-| [**blinc_text**](crates/blinc_text/README.md) | Text shaping, font loading, glyph atlas |
-| [**blinc_image**](crates/blinc_image/README.md) | Image loading and cross-platform assets |
-| [**blinc_svg**](crates/blinc_svg/README.md) | SVG parsing and rendering |
+| [**junita_paint**](crates/junita_paint/README.md) | Canvas/paint API for custom drawing |
+| [**junita_text**](crates/junita_text/README.md) | Text shaping, font loading, glyph atlas |
+| [**junita_image**](crates/junita_image/README.md) | Image loading and cross-platform assets |
+| [**junita_svg**](crates/junita_svg/README.md) | SVG parsing and rendering |
 
 ### Animation & Theming
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_animation**](crates/blinc_animation/README.md) | Spring physics and keyframe animations |
-| [**blinc_theme**](crates/blinc_theme/README.md) | Design tokens, theming, light/dark mode |
+| [**junita_animation**](crates/junita_animation/README.md) | Spring physics and keyframe animations |
+| [**junita_theme**](crates/junita_theme/README.md) | Design tokens, theming, light/dark mode |
 
 ### Component Library
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_cn**](crates/blinc_cn/README.md) | shadcn/ui-style component library (40+ components) |
-| [**blinc_icons**](crates/blinc_icons/README.md) | Lucide icon set integration |
+| [**junita_cn**](crates/junita_cn/README.md) | shadcn/ui-style component library (40+ components) |
+| [**junita_icons**](crates/junita_icons/README.md) | Lucide icon set integration |
 
 ### Platform
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_platform**](crates/blinc_platform/README.md) | Cross-platform traits and asset loading |
-| [**blinc_platform_desktop**](extensions/blinc_platform_desktop/README.md) | Desktop backend (winit) |
-| [**blinc_platform_android**](extensions/blinc_platform_android/README.md) | Android backend (NDK) |
-| [**blinc_platform_ios**](extensions/blinc_platform_ios/README.md) | iOS backend (UIKit/Metal) |
+| [**junita_platform**](crates/junita_platform/README.md) | Cross-platform traits and asset loading |
+| [**junita_platform_desktop**](extensions/junita_platform_desktop/README.md) | Desktop backend (winit) |
+| [**junita_platform_android**](extensions/junita_platform_android/README.md) | Android backend (NDK) |
+| [**junita_platform_ios**](extensions/junita_platform_ios/README.md) | iOS backend (UIKit/Metal) |
 
 ### Tooling & Development
 
 | Crate | Description |
 | ----- | ----------- |
-| [**blinc_cli**](crates/blinc_cli/README.md) | Command-line tooling |
-| [**blinc_macros**](crates/blinc_macros/README.md) | Procedural macros for components |
-| [**blinc_debugger**](crates/blinc_debugger/README.md) | Visual debugger overlay |
-| [**blinc_recorder**](crates/blinc_recorder/README.md) | Frame recording and debugging |
-| [**blinc_runtime**](crates/blinc_runtime/README.md) | Embedding SDK for host applications |
-| [**blinc_test_suite**](crates/blinc_test_suite/README.md) | Visual regression testing framework |
+| [**junita_cli**](crates/junita_cli/README.md) | Command-line tooling |
+| [**junita_macros**](crates/junita_macros/README.md) | Procedural macros for components |
+| [**junita_debugger**](crates/junita_debugger/README.md) | Visual debugger overlay |
+| [**junita_recorder**](crates/junita_recorder/README.md) | Frame recording and debugging |
+| [**junita_runtime**](crates/junita_runtime/README.md) | Embedding SDK for host applications |
+| [**junita_test_suite**](crates/junita_test_suite/README.md) | Visual regression testing framework |
 
 ## Builder API Reference
 
@@ -260,7 +260,7 @@ Custom drawing with paths, shapes, and transforms:
 ![Canvas API](<Screenshot 2025-12-26 at 18.52.49.png>)
 
 ```rust
-use blinc_paint::prelude::*;
+use junita_paint::prelude::*;
 
 fn canvas_example() -> Canvas{
     canvas(move |ctx: &mut dyn DrawContext, bounds| {
@@ -315,7 +315,7 @@ fn canvas_example() -> Canvas{
 
 ## Animation
 
-Blinc provides a comprehensive animation system with spring physics, keyframe animations, and declarative motion containers.
+Junita provides a comprehensive animation system with spring physics, keyframe animations, and declarative motion containers.
 
 ![keyframe animations](ScreenRecording2025-12-27at13.02.25-ezgif.com-video-to-gif-converter.gif)
 
@@ -324,7 +324,7 @@ Blinc provides a comprehensive animation system with spring physics, keyframe an
 Spring physics animations with RK4 integration for natural, interruptible motion:
 
 ```rust
-use blinc_animation::{AnimatedValue, SpringConfig};
+use junita_animation::{AnimatedValue, SpringConfig};
 
 // Create a spring-animated value
 let mut position = AnimatedValue::new(0.0);
@@ -343,7 +343,7 @@ position.animate_to(100.0, SpringConfig::smooth());   // Gentle, smooth
 Multi-keyframe animations with custom easing:
 
 ```rust
-use blinc_animation::{AnimatedTimeline, AnimatedKeyframe, Easing};
+use junita_animation::{AnimatedTimeline, AnimatedKeyframe, Easing};
 
 let timeline = AnimatedTimeline::new()
     .keyframe(AnimatedKeyframe::new(0.0).opacity(0.0).scale(0.8))
@@ -358,7 +358,7 @@ let timeline = AnimatedTimeline::new()
 Built-in presets for common animations:
 
 ```rust
-use blinc_animation::AnimationPreset;
+use junita_animation::AnimationPreset;
 
 // Fade animations
 AnimationPreset::fade_in(300)
@@ -387,7 +387,7 @@ AnimationPreset::slide_in_bottom(300, 50.0)
 The `motion()` container provides declarative enter/exit animations:
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 // Single element with enter/exit animations
 motion()
@@ -419,7 +419,7 @@ motion()
 Animate lists with staggered delays:
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 // Forward stagger (first to last)
 motion()
@@ -446,7 +446,7 @@ motion()
 ### Easing Functions
 
 ```rust
-use blinc_animation::Easing;
+use junita_animation::Easing;
 
 Easing::Linear
 Easing::EaseIn
@@ -500,14 +500,14 @@ Easing::EaseOutBounce    // Bounce effect
 
 ### Future
 
-- **Zyntax DSL** - `.blinc` file syntax with compile-time optimization
+- **Zyntax DSL** - `.junita` file syntax with compile-time optimization
 - Hot reload during development
 - Developer tools (inspector, animation debugger)
 - IDE integration (VS Code extension, LSP)
 
 ## Documentation
 
-For comprehensive documentation, tutorials, and API reference, visit the **[Blinc Book](https://project-blinc.github.io/Blinc)**.
+For comprehensive documentation, tutorials, and API reference, visit the **[Junita Book](https://project-junita.github.io/Junita)**.
 
 The book covers:
 

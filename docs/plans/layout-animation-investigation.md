@@ -51,7 +51,7 @@ if expanded {
 - [ ] Verify clip rect uses animated bounds (width/height) not layout bounds
 - [ ] Check if `has_layout_animation` returns true during render
 
-**Code Location**: [renderer.rs:4220-4231](crates/blinc_layout/src/renderer.rs#L4220-L4231)
+**Code Location**: [renderer.rs:4220-4231](crates/junita_layout/src/renderer.rs#L4220-L4231)
 ```rust
 let clips_content = render_node.props.clips_content || has_layout_animation;
 if clips_content {

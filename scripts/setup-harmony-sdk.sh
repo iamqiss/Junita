@@ -1,8 +1,8 @@
 #!/bin/bash
-# HarmonyOS / OpenHarmony SDK Setup Script for Blinc
+# HarmonyOS / OpenHarmony SDK Setup Script for Junita
 #
 # This script helps set up the development environment for building
-# Blinc applications targeting HarmonyOS and OpenHarmony.
+# Junita applications targeting HarmonyOS and OpenHarmony.
 #
 # References:
 # - DevEco Studio: https://developer.huawei.com/consumer/en/deveco-studio/
@@ -26,7 +26,7 @@ CMDLINE_TOOLS_DIR="$HARMONY_DIR/commandline-tools"
 
 print_header() {
     echo -e "${BLUE}======================================${NC}"
-    echo -e "${BLUE}  HarmonyOS SDK Setup for Blinc${NC}"
+    echo -e "${BLUE}  HarmonyOS SDK Setup for Junita${NC}"
     echo -e "${BLUE}======================================${NC}"
     echo ""
 }
@@ -305,7 +305,7 @@ setup_environment() {
     # Add environment setup
     cat >> "$shell_rc" << EOF
 
-# HarmonyOS / OpenHarmony SDK (added by Blinc setup script)
+# HarmonyOS / OpenHarmony SDK (added by Junita setup script)
 export HARMONY_DIR="$HARMONY_DIR"
 export OHOS_SDK_HOME="$platform_path"
 export OHOS_NDK_HOME="\$OHOS_SDK_HOME/native"
@@ -563,7 +563,7 @@ print_summary() {
     echo "  2. Run: source ~/.zshrc (or ~/.bashrc)"
     echo "  3. Run: ./scripts/verify-harmony-tools.sh"
     echo ""
-    echo "Build Blinc for HarmonyOS:"
+    echo "Build Junita for HarmonyOS:"
     echo "  cargo build --features harmony"
     echo ""
 }

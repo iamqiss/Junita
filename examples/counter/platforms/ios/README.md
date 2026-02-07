@@ -6,7 +6,7 @@ iOS platform files for counter.
 
 ```bash
 # From project root
-blinc build --target ios --release
+junita build --target ios --release
 ```
 
 ## Requirements

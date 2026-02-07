@@ -1,8 +1,8 @@
 {
   "modelVersion": "5.0.0",
-  "name": "blinc_example",
+  "name": "junita_example",
   "version": "1.0.0",
-  "description": "Blinc UI Framework Example for HarmonyOS",
+  "description": "Junita UI Framework Example for HarmonyOS",
   "main": "",
   "author": "",
   "license": "Apache-2.0",

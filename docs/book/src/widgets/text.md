@@ -1,13 +1,13 @@
 # Text & Rich Text
 
-Blinc provides two main elements for displaying text: `text()` for plain text and `rich_text()` for inline-formatted text with HTML-like markup.
+Junita provides two main elements for displaying text: `text()` for plain text and `rich_text()` for inline-formatted text with HTML-like markup.
 
 ## Plain Text
 
 The `text()` element is the simplest way to display text:
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 // Basic text
 text("Hello, World!")
@@ -46,7 +46,7 @@ text("Underlined and struck")
 The `rich_text()` element supports inline formatting using HTML-like tags. This is ideal for text that needs mixed styling within a single block.
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 // Basic formatting
 rich_text("This has <b>bold</b> and <i>italic</i> text.")
@@ -174,7 +174,7 @@ link("Hover to see underline", "https://example.com")
 For integration with syntax highlighting or markdown rendering, create rich text from a pre-built `StyledText`:
 
 ```rust
-use blinc_layout::styled_text::{StyledText, StyledLine, TextSpan};
+use junita_layout::styled_text::{StyledText, StyledLine, TextSpan};
 
 let styled = StyledText {
     lines: vec![
@@ -203,8 +203,8 @@ rich_text_styled(styled)
 Here's a complete example demonstrating various text features:
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_core::Color;
+use junita_app::prelude::*;
+use junita_core::Color;
 
 fn demo_ui() -> impl ElementBuilder {
     div()
@@ -245,5 +245,5 @@ fn demo_ui() -> impl ElementBuilder {
 Run the rich text demo to see all features in action:
 
 ```bash
-cargo run -p blinc_app --example rich_text_demo --features windowed
+cargo run -p junita_app --example rich_text_demo --features windowed
 ```

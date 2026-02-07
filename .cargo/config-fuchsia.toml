@@ -7,7 +7,7 @@
 #
 # For development:
 #   - Code compiles on macOS/Linux because FIDL code is gated with #[cfg(target_os = "fuchsia")]
-#   - Build with: cargo check -p blinc_platform_fuchsia
+#   - Build with: cargo check -p junita_platform_fuchsia
 #
 # For actual Fuchsia deployment:
 #   1. Clone Fuchsia source: https://fuchsia.dev/fuchsia-src/get-started/get_fuchsia_source

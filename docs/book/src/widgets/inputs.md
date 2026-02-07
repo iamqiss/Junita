@@ -1,13 +1,13 @@
 # Buttons & Inputs
 
-Blinc provides ready-to-use input widgets with built-in state management.
+Junita provides ready-to-use input widgets with built-in state management.
 
 ## Buttons
 
 ### Basic Button
 
 ```rust
-use blinc_layout::widgets::button::{button, Button};
+use junita_layout::widgets::button::{button, Button};
 
 fn my_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     let btn_state = ctx.use_state_for("save_btn", ButtonState::Idle);
@@ -61,7 +61,7 @@ button(state, "Cannot Click")
 ### Basic Checkbox
 
 ```rust
-use blinc_layout::widgets::checkbox::{checkbox, checkbox_state};
+use junita_layout::widgets::checkbox::{checkbox, checkbox_state};
 
 fn my_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     let state = checkbox_state(false);  // Initially unchecked
@@ -104,7 +104,7 @@ let state = checkbox_state(true);  // Start checked
 ### Basic Text Input
 
 ```rust
-use blinc_layout::widgets::text_input::{text_input, text_input_state};
+use junita_layout::widgets::text_input::{text_input, text_input_state};
 
 fn my_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     let state = text_input_state("Enter your name...");
@@ -145,7 +145,7 @@ let current_text = state.text();
 ### Basic Text Area
 
 ```rust
-use blinc_layout::widgets::text_area::{text_area, text_area_state};
+use junita_layout::widgets::text_area::{text_area, text_area_state};
 
 fn my_ui(ctx: &WindowedContext) -> impl ElementBuilder {
     let state = text_area_state("Enter description...");
@@ -179,12 +179,12 @@ text_area(&state)
 ### Syntax Highlighted Code
 
 ```rust
-use blinc_layout::widgets::code::code;
+use junita_layout::widgets::code::code;
 
 fn my_ui() -> impl ElementBuilder {
     let source = r#"
 fn main() {
-    println!("Hello, Blinc!");
+    println!("Hello, Junita!");
 }
 "#;
 

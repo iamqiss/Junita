@@ -1,4 +1,4 @@
-# Blinc Cargo Configuration
+# Junita Cargo Configuration
 # =========================
 # Cross-compilation settings for Android and iOS targets
 
@@ -44,12 +44,12 @@ ar = "llvm-ar"
 
 [alias]
 # Convenience aliases for Android builds
-android-arm64 = "build --target aarch64-linux-android -p blinc_platform_android"
-android-arm = "build --target armv7-linux-androideabi -p blinc_platform_android"
-android-x64 = "build --target x86_64-linux-android -p blinc_platform_android"
-android-x86 = "build --target i686-linux-android -p blinc_platform_android"
+android-arm64 = "build --target aarch64-linux-android -p junita_platform_android"
+android-arm = "build --target armv7-linux-androideabi -p junita_platform_android"
+android-x64 = "build --target x86_64-linux-android -p junita_platform_android"
+android-x86 = "build --target i686-linux-android -p junita_platform_android"
 android-all = ["android-arm64", "android-arm", "android-x64", "android-x86"]
 
 # iOS builds
-ios-device = "build --target aarch64-apple-ios -p blinc_platform_ios"
-ios-sim = "build --target aarch64-apple-ios-sim -p blinc_platform_ios"
+ios-device = "build --target aarch64-apple-ios -p junita_platform_ios"
+ios-sim = "build --target aarch64-apple-ios-sim -p junita_platform_ios"

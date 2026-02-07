@@ -6,7 +6,7 @@ macOS platform files for counter.
 
 ```bash
 # From project root
-blinc build --target macos --release
+junita build --target macos --release
 ```
 
 ## App Bundle Structure

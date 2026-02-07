@@ -1,0 +1,39 @@
+[package]
+name = "junita_platform_ios"
+description = "Junita iOS platform - UIKit integration, Metal rendering, and touch input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_platform_ios"
+rust-version.workspace = true
+
+[lib]
+crate-type = ["lib", "staticlib"]  # iOS requires static linking
+
+[features]
+default = []
+zrtl-plugin = []
+
+[dependencies]
+# Core dependencies (always available)
+junita_core = { path = "../../crates/junita_core", version = "0.1.12" }
+junita_animation = { path = "../../crates/junita_animation", version = "0.1.12" }
+junita_platform = { path = "../../crates/junita_platform", version = "0.1.12" }
+
+# Logging
+tracing.workspace = true
+tracing-subscriber = { workspace = true, optional = true }
+
+# Memory allocation
+libc = "0.2"
+
+# iOS-specific dependencies (only when targeting iOS)
+[target.'cfg(target_os = "ios")'.dependencies]
+junita_gpu = { path = "../../crates/junita_gpu", version = "0.1.12", default-features = false, features = ["metal"] }
+
+# iOS/macOS Objective-C bindings
+objc2.workspace = true
+objc2-foundation.workspace = true
+objc2-ui-kit.workspace = true
+objc2-metal.workspace = true

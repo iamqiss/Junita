@@ -1,11 +1,11 @@
 #!/bin/bash
-# Blinc CLI installer script
-# Usage: curl -fsSL https://raw.githubusercontent.com/project-blinc/blinc/main/scripts/install.sh | bash
+# Junita CLI installer script
+# Usage: curl -fsSL https://raw.githubusercontent.com/project-junita/junita/main/scripts/install.sh | bash
 
 set -e
 
-REPO="project-blinc/blinc"
-INSTALL_DIR="${BLINC_INSTALL_DIR:-/usr/local/bin}"
+REPO="project-junita/junita"
+INSTALL_DIR="${JUNITA_INSTALL_DIR:-/usr/local/bin}"
 
 # Colors
 RED='\033[0;31m'
@@ -87,46 +87,46 @@ get_latest_version() {
 # Download and install
 install() {
     info "Detected platform: $PLATFORM"
-    info "Installing Blinc CLI $VERSION..."
+    info "Installing Junita CLI $VERSION..."
 
-    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/blinc-$PLATFORM.tar.gz"
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/junita-$PLATFORM.tar.gz"
     TMP_DIR=$(mktemp -d)
     trap "rm -rf $TMP_DIR" EXIT
 
     info "Downloading from $DOWNLOAD_URL..."
 
     if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/blinc.tar.gz"
+        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/junita.tar.gz"
     else
-        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/blinc.tar.gz"
+        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/junita.tar.gz"
     fi
 
     info "Extracting..."
-    tar -xzf "$TMP_DIR/blinc.tar.gz" -C "$TMP_DIR"
+    tar -xzf "$TMP_DIR/junita.tar.gz" -C "$TMP_DIR"
 
     info "Installing to $INSTALL_DIR..."
     if [ -w "$INSTALL_DIR" ]; then
-        mv "$TMP_DIR/blinc" "$INSTALL_DIR/"
+        mv "$TMP_DIR/junita" "$INSTALL_DIR/"
     else
         warn "Need sudo to install to $INSTALL_DIR"
-        sudo mv "$TMP_DIR/blinc" "$INSTALL_DIR/"
+        sudo mv "$TMP_DIR/junita" "$INSTALL_DIR/"
     fi
 
-    chmod +x "$INSTALL_DIR/blinc"
+    chmod +x "$INSTALL_DIR/junita"
 }
 
 # Verify installation
 verify() {
-    if command -v blinc &> /dev/null; then
+    if command -v junita &> /dev/null; then
         success ""
-        success "✓ Blinc CLI installed successfully!"
+        success "✓ Junita CLI installed successfully!"
         echo ""
-        blinc --version
+        junita --version
         echo ""
-        info "Run 'blinc doctor' to check your development environment."
+        info "Run 'junita doctor' to check your development environment."
     else
         warn ""
-        warn "Blinc installed to $INSTALL_DIR/blinc"
+        warn "Junita installed to $INSTALL_DIR/junita"
         warn "Make sure $INSTALL_DIR is in your PATH."
         echo ""
         echo "Add this to your shell profile:"
@@ -137,7 +137,7 @@ verify() {
 main() {
     echo ""
     info "╔════════════════════════════════════════╗"
-    info "║         Blinc CLI Installer            ║"
+    info "║         Junita CLI Installer            ║"
     info "╚════════════════════════════════════════╝"
     echo ""
 

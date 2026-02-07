@@ -9,17 +9,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         window = UIWindow(frame: UIScreen.main.bounds)
-        window?.rootViewController = BlincViewController()
+        window?.rootViewController = JunitaViewController()
         window?.makeKeyAndVisible()
         return true
     }
 }
 
-/// View controller that hosts the Blinc rendering surface
-class BlincViewController: UIViewController {
+/// View controller that hosts the Junita rendering surface
+class JunitaViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        // Blinc runtime initialization will be added here
+        // Junita runtime initialization will be added here
     }
 }

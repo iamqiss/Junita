@@ -1,0 +1,28 @@
+[package]
+name = "junita_runtime"
+description = "Junita runtime - core runtime for Junita UI applications"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_runtime"
+rust-version.workspace = true
+
+[features]
+default = ["full"]
+full = ["junita_core", "junita_animation", "junita_layout", "junita_gpu", "junita_paint"]
+
+[dependencies]
+junita_core = { path = "../junita_core", version = "0.1.12", optional = true }
+junita_animation = { path = "../junita_animation", version = "0.1.12", optional = true }
+junita_layout = { path = "../junita_layout", version = "0.1.12", optional = true }
+junita_gpu = { path = "../junita_gpu", version = "0.1.12", optional = true }
+junita_paint = { path = "../junita_paint", version = "0.1.12", optional = true }
+# junita_cn = { path = "../junita_cn", version = "0.1.12", optional = true }
+
+# Errors
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true

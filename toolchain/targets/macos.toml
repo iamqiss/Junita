@@ -36,8 +36,8 @@ lto = "thin"
 
 [bundle]
 # macOS app bundle settings
-bundle_identifier = "com.example.blincapp"
-bundle_name = "BlincApp"
+bundle_identifier = "com.example.junitaapp"
+bundle_name = "JunitaApp"
 bundle_version = "1.0.0"
 bundle_short_version = "1.0"
 
@@ -62,15 +62,15 @@ entitlements = ""
 
 [notarization]
 # Apple ID for notarization
-# Can be set via BLINC_APPLE_ID env var
+# Can be set via JUNITA_APPLE_ID env var
 apple_id = ""
 
 # App-specific password
-# Can be set via BLINC_APPLE_PASSWORD env var
+# Can be set via JUNITA_APPLE_PASSWORD env var
 password = ""
 
 # Team ID
-# Can be set via BLINC_APPLE_TEAM_ID env var
+# Can be set via JUNITA_APPLE_TEAM_ID env var
 team_id = ""
 
 [sandbox]

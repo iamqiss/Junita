@@ -1,4 +1,4 @@
-# Blinc Rust Fuchsia SDK Plan
+# Junita Rust Fuchsia SDK Plan
 
 Build a standalone Rust SDK for Fuchsia development without requiring the full Fuchsia source tree.
 
@@ -13,11 +13,11 @@ Build a standalone Rust SDK for Fuchsia development without requiring the full F
 
 ## SDK Components to Build
 
-### 1. blinc_fuchsia_zircon (Zircon Runtime)
+### 1. junita_fuchsia_zircon (Zircon Runtime)
 Modernized Zircon kernel bindings.
 
 ```
-extensions/blinc_fuchsia_zircon/
+extensions/junita_fuchsia_zircon/
 ├── src/
 │   ├── lib.rs          # Re-exports
 │   ├── status.rs       # zx_status_t error codes
@@ -37,11 +37,11 @@ Key types needed:
 - `Vmo` - For buffer sharing with GPU
 - `Status` - Error codes
 
-### 2. blinc_fuchsia_async (Async Runtime)
+### 2. junita_fuchsia_async (Async Runtime)
 Fuchsia-compatible async executor.
 
 ```
-extensions/blinc_fuchsia_async/
+extensions/junita_fuchsia_async/
 ├── src/
 │   ├── lib.rs
 │   ├── executor.rs     # Single-threaded executor
@@ -50,11 +50,11 @@ extensions/blinc_fuchsia_async/
 └── Cargo.toml
 ```
 
-### 3. blinc_fidl (FIDL Runtime)
+### 3. junita_fidl (FIDL Runtime)
 FIDL encoding/decoding runtime.
 
 ```
-extensions/blinc_fidl/
+extensions/junita_fidl/
 ├── src/
 │   ├── lib.rs
 │   ├── encoding.rs     # Wire format encoding
@@ -65,7 +65,7 @@ extensions/blinc_fidl/
 └── Cargo.toml
 ```
 
-### 4. blinc_fuchsia_bindings (Generated - DONE)
+### 4. junita_fuchsia_bindings (Generated - DONE)
 Already created - FIDL type definitions.
 
 ## Implementation Strategy
@@ -111,28 +111,28 @@ use fidl::...;
 use fuchsia_zircon as zx;
 
 // Generate:
-use blinc_fidl::...;
-use blinc_fuchsia_zircon as zx;
+use junita_fidl::...;
+use junita_fuchsia_zircon as zx;
 ```
 
 ### Phase 4: Integration
-Update `blinc_platform_fuchsia` to use the SDK:
+Update `junita_platform_fuchsia` to use the SDK:
 
 ```toml
 [dependencies]
-blinc_fuchsia_zircon = { path = "..." }
-blinc_fuchsia_async = { path = "..." }
-blinc_fidl = { path = "..." }
-blinc_fuchsia_bindings = { path = "..." }
+junita_fuchsia_zircon = { path = "..." }
+junita_fuchsia_async = { path = "..." }
+junita_fidl = { path = "..." }
+junita_fuchsia_bindings = { path = "..." }
 ```
 
 ## Files to Create
 
 | Crate | Files | Priority |
 |-------|-------|----------|
-| blinc_fuchsia_zircon | 8 | High |
-| blinc_fidl | 6 | High |
-| blinc_fuchsia_async | 4 | Medium |
+| junita_fuchsia_zircon | 8 | High |
+| junita_fidl | 6 | High |
+| junita_fuchsia_async | 4 | Medium |
 
 ## Build Workflow
 
@@ -141,10 +141,10 @@ blinc_fuchsia_bindings = { path = "..." }
 ./scripts/generate-fuchsia-fidl.sh
 
 # 2. Build for host (stubs)
-cargo build -p blinc_platform_fuchsia
+cargo build -p junita_platform_fuchsia
 
 # 3. Build for Fuchsia (real syscalls)
-cargo build --target x86_64-unknown-fuchsia -p blinc_platform_fuchsia \
+cargo build --target x86_64-unknown-fuchsia -p junita_platform_fuchsia \
     -Z build-std=std,panic_abort
 ```
 
@@ -164,7 +164,7 @@ cargo build --target x86_64-unknown-fuchsia -p blinc_platform_fuchsia \
 ## Timeline Estimate
 
 This is a significant undertaking. The FIDL runtime alone is complex.
-Consider prioritizing the minimal subset needed for Blinc:
+Consider prioritizing the minimal subset needed for Junita:
 - Channel (for FIDL IPC)
 - EventPair (for ViewRef)
 - Vmo (for GPU buffers)

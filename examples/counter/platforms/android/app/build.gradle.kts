@@ -36,5 +36,5 @@ android {
 }
 
 dependencies {
-    // Blinc runtime will be added here
+    // Junita runtime will be added here
 }

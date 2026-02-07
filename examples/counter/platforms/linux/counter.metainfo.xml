@@ -2,12 +2,12 @@
 <component type="desktop-application">
     <id>com.example.counter</id>
     <name>counter</name>
-    <summary>A Blinc application</summary>
+    <summary>A Junita application</summary>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>MIT</project_license>
     <description>
         <p>
-            counter is a cross-platform application built with Blinc.
+            counter is a cross-platform application built with Junita.
         </p>
     </description>
     <launchable type="desktop-id">counter.desktop</launchable>

@@ -1,6 +1,6 @@
 # Known Limitations
 
-This document describes known limitations in the Blinc rendering system and their workarounds.
+This document describes known limitations in the Junita rendering system and their workarounds.
 
 ## Asymmetric Borders with Rounded Corners
 

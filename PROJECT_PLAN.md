@@ -1,10 +1,10 @@
-# Blinc Project Plan
+# Junita Project Plan
 
 ## Overview
 
-Blinc is a native UI framework powered by Zyntax, featuring:
+Junita is a native UI framework powered by Zyntax, featuring:
 
-- **Declarative DSL** (`.blinc` / `.bl`) with compile-time optimization
+- **Declarative DSL** (`.junita` / `.bl`) with compile-time optimization
 - **Fine-grained Reactivity** via signals (no VDOM)
 - **Built-in State Machines** (Harel statecharts) for widget interactions
 - **Animation-first Design** with spring physics and keyframes
@@ -22,19 +22,19 @@ Blinc is a native UI framework powered by Zyntax, featuring:
 
 #### Tasks
 
-- [x] **CLI Scaffolding** (`blinc_cli`)
-  - [x] Implement `blinc build` command with target selection
-  - [x] Implement `blinc dev` with file watcher (notify crate) - *stub ready*
-  - [x] Implement `blinc new` for project scaffolding
-  - [x] Implement `blinc init` for in-place initialization
-  - [x] Implement `blinc plugin build` for ZRTL plugin compilation - *stub ready*
-  - [x] Implement `blinc doctor` for platform diagnostics
-  - [x] Implement `blinc info` for toolchain information
-  - [x] Implement `blinc check` for project validation - *stub ready*
+- [x] **CLI Scaffolding** (`junita_cli`)
+  - [x] Implement `junita build` command with target selection
+  - [x] Implement `junita dev` with file watcher (notify crate) - *stub ready*
+  - [x] Implement `junita new` for project scaffolding
+  - [x] Implement `junita init` for in-place initialization
+  - [x] Implement `junita plugin build` for ZRTL plugin compilation - *stub ready*
+  - [x] Implement `junita doctor` for platform diagnostics
+  - [x] Implement `junita info` for toolchain information
+  - [x] Implement `junita check` for project validation - *stub ready*
 
 - [ ] **Zyntax Integration**
   - [ ] Integrate `zyntax_embed` for JIT compilation
-  - [ ] Configure grammar loading from `grammars/blinc.zyn`
+  - [ ] Configure grammar loading from `grammars/junita.zyn`
   - [ ] Set up ZRTL plugin discovery and loading
   - [ ] Implement hot-reload via grammar recompilation
 
@@ -46,8 +46,8 @@ Blinc is a native UI framework powered by Zyntax, featuring:
   - [x] Create `toolchain/targets/linux.toml`
 
 - [x] **Project Scaffolding System**
-  - [x] `.blincproj` configuration schema (TOML-based)
-  - [x] `src/` directory with main.blinc templates
+  - [x] `.junitaproj` configuration schema (TOML-based)
+  - [x] `src/` directory with main.junita templates
   - [x] `plugins/` directory for local plugins
   - [x] `platforms/` directory with platform-specific files:
     - [x] Android: Gradle project, MainActivity.kt, AndroidManifest.xml
@@ -68,9 +68,9 @@ Blinc is a native UI framework powered by Zyntax, featuring:
   - [x] Android library size optimization (~530KB from 10MB+)
   - [x] Strip symbols in release builds
 
-### 1.2 Blinc Grammar (`blinc.zyn`)
+### 1.2 Junita Grammar (`junita.zyn`)
 
-**Goal**: Define the complete Blinc DSL grammar that compiles to ZRTL function calls.
+**Goal**: Define the complete Junita DSL grammar that compiles to ZRTL function calls.
 
 #### DSL Constructs
 
@@ -78,13 +78,13 @@ Blinc is a native UI framework powered by Zyntax, featuring:
 |-----------|--------|-------------|
 | `@widget` | `@widget Name { ... }` | Struct + init/render functions |
 | `@prop` | `@prop name: Type = default` | Struct field |
-| `@state` | `@state name: Type = value` | `blinc_signal_create_*()` |
-| `@derived` | `@derived name: Type = expr` | `blinc_derived_create()` |
-| `@machine` | `@machine name { states { ... } }` | `blinc_fsm_create()` |
-| `@spring` | `@spring name { stiffness, damping, target }` | `blinc_spring_create()` |
-| `@animation` | `@animation name { duration, keyframes }` | `blinc_keyframe_create()` |
-| `@render` | `@render { Widget(...) { ... } }` | `blinc_widget_*()` calls |
-| `@paint` | `@paint (ctx) { ... }` | `blinc_paint_*()` calls |
+| `@state` | `@state name: Type = value` | `junita_signal_create_*()` |
+| `@derived` | `@derived name: Type = expr` | `junita_derived_create()` |
+| `@machine` | `@machine name { states { ... } }` | `junita_fsm_create()` |
+| `@spring` | `@spring name { stiffness, damping, target }` | `junita_spring_create()` |
+| `@animation` | `@animation name { duration, keyframes }` | `junita_keyframe_create()` |
+| `@render` | `@render { Widget(...) { ... } }` | `junita_widget_*()` calls |
+| `@paint` | `@paint (ctx) { ... }` | `junita_paint_*()` calls |
 
 #### Tasks
 
@@ -98,7 +98,7 @@ Blinc is a native UI framework powered by Zyntax, featuring:
 - [ ] Implement paint context (`@paint`)
 - [ ] Add semantic actions to emit ZRTL function calls
 
-### 1.3 Reactive System (`blinc_core`)
+### 1.3 Reactive System (`junita_core`)
 
 **Goal**: Fine-grained signal-based reactivity inspired by Leptos/SolidJS.
 
@@ -119,7 +119,7 @@ Signal → Subscribers → Effects/Derived
 - [x] Implement reactive graph topological sorting
 - [ ] Export ZRTL C-ABI functions
 
-### 1.4 State Machine Runtime (`blinc_core`)
+### 1.4 State Machine Runtime (`junita_core`)
 
 **Goal**: Harel statecharts for complex widget interactions.
 
@@ -144,7 +144,7 @@ Signal → Subscribers → Effects/Derived
 
 ## Phase 2: Animation & Layout
 
-### 2.1 Animation System (`blinc_animation`)
+### 2.1 Animation System (`junita_animation`)
 
 **Goal**: Framer Motion-quality animations with spring physics.
 
@@ -178,14 +178,14 @@ Signal → Subscribers → Effects/Derived
 - [x] Spring presets (gentle, wobbly, stiff, snappy, molasses)
 - [ ] Export ZRTL C-ABI functions
 
-### 2.2 Layout Engine (`blinc_layout`)
+### 2.2 Layout Engine (`junita_layout`)
 
 **Goal**: Flexbox layout via Taffy with GPUI-style builder API.
 
 #### Tasks
 
 - [x] Integrate Taffy layout engine
-- [x] Map Blinc style properties to Taffy styles
+- [x] Map Junita style properties to Taffy styles
 - [x] Implement layout tree management
 - [x] Implement GPUI-style builder API (`div()`, `text()`, `svg()`)
 - [x] Support percentage, pixel, and auto sizing
@@ -199,7 +199,7 @@ Signal → Subscribers → Effects/Derived
 
 ## Phase 3: Rendering
 
-### 3.1 GPU Renderer (`blinc_gpu`)
+### 3.1 GPU Renderer (`junita_gpu`)
 
 **Goal**: High-performance SDF-based GPU rendering.
 
@@ -234,7 +234,7 @@ Signal → Subscribers → Effects/Derived
 - [ ] Implement texture atlas for caching
 - [ ] Optimize draw call batching
 
-### 3.2 Paint/Canvas System (`blinc_paint`)
+### 3.2 Paint/Canvas System (`junita_paint`)
 
 **Goal**: Full 2D drawing API for custom graphics.
 
@@ -262,7 +262,7 @@ ctx.push_transform(matrix);
 - [x] Integrate with GPU renderer (GpuPaintContext)
 - [ ] Export ZRTL C-ABI functions
 
-### 3.3 Text Rendering (`blinc_text`)
+### 3.3 Text Rendering (`junita_text`)
 
 **Goal**: High-quality text with proper shaping and rendering.
 
@@ -280,7 +280,7 @@ ctx.push_transform(matrix);
 - [ ] Implement SDF-based glyph rendering
 - [ ] Implement glyph atlas LRU eviction
 
-### 3.4 Image Rendering (`blinc_image`)
+### 3.4 Image Rendering (`junita_image`)
 
 **Goal**: Cross-platform image loading and GPU texture rendering.
 
@@ -298,7 +298,7 @@ ctx.push_transform(matrix);
 - [x] Implement ImageFit modes (Cover, Contain, Fill, Tile)
 - [ ] Implement async network image loading
 
-### 3.6 SVG Rendering (`blinc_svg`)
+### 3.6 SVG Rendering (`junita_svg`)
 
 **Goal**: Load and render SVG graphics.
 
@@ -315,7 +315,7 @@ ctx.push_transform(matrix);
 
 ## Phase 4: Platform Integration
 
-### 4.0 Platform Abstraction (`blinc_platform`)
+### 4.0 Platform Abstraction (`junita_platform`)
 
 **Goal**: Cross-platform traits and APIs for windowing, input, and assets.
 
@@ -332,7 +332,7 @@ ctx.push_transform(matrix);
 - [ ] Implement clipboard access trait
 - [ ] Implement system theme detection trait
 
-### 4.1 Desktop Platform (`blinc_platform_desktop`)
+### 4.1 Desktop Platform (`junita_platform_desktop`)
 
 **Goal**: Native windowing for macOS, Windows, Linux.
 
@@ -346,7 +346,7 @@ ctx.push_transform(matrix);
 - [ ] Implement clipboard access
 - [ ] Implement system theme detection
 
-### 4.2 Android Platform (`blinc_platform_android`)
+### 4.2 Android Platform (`junita_platform_android`)
 
 **Goal**: Native Android integration.
 
@@ -368,7 +368,7 @@ ctx.push_transform(matrix);
 - [x] x86_64-linux-android target (for emulator)
 - [x] Optimized library size (~530KB)
 
-### 4.3 iOS Platform (`blinc_platform_ios`)
+### 4.3 iOS Platform (`junita_platform_ios`)
 
 **Goal**: Native iOS integration.
 
@@ -386,13 +386,13 @@ ctx.push_transform(matrix);
 
 ## Phase 5: Application Framework
 
-### 5.1 App Delegate (`blinc_app`)
+### 5.1 App Delegate (`junita_app`)
 
-**Goal**: High-level API for building Blinc applications.
+**Goal**: High-level API for building Junita applications.
 
 #### Tasks
 
-- [x] Implement BlincApp with configuration
+- [x] Implement JunitaApp with configuration
 - [x] Implement single render() function API
 - [x] Implement RenderContext for unified rendering
 - [x] Implement automatic glass backdrop handling
@@ -400,7 +400,7 @@ ctx.push_transform(matrix);
 - [x] Implement MSAA configuration
 - [x] Implement comprehensive visual test suite
 
-### 5.2 Widget Library (`blinc_widgets`)
+### 5.2 Widget Library (`junita_widgets`)
 
 **Goal**: Core UI widgets with FSM-driven interactions.
 
@@ -535,8 +535,8 @@ File Change → Grammar Recompile → JIT Update → State Preserved
 - [x] Unit tests for reactive system
 - [x] Unit tests for state machines
 - [x] Unit tests for animation
-- [x] Integration tests for blinc_core
-- [x] Visual test suite (blinc_test_suite) with 14 test categories
+- [x] Integration tests for junita_core
+- [x] Visual test suite (junita_test_suite) with 14 test categories
   - [x] Clipping tests
   - [x] Glass/vibrancy tests
   - [x] Gradient tests
@@ -550,7 +550,7 @@ File Change → Grammar Recompile → JIT Update → State Preserved
   - [x] SVG tests
   - [x] Text tests
   - [x] Transform tests
-- [x] blinc_app API tests
+- [x] junita_app API tests
 - [ ] Visual regression tests (reference image comparison)
 - [ ] Performance benchmarks
 
@@ -574,48 +574,48 @@ File Change → Grammar Recompile → JIT Update → State Preserved
 
 | Crate | Lines | Tests | Status |
 |-------|-------|-------|--------|
-| **blinc_core** | ~3,500 | ✓ | Reactive signals, FSM runtime, draw context, Brush types, events |
-| **blinc_animation** | ~1,500 | ✓ | Springs (RK4), keyframes, timelines, easing |
-| **blinc_layout** | ~8,000 | ✓ | Taffy, GPUI-style builder, widgets (scroll, text input, code, tables, typography, motion) |
-| **blinc_gpu** | ~4,000 | ✓ | SDF rendering, glass, MSAA, compositing, image textures |
-| **blinc_paint** | ~1,500 | ✓ | Canvas API, paths, shapes, transforms |
-| **blinc_text** | ~2,000 | ✓ | Font loading, shaping, atlas, layout, text wrapping |
-| **blinc_image** | ~500 | ✓ | Image loading, decoding, cross-platform assets |
-| **blinc_svg** | ~800 | ✓ | SVG parsing and rendering |
-| **blinc_platform** | ~1,200 | ✓ | Cross-platform traits, asset loading, scroll phases |
-| **blinc_app** | ~1,500 | ✓ | High-level app framework, windowed runner, DPI scaling |
-| **blinc_widgets** | ~400 | - | Button, container, text (basic) |
-| **blinc_runtime** | ~200 | - | Embedding SDK |
-| **blinc_cli** | ~2,000 | - | CLI tool |
-| **blinc_test_suite** | ~3,000 | 107 | Comprehensive visual testing |
+| **junita_core** | ~3,500 | ✓ | Reactive signals, FSM runtime, draw context, Brush types, events |
+| **junita_animation** | ~1,500 | ✓ | Springs (RK4), keyframes, timelines, easing |
+| **junita_layout** | ~8,000 | ✓ | Taffy, GPUI-style builder, widgets (scroll, text input, code, tables, typography, motion) |
+| **junita_gpu** | ~4,000 | ✓ | SDF rendering, glass, MSAA, compositing, image textures |
+| **junita_paint** | ~1,500 | ✓ | Canvas API, paths, shapes, transforms |
+| **junita_text** | ~2,000 | ✓ | Font loading, shaping, atlas, layout, text wrapping |
+| **junita_image** | ~500 | ✓ | Image loading, decoding, cross-platform assets |
+| **junita_svg** | ~800 | ✓ | SVG parsing and rendering |
+| **junita_platform** | ~1,200 | ✓ | Cross-platform traits, asset loading, scroll phases |
+| **junita_app** | ~1,500 | ✓ | High-level app framework, windowed runner, DPI scaling |
+| **junita_widgets** | ~400 | - | Button, container, text (basic) |
+| **junita_runtime** | ~200 | - | Embedding SDK |
+| **junita_cli** | ~2,000 | - | CLI tool |
+| **junita_test_suite** | ~3,000 | 107 | Comprehensive visual testing |
 
 ### Platform Extensions
 
 | Extension | Status |
 |-----------|--------|
-| **blinc_platform_desktop** | Window creation, input handling, filesystem assets, DPI scaling, scroll phases via winit |
-| **blinc_platform_android** | NativeActivity, JNI, Vulkan, NDK AssetManager (~530KB binary) |
-| **blinc_platform_ios** | UIKit, Metal, touch input |
+| **junita_platform_desktop** | Window creation, input handling, filesystem assets, DPI scaling, scroll phases via winit |
+| **junita_platform_android** | NativeActivity, JNI, Vulkan, NDK AssetManager (~530KB binary) |
+| **junita_platform_ios** | UIKit, Metal, touch input |
 
 ### Completed ✓
 
 | Component | Features |
 |-----------|----------|
-| **blinc_core** | Reactive signals, FSM runtime, draw context, layer model, Brush::Image, event system |
-| **blinc_animation** | Springs (RK4), keyframes, timelines, easing, presets |
-| **blinc_layout** | Taffy integration, GPUI-style builder, RenderTree, materials, image element |
-| **blinc_layout widgets** | Scroll (spring physics), TextInput, TextArea, Code/Pre (syntax highlighting), Motion (enter/exit animations), Typography (h1-h6, span, muted), Tables (TableBuilder) |
-| **blinc_gpu** | SDF shaders, gradients, glass/blur, MSAA, path tessellation, image textures |
-| **blinc_paint** | Paint context, paths, shapes, transforms, shadows |
-| **blinc_text** | Font loading, text shaping, glyph atlas, layout, text wrapping |
-| **blinc_image** | Image decoding (PNG/JPEG/GIF/WebP/BMP), cross-platform asset loading |
-| **blinc_svg** | SVG parsing, rendering, element builder |
-| **blinc_platform** | Platform traits, event system, cross-platform AssetLoader, scroll phases |
-| **blinc_app** | BlincApp, RenderContext, WindowedApp runner, DPI scaling, visual tests |
-| **blinc_cli** | Full CLI with new/init/build/dev/doctor/info |
-| **blinc_platform_desktop** | winit integration, filesystem assets, DPI scaling, scroll phase detection |
-| **blinc_platform_android** | NDK integration, JNI bridge, Vulkan, NDK AssetManager |
-| **blinc_platform_ios** | UIKit, Metal, touch input |
+| **junita_core** | Reactive signals, FSM runtime, draw context, layer model, Brush::Image, event system |
+| **junita_animation** | Springs (RK4), keyframes, timelines, easing, presets |
+| **junita_layout** | Taffy integration, GPUI-style builder, RenderTree, materials, image element |
+| **junita_layout widgets** | Scroll (spring physics), TextInput, TextArea, Code/Pre (syntax highlighting), Motion (enter/exit animations), Typography (h1-h6, span, muted), Tables (TableBuilder) |
+| **junita_gpu** | SDF shaders, gradients, glass/blur, MSAA, path tessellation, image textures |
+| **junita_paint** | Paint context, paths, shapes, transforms, shadows |
+| **junita_text** | Font loading, text shaping, glyph atlas, layout, text wrapping |
+| **junita_image** | Image decoding (PNG/JPEG/GIF/WebP/BMP), cross-platform asset loading |
+| **junita_svg** | SVG parsing, rendering, element builder |
+| **junita_platform** | Platform traits, event system, cross-platform AssetLoader, scroll phases |
+| **junita_app** | JunitaApp, RenderContext, WindowedApp runner, DPI scaling, visual tests |
+| **junita_cli** | Full CLI with new/init/build/dev/doctor/info |
+| **junita_platform_desktop** | winit integration, filesystem assets, DPI scaling, scroll phase detection |
+| **junita_platform_android** | NDK integration, JNI bridge, Vulkan, NDK AssetManager |
+| **junita_platform_ios** | UIKit, Metal, touch input |
 | **CI/CD** | GitHub Actions for CI, Android, releases |
 | **Test Suite** | 107 tests across 14 categories |
 
@@ -628,7 +628,7 @@ File Change → Grammar Recompile → JIT Update → State Preserved
 
 ### Next Priorities
 
-1. **Zyntax Grammar2 Integration** - Enable .blinc file parsing
+1. **Zyntax Grammar2 Integration** - Enable .junita file parsing
 2. **ZRTL Function Exports** - Bridge Rust runtime to Zyntax
 3. **Remaining Widgets** - Checkbox, Toggle, Dropdown, Modal, Tabs, Slider
 4. **Theming System** - Colors, typography, dark/light mode
@@ -690,7 +690,7 @@ A complete music player interface demonstrating:
 - Progress bar with nested glass elements
 - GPUI-style builder API usage
 
-Location: `crates/blinc_test_suite/src/tests/layout.rs` (music_player test)
+Location: `crates/junita_test_suite/src/tests/layout.rs` (music_player test)
 
 ### Glass Card UI
 
@@ -701,7 +701,7 @@ Demonstrates glassmorphism with:
 - Foreground children rendered on top
 - Automatic layer separation
 
-Location: `crates/blinc_test_suite/src/tests/layout.rs` (glass_card test)
+Location: `crates/junita_test_suite/src/tests/layout.rs` (glass_card test)
 
 ### Typography Demo
 
@@ -712,7 +712,7 @@ Demonstrates typography helpers:
 - Block text (paragraphs, captions, inline code)
 - Text wrapping and layout
 
-Location: `crates/blinc_app/examples/typography_demo.rs`
+Location: `crates/junita_app/examples/typography_demo.rs`
 
 ### Table Demo
 
@@ -723,7 +723,7 @@ Demonstrates table components:
 - Striped rows for better readability
 - Cell styling and alignment options
 
-Location: `crates/blinc_app/examples/table_demo.rs`
+Location: `crates/junita_app/examples/table_demo.rs`
 
 ### Animation Demo
 
@@ -733,4 +733,4 @@ Demonstrates motion animations:
 - Stagger animations with configurable direction
 - Spring-based smooth transitions
 
-Location: `crates/blinc_app/examples/animation_demo.rs`
+Location: `crates/junita_app/examples/animation_demo.rs`

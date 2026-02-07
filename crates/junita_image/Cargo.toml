@@ -1,0 +1,40 @@
+[package]
+name = "junita_image"
+description = "Image loading and rendering for Junita UI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_image"
+rust-version.workspace = true
+keywords = ["ui", "gui", "image", "junita"]
+categories = ["gui", "multimedia::images"]
+
+[dependencies]
+# Image decoding
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+
+# Async/networking for URL loading
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"], optional = true }
+tokio = { version = "1", features = ["rt"], optional = true }
+
+# Base64 decoding
+base64 = "0.22"
+
+# Error handling
+thiserror = "2"
+
+# Tracing
+tracing = "0.1"
+
+# Platform asset loading (optional)
+junita_platform = { path = "../junita_platform", version = "0.1.12", optional = true }
+
+# Text rendering for emoji (optional)
+junita_text = { path = "../junita_text", version = "0.1.12", optional = true }
+
+[features]
+default = ["platform", "emoji"]
+network = ["reqwest", "tokio"]
+platform = ["junita_platform"]
+emoji = ["junita_text"]

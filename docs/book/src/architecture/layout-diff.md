@@ -1,12 +1,12 @@
 # Layout & Diff System
 
-Blinc separates layout computation from visual rendering, enabling incremental updates without full tree rebuilds.
+Junita separates layout computation from visual rendering, enabling incremental updates without full tree rebuilds.
 
 ## Layout System
 
 ### Taffy Integration
 
-Blinc uses [Taffy](https://github.com/DioxusLabs/taffy) for flexbox layout computation. Taffy is a high-performance layout engine that implements the CSS Flexbox specification.
+Junita uses [Taffy](https://github.com/DioxusLabs/taffy) for flexbox layout computation. Taffy is a high-performance layout engine that implements the CSS Flexbox specification.
 
 ```rust
 // LayoutTree wraps Taffy

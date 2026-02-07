@@ -1,13 +1,13 @@
 # Performance Tips
 
-Blinc is designed for high performance, but following these guidelines ensures your UI stays smooth.
+Junita is designed for high performance, but following these guidelines ensures your UI stays smooth.
 
 ## Use Stateful for Visual States
 
 **Do:** Use `stateful(handle)` for hover, press, and focus effects:
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn hover_button(ctx: &WindowedContext) -> impl ElementBuilder {
     let handle = ctx.use_state(ButtonState::Idle);
@@ -184,7 +184,7 @@ Enable tracing to identify bottlenecks:
 
 ```rust
 tracing_subscriber::fmt()
-    .with_env_filter("blinc_layout=debug")
+    .with_env_filter("junita_layout=debug")
     .init();
 ```
 

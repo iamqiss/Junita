@@ -1,13 +1,13 @@
 # Images & SVG
 
-Blinc supports raster images and SVG graphics with flexible sizing and styling options.
+Junita supports raster images and SVG graphics with flexible sizing and styling options.
 
 ## Images
 
 ### Basic Image
 
 ```rust
-use blinc_layout::image::image;
+use junita_layout::image::image;
 
 image("path/to/photo.png")
     .w(200.0)
@@ -93,7 +93,7 @@ image(src)
 For content-heavy applications with many images (galleries, feeds, chat apps), lazy loading defers image loading until the image is visible in the viewport. This reduces initial memory usage and load time.
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 use std::time::Duration;
 
 // Basic lazy loading
@@ -169,7 +169,7 @@ img("photo.jpg")
 Render emoji as images at arbitrary sizes using the system emoji font. Emoji images are **automatically lazy-loaded** for memory efficiency.
 
 ```rust
-use blinc_layout::image::{emoji, emoji_sized};
+use junita_layout::image::{emoji, emoji_sized};
 
 // Default size (64px)
 emoji("😀")
@@ -195,7 +195,7 @@ Emoji images use the system color emoji font (Apple Color Emoji on macOS, Segoe 
 ### Basic SVG
 
 ```rust
-use blinc_layout::svg::svg;
+use junita_layout::svg::svg;
 
 svg("icons/menu.svg")
     .w(24.0)
@@ -250,7 +250,7 @@ fn avatar(url: &str, size: f32) -> impl ElementBuilder {
 ### Icon Button
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn icon_button(ctx: &WindowedContext, icon_path: &str) -> impl ElementBuilder {
     // Use use_state_for with icon_path as key for reusable component

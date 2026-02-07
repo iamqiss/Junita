@@ -1,6 +1,6 @@
 # Building Reusable Components
 
-This guide covers patterns for creating composable, reusable UI components in Blinc.
+This guide covers patterns for creating composable, reusable UI components in Junita.
 
 ## Component Patterns
 
@@ -62,7 +62,7 @@ card_with_content("Settings",
 For components needing state or animations:
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn counter_card(ctx: &WindowedContext) -> impl ElementBuilder {
     let count = ctx.use_state_keyed("counter_card_count", || 0i32);
@@ -114,9 +114,9 @@ fn increment_btn(ctx: &WindowedContext, count: State<i32>) -> impl ElementBuilde
 Use `motion()` for components with spring animations:
 
 ```rust
-use blinc_layout::motion::motion;
+use junita_layout::motion::motion;
 
-#[derive(BlincComponent)]
+#[derive(JunitaComponent)]
 struct AnimatedCard {
     #[animation]
     scale: f32,
@@ -160,7 +160,7 @@ fn animated_card(ctx: &WindowedContext, title: &str) -> impl ElementBuilder {
 Use `stateful(handle)` for components with visual states:
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn interactive_card(ctx: &WindowedContext, title: &str) -> impl ElementBuilder {
     // Use use_state_for with title as key for reusable component
@@ -272,7 +272,7 @@ Organize related components in modules:
 ```rust
 // src/components/cards.rs
 pub mod cards {
-    use blinc_app::prelude::*;
+    use junita_app::prelude::*;
 
     pub fn simple_card(title: &str) -> Div {
         // ...
@@ -361,7 +361,7 @@ pub fn notification(props: NotificationProps) -> Div {
 
 6. **Separate stateless and stateful** - Pure components are easier to test and reuse.
 
-7. **Use BlincComponent for state and animations** - Type-safe hooks for both `State<T>` and `SharedAnimatedValue` prevent key collisions.
+7. **Use JunitaComponent for state and animations** - Type-safe hooks for both `State<T>` and `SharedAnimatedValue` prevent key collisions.
 
 8. **Use Stateful for visual states** - Hover, press, focus effects should use `Stateful` rather than signals.
 

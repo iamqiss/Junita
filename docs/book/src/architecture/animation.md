@@ -1,10 +1,10 @@
 # Animation System
 
-Blinc provides a multi-layered animation system with physics-based springs and timed keyframe animations.
+Junita provides a multi-layered animation system with physics-based springs and timed keyframe animations.
 
 ## Spring Physics
 
-Springs are the foundation of Blinc's animation system, providing natural, interruptible motion.
+Springs are the foundation of Junita's animation system, providing natural, interruptible motion.
 
 ### Spring Model
 
@@ -37,7 +37,7 @@ struct SpringConfig {
 
 ### RK4 Integration
 
-Blinc uses **4th-order Runge-Kutta (RK4)** integration for stability:
+Junita uses **4th-order Runge-Kutta (RK4)** integration for stability:
 
 ```rust
 fn step(&mut self, dt: f32) {
@@ -306,10 +306,10 @@ fn animated_button(ctx: &WindowedContext) -> impl ElementBuilder {
 }
 ```
 
-### With BlincComponent
+### With JunitaComponent
 
 ```rust
-#[derive(BlincComponent)]
+#[derive(JunitaComponent)]
 struct ExpandableCard {
     #[animation]
     height: f32,

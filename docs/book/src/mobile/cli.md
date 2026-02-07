@@ -1,16 +1,16 @@
 # CLI Reference
 
-The Blinc CLI simplifies creating and building mobile projects.
+The Junita CLI simplifies creating and building mobile projects.
 
 ## Creating a Project
 
 ### New Project
 
 ```bash
-blinc new my-app --template rust
+junita new my-app --template rust
 ```
 
-This creates a new Blinc project with:
+This creates a new Junita project with:
 - Cargo.toml configured for mobile targets
 - Platform directories for Android and iOS
 - Build scripts for each platform
@@ -19,7 +19,7 @@ This creates a new Blinc project with:
 ### Options
 
 ```bash
-blinc new <name> [options]
+junita new <name> [options]
 
 Options:
   --template <type>   Project template (rust, swift, kotlin)
@@ -32,13 +32,13 @@ Options:
 ### Build for Android
 
 ```bash
-blinc build android
+junita build android
 ```
 
 Options:
 
 ```bash
-blinc build android [options]
+junita build android [options]
 
 Options:
   --release           Build in release mode
@@ -49,13 +49,13 @@ Options:
 ### Build for iOS
 
 ```bash
-blinc build ios
+junita build ios
 ```
 
 Options:
 
 ```bash
-blinc build ios [options]
+junita build ios [options]
 
 Options:
   --release           Build in release mode
@@ -68,7 +68,7 @@ Options:
 ### Run on Android
 
 ```bash
-blinc run android
+junita run android
 ```
 
 This will:
@@ -80,7 +80,7 @@ This will:
 Options:
 
 ```bash
-blinc run android [options]
+junita run android [options]
 
 Options:
   --release           Run release build
@@ -91,7 +91,7 @@ Options:
 ### Run on iOS
 
 ```bash
-blinc run ios
+junita run ios
 ```
 
 This will:
@@ -102,7 +102,7 @@ This will:
 Options:
 
 ```bash
-blinc run ios [options]
+junita run ios [options]
 
 Options:
   --release           Run release build
@@ -112,7 +112,7 @@ Options:
 
 ## Project Configuration
 
-### blinc.toml
+### junita.toml
 
 The project configuration file:
 
@@ -140,7 +140,7 @@ enabled = true
 platform_dir = "platforms/ios"
 
 [build]
-blinc_path = "../.."  # Path to Blinc framework
+junita_path = "../.."  # Path to Junita framework
 ```
 
 ### Configuration Options
@@ -152,28 +152,28 @@ blinc_path = "../.."  # Path to Blinc framework
 | `project.template` | Template type | "rust" |
 | `targets.default` | Default build target | "desktop" |
 | `targets.supported` | List of supported platforms | ["desktop"] |
-| `build.blinc_path` | Path to Blinc framework | "../.." |
+| `build.junita_path` | Path to Junita framework | "../.." |
 
 ## Cleaning
 
 ```bash
 # Clean all build artifacts
-blinc clean
+junita clean
 
 # Clean specific platform
-blinc clean android
-blinc clean ios
+junita clean android
+junita clean ios
 ```
 
 ## Checking Configuration
 
 ```bash
 # Validate project configuration
-blinc check
+junita check
 
 # Check specific platform setup
-blinc check android
-blinc check ios
+junita check android
+junita check ios
 ```
 
 This verifies:

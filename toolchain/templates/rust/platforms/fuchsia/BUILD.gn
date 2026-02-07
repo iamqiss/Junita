@@ -1,9 +1,9 @@
-# Copyright 2024 The Blinc Authors. All rights reserved.
+# Copyright 2024 The Junita Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license.
 #
-# BUILD.gn - Fuchsia build file for Blinc applications
+# BUILD.gn - Fuchsia build file for Junita applications
 #
-# This file integrates Rust Blinc applications into the Fuchsia build system.
+# This file integrates Rust Junita applications into the Fuchsia build system.
 # It defines how to compile the Rust code and package it as a Fuchsia component.
 #
 # Prerequisites:
@@ -25,7 +25,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 # Application name - update this
-project_name = "blinc_app"
+project_name = "junita_app"
 
 # Build the Rust binary
 rustc_binary("${project_name}_bin") {

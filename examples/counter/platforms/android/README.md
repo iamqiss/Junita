@@ -6,7 +6,7 @@ Android platform files for counter.
 
 ```bash
 # From project root
-blinc build --target android --release
+junita build --target android --release
 
 # Or using Gradle directly
 cd platforms/android

@@ -17,30 +17,30 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [dependencies]
-blinc_core = { path = "../../crates/blinc_core" }
-blinc_layout = { path = "../../crates/blinc_layout" }
+junita_core = { path = "../../crates/junita_core" }
+junita_layout = { path = "../../crates/junita_layout" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
 [target.'cfg(target_os = "android")'.dependencies]
-blinc_app = { path = "../../crates/blinc_app", default-features = false, features = ["android"] }
-blinc_platform_android = { path = "../../extensions/blinc_platform_android" }
+junita_app = { path = "../../crates/junita_app", default-features = false, features = ["android"] }
+junita_platform_android = { path = "../../extensions/junita_platform_android" }
 android-activity = { version = "0.6", features = ["native-activity"] }
 log = "0.4"
 android_logger = "0.14"
 
 [target.'cfg(target_os = "ios")'.dependencies]
-blinc_app = { path = "../../crates/blinc_app", default-features = false, features = ["ios"] }
-blinc_platform_ios = { path = "../../extensions/blinc_platform_ios" }
+junita_app = { path = "../../crates/junita_app", default-features = false, features = ["ios"] }
+junita_platform_ios = { path = "../../extensions/junita_platform_ios" }
 
 # HarmonyOS/OpenHarmony (target_env = "ohos", target_os = "linux")
 [target.'cfg(target_env = "ohos")'.dependencies]
-blinc_app = { path = "../../crates/blinc_app", default-features = false, features = ["harmony"] }
-blinc_platform_harmony = { path = "../../extensions/blinc_platform_harmony" }
+junita_app = { path = "../../crates/junita_app", default-features = false, features = ["harmony"] }
+junita_platform_harmony = { path = "../../extensions/junita_platform_harmony" }
 
 [target.'cfg(all(any(target_os = "windows", target_os = "macos", target_os = "linux"), not(target_env = "ohos")))'.dependencies]
-blinc_app = { path = "../../crates/blinc_app" }
-blinc_platform_desktop = { path = "../../extensions/blinc_platform_desktop" }
+junita_app = { path = "../../crates/junita_app" }
+junita_platform_desktop = { path = "../../extensions/junita_platform_desktop" }
 
 [features]
 default = ["desktop"]
@@ -60,7 +60,7 @@ panic = "abort"
 opt-level = 1
 
 [package.metadata.android]
-package = "com.blinc.example"
+package = "com.junita.example"
 apk_label = "example"
 target_sdk_version = 34
 min_sdk_version = 24

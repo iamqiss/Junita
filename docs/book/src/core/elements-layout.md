@@ -1,6 +1,6 @@
 # Elements & Layout
 
-Blinc provides a set of core elements that can be composed to build any UI. All elements implement the `ElementBuilder` trait and use a fluent builder pattern.
+Junita provides a set of core elements that can be composed to build any UI. All elements implement the `ElementBuilder` trait and use a fluent builder pattern.
 
 ## Core Elements
 
@@ -127,7 +127,7 @@ See [Images & SVG](../widgets/media.md) for more details.
 
 ## Layout System
 
-Blinc uses Flexbox for layout, powered by [Taffy](https://github.com/DioxusLabs/taffy).
+Junita uses Flexbox for layout, powered by [Taffy](https://github.com/DioxusLabs/taffy).
 
 ### Sizing
 

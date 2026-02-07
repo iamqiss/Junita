@@ -1,6 +1,6 @@
 # example
 
-A Blinc UI application with cross-platform support for desktop, Android, and iOS.
+A Junita UI application with cross-platform support for desktop, Android, and iOS.
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ cargo lipo --release
 ```
 example/
 ├── Cargo.toml           # Rust project configuration
-├── blinc.toml           # Blinc toolchain configuration
+├── junita.toml           # Junita toolchain configuration
 ├── src/
 │   └── main.rs          # Application code
 └── platforms/

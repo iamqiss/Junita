@@ -1,6 +1,6 @@
 # CSS Styling
 
-Blinc includes a powerful CSS parser that allows you to define styles using familiar CSS syntax. This enables separation of concerns between layout code and visual styling.
+Junita includes a powerful CSS parser that allows you to define styles using familiar CSS syntax. This enables separation of concerns between layout code and visual styling.
 
 ## Overview
 
@@ -22,7 +22,7 @@ The CSS system supports:
 ### Parsing CSS
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 let css = r#"
     #card {
@@ -211,7 +211,7 @@ Color stops can use any supported color format:
 
 ## Length Units
 
-Blinc CSS supports three types of length units:
+Junita CSS supports three types of length units:
 
 ### Pixels (`px`)
 
@@ -615,7 +615,7 @@ motion()
 ## Complete Example
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 use std::sync::Arc;
 
 fn styled_app() -> impl ElementBuilder {

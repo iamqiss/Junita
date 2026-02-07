@@ -2,12 +2,12 @@
 """
 Junita Rebranding Script
 ========================
-Rebrand Blinc to Junita across the entire codebase.
+Rebrand Junita to Junita across the entire codebase.
 
 This script will:
-- Replace all variations of "Blinc" with "Junita"
-- Update GitHub username from @project-blinc to @iamqiss
-- Handle case variations (blinc, Blinc, BLINC)
+- Replace all variations of "Junita" with "Junita"
+- Update GitHub username from @project-junita to @iamqiss
+- Handle case variations (junita, Junita, JUNITA)
 - Update URLs, package names, and documentation
 - Preserve file permissions and structure
 
@@ -25,23 +25,23 @@ from typing import List, Dict, Tuple
 # Rebranding mappings
 REBRAND_PATTERNS = [
     # Exact case matches
-    ('Blinc', 'Junita'),
-    ('blinc', 'junita'),
-    ('BLINC', 'JUNITA'),
+    ('Junita', 'Junita'),
+    ('junita', 'junita'),
+    ('JUNITA', 'JUNITA'),
     
     # GitHub usernames and organizations
-    ('project-blinc', 'iamqiss'),
-    ('project_blinc', 'iamqiss'),
-    ('@project-blinc', '@iamqiss'),
+    ('project-junita', 'iamqiss'),
+    ('project_junita', 'iamqiss'),
+    ('@project-junita', '@iamqiss'),
     
     # URLs and domains
-    ('https://github.com/project-blinc', 'https://github.com/iamqiss'),
-    ('https://project-blinc.github.io', 'https://iamqiss.github.io'),
-    ('project-blinc.github.io', 'iamqiss.github.io'),
+    ('https://github.com/project-junita', 'https://github.com/iamqiss'),
+    ('https://project-junita.github.io', 'https://iamqiss.github.io'),
+    ('project-junita.github.io', 'iamqiss.github.io'),
     
     # Package names (common in Rust/Cargo)
-    ('blinc-', 'junita-'),
-    ('blinc_', 'junita_'),
+    ('junita-', 'junita-'),
+    ('junita_', 'junita_'),
 ]
 
 # Files to skip (binary, generated, or special files)
@@ -147,7 +147,7 @@ def rebrand_file(filepath: Path, dry_run: bool = False) -> Dict:
 
 def rename_paths(root_path: Path, dry_run: bool = False) -> List[Tuple[Path, Path]]:
     """
-    Rename files and directories containing 'blinc' to 'junita'.
+    Rename files and directories containing 'junita' to 'junita'.
     Returns list of (old_path, new_path) tuples.
     """
     renames = []
@@ -162,7 +162,7 @@ def rename_paths(root_path: Path, dry_run: bool = False) -> List[Tuple[Path, Pat
         
         # Rename files
         for filename in filenames:
-            if 'blinc' in filename.lower():
+            if 'junita' in filename.lower():
                 old_path = current_dir / filename
                 new_filename = filename
                 
@@ -180,7 +180,7 @@ def rename_paths(root_path: Path, dry_run: bool = False) -> List[Tuple[Path, Pat
         
         # Rename directories
         for dirname in dirnames:
-            if 'blinc' in dirname.lower():
+            if 'junita' in dirname.lower():
                 old_path = current_dir / dirname
                 new_dirname = dirname
                 
@@ -263,7 +263,7 @@ def main():
     """Main rebranding function."""
     if len(sys.argv) < 2:
         print("Usage: python3 rebrand.py <path-to-repo> [--dry-run]")
-        print("\nThis script will rebrand Blinc to Junita throughout the repository.")
+        print("\nThis script will rebrand Junita to Junita throughout the repository.")
         print("Use --dry-run to see what would change without making modifications.")
         sys.exit(1)
     

@@ -1,0 +1,71 @@
+[package]
+name = "junita_platform_fuchsia"
+description = "Junita Fuchsia platform - Scenic compositor, FIDL events, and Vulkan rendering"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_platform_fuchsia"
+rust-version.workspace = true
+keywords = ["ui", "gui", "fuchsia", "junita"]
+categories = ["gui"]
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+# Enable this feature when building within the Fuchsia tree with full SDK
+# This enables real FIDL protocol implementations instead of stubs
+fuchsia-sdk = []
+
+[dependencies]
+# Core dependencies (always available)
+junita_core = { path = "../../crates/junita_core", version = "0.1.12" }
+junita_animation = { path = "../../crates/junita_animation", version = "0.1.12" }
+junita_platform = { path = "../../crates/junita_platform", version = "0.1.12" }
+
+# GPU types for wgpu configuration (version-matched to workspace wgpu)
+wgpu-types = "23.0"
+
+# Logging
+tracing.workspace = true
+
+# Fuchsia-specific dependencies (only when targeting Fuchsia)
+# IMPORTANT: These crates are NOT available on crates.io. They are provided by
+# the Fuchsia SDK's internal package system and resolve during `fx build`.
+#
+# When building this crate as part of a Fuchsia component:
+# 1. Use `fx set` to configure your Fuchsia build
+# 2. Add this crate to your BUILD.gn
+# 3. Run `fx build`
+#
+# The Fuchsia build system will provide these dependencies:
+# - fuchsia-async
+# - fuchsia-component
+# - fuchsia-zircon (as fuchsia_zircon)
+# - fidl
+# - fidl_fuchsia_ui_app
+# - fidl_fuchsia_ui_composition
+# - fidl_fuchsia_ui_views
+# - fidl_fuchsia_ui_input3
+# - fidl_fuchsia_ui_pointer
+# - fidl_fuchsia_sysmem2
+# - fidl_fuchsia_images2
+# - fidl_fuchsia_math
+# - futures
+#
+# For development on non-Fuchsia hosts, the #[cfg(target_os = "fuchsia")] blocks
+# in the source code ensure the crate compiles without these dependencies.
+
+# Futures for async (used on both platforms for types)
+futures = "0.3"
+
+# Our standalone Fuchsia SDK (works on all platforms, stubs on non-Fuchsia)
+junita_fuchsia_zircon = { path = "../junita_fuchsia_zircon", version = "0.1.12" }
+junita_fidl = { path = "../junita_fidl", version = "0.1.12" }
+junita_fuchsia_async = { path = "../junita_fuchsia_async", version = "0.1.12" }
+
+# GPU support - enabled when building for Fuchsia
+[target.'cfg(target_os = "fuchsia")'.dependencies]
+junita_gpu = { path = "../../crates/junita_gpu", version = "0.1.12", default-features = false, features = ["vulkan"] }

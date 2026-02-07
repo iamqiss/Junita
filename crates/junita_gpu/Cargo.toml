@@ -1,0 +1,55 @@
+[package]
+name = "junita_gpu"
+description = "Junita GPU renderer - SDF-based rendering via wgpu"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_gpu"
+rust-version.workspace = true
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+# No default backends - must be explicitly selected per platform
+default = []
+vulkan = ["wgpu/vulkan-portability"]
+metal = ["wgpu/metal"]
+dx12 = ["wgpu/dx12"]
+webgl = ["wgpu/webgl"]
+# Platform-specific presets
+desktop = ["vulkan", "metal", "dx12", "winit"]  # All desktop backends + windowing
+android = ["vulkan"]                    # Android only uses Vulkan (native windowing)
+ios = ["metal"]                         # iOS only uses Metal (native windowing)
+fuchsia = ["vulkan"]                    # Fuchsia uses Vulkan via Scenic (native windowing)
+harmony = ["vulkan"]                    # HarmonyOS prefers Vulkan (native windowing)
+
+[dependencies]
+junita_core = { path = "../junita_core", version = "0.1.12" }
+junita_layout = { path = "../junita_layout", version = "0.1.12" }
+junita_paint = { path = "../junita_paint", version = "0.1.12" }
+junita_text = { path = "../junita_text", version = "0.1.12" }
+
+# GPU
+wgpu.workspace = true
+naga.workspace = true
+bytemuck.workspace = true
+
+# Windowing (optional - only needed for desktop)
+winit = { workspace = true, optional = true }
+raw-window-handle.workspace = true
+
+# Data structures
+slotmap.workspace = true
+smallvec.workspace = true
+lru.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Async
+pollster.workspace = true
+
+# Path tessellation
+lyon.workspace = true

@@ -7,7 +7,7 @@ Components for layout and structure: avatar, separator, accordion, and more.
 User profile images with fallback:
 
 ```rust
-use blinc_cn::prelude::*;
+use junita_cn::prelude::*;
 
 avatar()
     .src("user.jpg")

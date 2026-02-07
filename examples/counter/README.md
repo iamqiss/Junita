@@ -1,31 +1,31 @@
 # counter
 
-A Blinc UI application.
+A Junita UI application.
 
 ## Development
 
 ```bash
-blinc dev
+junita dev
 ```
 
 ## Build
 
 ```bash
 # Desktop (current platform)
-blinc build --release
+junita build --release
 
 # Mobile
-blinc build --target android --release
-blinc build --target ios --release
+junita build --target android --release
+junita build --target ios --release
 ```
 
 ## Project Structure
 
 ```
 counter/
-├── .blincproj           # Project configuration
+├── .junitaproj           # Project configuration
 ├── src/
-│   └── main.blinc       # Application entry point
+│   └── main.junita       # Application entry point
 ├── assets/              # Static assets (images, fonts, etc.)
 ├── plugins/             # Local plugins
 └── platforms/           # Platform-specific code
@@ -38,7 +38,7 @@ counter/
 
 ## Configuration
 
-Edit `.blincproj` to configure:
+Edit `.junitaproj` to configure:
 - Project metadata (name, version, description)
 - Platform-specific settings (package IDs, SDK versions)
 - Dependencies (plugins, external packages)

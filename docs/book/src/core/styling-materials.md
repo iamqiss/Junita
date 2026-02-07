@@ -1,6 +1,6 @@
 # Styling & Materials
 
-Blinc provides comprehensive styling options from simple colors to advanced GPU-accelerated material effects.
+Junita provides comprehensive styling options from simple colors to advanced GPU-accelerated material effects.
 
 ## Colors
 
@@ -40,7 +40,7 @@ div().bg([0.1, 0.1, 0.15, 1.0])
 For gradients, use the `.background()` method with a `Brush`:
 
 ```rust
-use blinc_core::{Brush, Gradient, GradientStop, Point};
+use junita_core::{Brush, Gradient, GradientStop, Point};
 
 div()
     .w(200.0)
@@ -129,7 +129,7 @@ div()
 For combined transforms:
 
 ```rust
-use blinc_core::Transform;
+use junita_core::Transform;
 
 div().transform(
     Transform::translate(100.0, 50.0)
@@ -142,7 +142,7 @@ div().transform(
 
 ## Materials
 
-Blinc includes GPU-accelerated material effects for modern, polished UIs.
+Junita includes GPU-accelerated material effects for modern, polished UIs.
 
 ### Glass Material
 
@@ -153,7 +153,7 @@ Creates a frosted glass effect with background blur:
 div().glass()
 
 // Customized glass
-use blinc_core::GlassMaterial;
+use junita_core::GlassMaterial;
 
 div().material(Material::Glass(
     GlassMaterial::new()
@@ -182,7 +182,7 @@ GlassMaterial::card()        // Card-like appearance
 Creates reflective metallic surfaces:
 
 ```rust
-use blinc_core::MetallicMaterial;
+use junita_core::MetallicMaterial;
 
 div().material(Material::Metallic(
     MetallicMaterial::new()
@@ -219,7 +219,7 @@ div().gold()        // Gold preset
 Control rendering order with layers:
 
 ```rust
-use blinc_core::RenderLayer;
+use junita_core::RenderLayer;
 
 div()
     .layer(RenderLayer::Background)  // Rendered first
@@ -306,7 +306,7 @@ fn ghost_button() -> Div {
 Use `stateful(handle)` to create elements with automatic hover/press state transitions:
 
 ```rust
-use blinc_layout::stateful::stateful;
+use junita_layout::stateful::stateful;
 
 fn hoverable_card(ctx: &WindowedContext) -> impl ElementBuilder {
     let handle = ctx.use_state(ButtonState::Idle);

@@ -1,0 +1,45 @@
+[package]
+name = "junita_platform_android"
+description = "Junita Android platform - native activity, JNI bridge, and input handling"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_platform_android"
+rust-version.workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[features]
+default = ["gpu"]
+gpu = []
+zrtl-plugin = []
+# Enable the default android_main entry point (not recommended for custom apps)
+default-activity = []
+
+[dependencies]
+# Core dependencies (always available)
+junita_core = { path = "../../crates/junita_core", version = "0.1.12" }
+junita_animation = { path = "../../crates/junita_animation", version = "0.1.12" }
+junita_platform = { path = "../../crates/junita_platform", version = "0.1.12" }
+
+# Logging (platform-independent)
+tracing.workspace = true
+tracing-subscriber.workspace = true
+log = "0.4"
+
+# Android-specific dependencies (only when targeting Android)
+[target.'cfg(target_os = "android")'.dependencies]
+junita_gpu = { path = "../../crates/junita_gpu", version = "0.1.12", default-features = false, features = ["vulkan"], optional = true }
+
+# Android NDK
+ndk.workspace = true
+android-activity.workspace = true
+jni.workspace = true
+
+# Android logging
+android_logger = "0.14"
+
+# Encoding
+base64 = "0.22"

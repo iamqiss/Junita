@@ -1,0 +1,30 @@
+[package]
+name = "junita_cn"
+description = "Junita Component Library - shadcn-style themed components built on junita_layout primitives"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_cn"
+rust-version.workspace = true
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+
+[dependencies]
+# Primitives layer
+junita_layout = { path = "../junita_layout", version = "0.1.12" }
+junita_core = { path = "../junita_core", version = "0.1.12" }
+junita_animation = { path = "../junita_animation", version = "0.1.12" }
+junita_theme = { path = "../junita_theme", version = "0.1.12" }
+junita_macros = { path = "../junita_macros", version = "0.1.12" }
+junita_icons = { path = "../junita_icons", version = "0.1.12" }
+
+# Layout
+taffy.workspace = true
+
+# Logging
+tracing.workspace = true

@@ -1,6 +1,6 @@
 # Overlay System
 
-Blinc provides an overlay system for modals, dialogs, toasts, and context menus.
+Junita provides an overlay system for modals, dialogs, toasts, and context menus.
 
 ## Overview
 

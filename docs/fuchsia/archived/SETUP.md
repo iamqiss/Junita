@@ -1,6 +1,6 @@
-# Fuchsia Development Setup for Blinc
+# Fuchsia Development Setup for Junita
 
-This guide covers setting up a Fuchsia development environment for building and testing Blinc applications.
+This guide covers setting up a Fuchsia development environment for building and testing Junita applications.
 
 ## Quick Start
 
@@ -78,7 +78,7 @@ rustflags = ["-C", "link-arg=--target=aarch64-unknown-fuchsia"]
 
 **Note**: The Fuchsia SDK setup script creates this configuration automatically.
 
-### 4. Build Blinc for Fuchsia
+### 4. Build Junita for Fuchsia
 
 ```bash
 # Debug build (faster)
@@ -150,7 +150,7 @@ ffx component run fuchsia-pkg://fuchsia.com/fuchsia_hello#meta/fuchsia_hello.cm
 
 ```bash
 # View logs
-ffx log --filter blinc
+ffx log --filter junita
 
 # VNC for graphical output
 ffx target vnc
@@ -160,7 +160,7 @@ ffx target vnc
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Blinc App                             │
+│                        Junita App                             │
 │  ┌─────────────────────────────────────────────────────────┐│
 │  │                    FuchsiaApp::run()                    ││
 │  │  - UI builder callback                                  ││
@@ -169,7 +169,7 @@ ffx target vnc
 │  └────────────────────────┬────────────────────────────────┘│
 │                           │                                  │
 │  ┌────────────────────────┴────────────────────────────────┐│
-│  │              blinc_platform_fuchsia                      ││
+│  │              junita_platform_fuchsia                      ││
 │  │  - FuchsiaPlatform (lifecycle)                          ││
 │  │  - FuchsiaWindow (Scenic View)                          ││
 │  │  - FuchsiaEventLoop (FIDL events)                       ││

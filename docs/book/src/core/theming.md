@@ -1,6 +1,6 @@
 # Theming
 
-Blinc provides a comprehensive theming system with design tokens, light/dark mode support, animated theme transitions, and platform-native color scheme detection.
+Junita provides a comprehensive theming system with design tokens, light/dark mode support, animated theme transitions, and platform-native color scheme detection.
 
 ## Overview
 
@@ -18,7 +18,7 @@ The theming system is built around these core concepts:
 ### Accessing Theme Tokens
 
 ```rust
-use blinc_theme::{ThemeState, ColorToken};
+use junita_theme::{ThemeState, ColorToken};
 
 fn my_component() -> impl ElementBuilder {
     let theme = ThemeState::get();
@@ -68,7 +68,7 @@ fn my_component() -> impl ElementBuilder {
 ThemeState::get().toggle_scheme();
 
 // Or set explicitly
-use blinc_theme::ColorScheme;
+use junita_theme::ColorScheme;
 ThemeState::get().set_scheme(ColorScheme::Dark);
 ThemeState::get().set_scheme(ColorScheme::Light);
 
@@ -102,7 +102,7 @@ Color tokens provide semantic meaning to colors, making it easy to build consist
 ### Usage Example
 
 ```rust
-use blinc_theme::{ThemeState, ColorToken};
+use junita_theme::{ThemeState, ColorToken};
 
 fn themed_card() -> impl ElementBuilder {
     let theme = ThemeState::get();
@@ -278,7 +278,7 @@ fn themed_button(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ## Default Theme: Catppuccin
 
-Blinc's default theme is derived from [Catppuccin](https://catppuccin.com/), a community-driven pastel theme:
+Junita's default theme is derived from [Catppuccin](https://catppuccin.com/), a community-driven pastel theme:
 
 - **Light mode**: Catppuccin Latte
 - **Dark mode**: Catppuccin Mocha
@@ -311,7 +311,7 @@ Blinc's default theme is derived from [Catppuccin](https://catppuccin.com/), a c
 
 ## Platform Color Scheme Detection
 
-Blinc automatically detects the system's preferred color scheme on supported platforms:
+Junita automatically detects the system's preferred color scheme on supported platforms:
 
 | Platform | Detection Method |
 |----------|------------------|
@@ -324,13 +324,13 @@ Blinc automatically detects the system's preferred color scheme on supported pla
 ### Manual Detection
 
 ```rust
-use blinc_theme::platform::detect_system_color_scheme;
+use junita_theme::platform::detect_system_color_scheme;
 
 // Get system preference
 let scheme = detect_system_color_scheme();
 
 // Initialize theme with system preference
-ThemeState::init(BlincTheme::bundle(), scheme);
+ThemeState::init(JunitaTheme::bundle(), scheme);
 ```
 
 The `WindowedApp` automatically initializes the theme with system color scheme detection.
@@ -343,7 +343,7 @@ The `WindowedApp` automatically initializes the theme with system color scheme d
 >
 > Due to the [dynamic theme toggle limitations](#toggling-color-scheme), the system scheme watcher is not recommended for production apps. When the system theme changes, it triggers the same problematic full UI rebuild. Consider detecting the system scheme once at startup instead.
 
-For apps that need to automatically follow system theme changes (e.g., when the user toggles dark mode in system settings), Blinc provides an optional background watcher.
+For apps that need to automatically follow system theme changes (e.g., when the user toggles dark mode in system settings), Junita provides an optional background watcher.
 
 ### Enabling the Feature
 
@@ -351,13 +351,13 @@ Add the `watcher` feature to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-blinc_theme = { version = "0.1", features = ["watcher"] }
+junita_theme = { version = "0.1", features = ["watcher"] }
 ```
 
 ### Basic Usage
 
 ```rust
-use blinc_theme::{SystemSchemeWatcher, WatcherConfig};
+use junita_theme::{SystemSchemeWatcher, WatcherConfig};
 use std::time::Duration;
 
 // Start watching with default interval (1 second)
@@ -376,7 +376,7 @@ let watcher = SystemSchemeWatcher::start_with_interval(Duration::from_secs(5));
 ### Using WatcherConfig
 
 ```rust
-use blinc_theme::WatcherConfig;
+use junita_theme::WatcherConfig;
 use std::time::Duration;
 
 // Builder pattern for configuration
@@ -388,7 +388,7 @@ let watcher = WatcherConfig::new()
 
 ### How It Works
 
-1. The watcher runs in a background thread named `blinc-scheme-watcher`
+1. The watcher runs in a background thread named `junita-scheme-watcher`
 2. It polls the system color scheme at the configured interval
 3. When a change is detected, it calls `ThemeState::set_scheme()` automatically
 4. Theme transitions are animated smoothly using spring physics
@@ -413,8 +413,8 @@ let watcher = WatcherConfig::new()
 You can override individual tokens at runtime without changing the entire theme:
 
 ```rust
-use blinc_theme::{ThemeState, ColorToken};
-use blinc_core::Color;
+use junita_theme::{ThemeState, ColorToken};
+use junita_core::Color;
 
 // Override a specific color
 ThemeState::get().set_color_override(
@@ -533,8 +533,8 @@ status_badge("Error", ColorToken::Error)
 ## Example: Complete Themed Component
 
 ```rust
-use blinc_app::prelude::*;
-use blinc_theme::{ThemeState, ColorToken};
+use junita_app::prelude::*;
+use junita_theme::{ThemeState, ColorToken};
 
 fn notification_toast(
     ctx: &WindowedContext,

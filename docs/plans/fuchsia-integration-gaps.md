@@ -2,18 +2,18 @@
 
 ## Overview
 
-Complete the remaining integration gaps to make Blinc fully functional on Fuchsia OS.
+Complete the remaining integration gaps to make Junita fully functional on Fuchsia OS.
 
 ## Current State
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Platform traits | ✅ Complete | `extensions/blinc_platform_fuchsia/src/` |
+| Platform traits | ✅ Complete | `extensions/junita_platform_fuchsia/src/` |
 | Flatland session | ✅ Stubs | `flatland.rs` |
 | ImagePipe2 client | ✅ Stubs | `gpu.rs` |
 | Input types | ✅ Complete | `input.rs` |
 | Event loop | ✅ Structure | `event_loop.rs` |
-| FuchsiaApp runner | ✅ Structure | `crates/blinc_app/src/fuchsia.rs` |
+| FuchsiaApp runner | ✅ Structure | `crates/junita_app/src/fuchsia.rs` |
 
 ---
 
@@ -26,8 +26,8 @@ Fuchsia GUI apps must implement `fuchsia.ui.app.ViewProvider` to receive a View 
 
 ### Files to Create/Modify
 
-- `extensions/blinc_platform_fuchsia/src/view_provider.rs` (new)
-- `extensions/blinc_platform_fuchsia/src/lib.rs` (add module)
+- `extensions/junita_platform_fuchsia/src/view_provider.rs` (new)
+- `extensions/junita_platform_fuchsia/src/lib.rs` (add module)
 
 ### Implementation
 
@@ -109,8 +109,8 @@ Receive layout size and device pixel ratio from the parent.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/view_provider.rs`
-- `crates/blinc_app/src/fuchsia.rs`
+- `extensions/junita_platform_fuchsia/src/view_provider.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -180,8 +180,8 @@ Track focus state for keyboard input.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/scenic.rs`
-- `crates/blinc_app/src/fuchsia.rs`
+- `extensions/junita_platform_fuchsia/src/scenic.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -222,8 +222,8 @@ Receive actual input events from fuchsia.ui.pointer.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/input.rs`
-- `crates/blinc_app/src/fuchsia.rs`
+- `extensions/junita_platform_fuchsia/src/input.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -297,8 +297,8 @@ Receive keyboard input from fuchsia.ui.input3.Keyboard.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/input.rs`
-- `crates/blinc_app/src/fuchsia.rs`
+- `extensions/junita_platform_fuchsia/src/input.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -342,8 +342,8 @@ Connect ImagePipe2 buffers to wgpu for actual rendering.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/gpu.rs`
-- `crates/blinc_app/src/fuchsia.rs`
+- `extensions/junita_platform_fuchsia/src/gpu.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -371,7 +371,7 @@ impl ImagePipeClient {
     /// Get Vulkan image for current buffer
     pub fn get_vulkan_image(&self, buffer_index: u32) -> VulkanImage {
         // Returns VkImage from BufferCollection
-        // Used for rendering via blinc_gpu
+        // Used for rendering via junita_gpu
     }
 }
 ```
@@ -418,7 +418,7 @@ Replace placeholder sleep loop with proper fuchsia-async integration.
 
 ### Files to Modify
 
-- `crates/blinc_app/src/fuchsia.rs`
+- `crates/junita_app/src/fuchsia.rs`
 
 ### Implementation
 
@@ -500,12 +500,12 @@ Create proper .cml manifest for Fuchsia apps.
 
 ### Files to Create
 
-- `extensions/blinc_platform_fuchsia/meta/blinc_app.cml`
+- `extensions/junita_platform_fuchsia/meta/junita_app.cml`
 
 ### Implementation
 
 ```json5
-// blinc_app.cml
+// junita_app.cml
 {
     include: [
         "syslog/client.shard.cml",
@@ -513,7 +513,7 @@ Create proper .cml manifest for Fuchsia apps.
 
     program: {
         runner: "elf",
-        binary: "bin/blinc_app",
+        binary: "bin/junita_app",
     },
 
     capabilities: [
@@ -584,7 +584,7 @@ Load assets from Fuchsia package namespace.
 
 ### Files to Modify
 
-- `extensions/blinc_platform_fuchsia/src/assets.rs`
+- `extensions/junita_platform_fuchsia/src/assets.rs`
 
 ### Current State
 
@@ -618,8 +618,8 @@ Already implemented with `/pkg/data/` path prefix.
 
 Run with placeholder implementations:
 ```bash
-cargo test -p blinc_platform_fuchsia
-cargo test -p blinc_app --features fuchsia
+cargo test -p junita_platform_fuchsia
+cargo test -p junita_app --features fuchsia
 ```
 
 ### Integration Tests (Emulator)
@@ -629,9 +629,9 @@ cargo test -p blinc_app --features fuchsia
 ffx emu start --headless
 
 # Build and deploy
-fx set core.x64 --with //examples/blinc_hello
+fx set core.x64 --with //examples/junita_hello
 fx build
-fx run fuchsia-pkg://fuchsia.com/blinc_hello#meta/blinc_hello.cm
+fx run fuchsia-pkg://fuchsia.com/junita_hello#meta/junita_hello.cm
 
 # Check logs
 ffx log
@@ -682,7 +682,7 @@ rustflags = ["-L", "path/to/fuchsia-sdk/arch/arm64/lib"]
 
 ## Success Criteria
 
-- [ ] Blinc apps compile for Fuchsia targets
+- [ ] Junita apps compile for Fuchsia targets
 - [ ] Apps run in Fuchsia emulator
 - [ ] Touch/mouse input works
 - [ ] Keyboard input works

@@ -1,10 +1,10 @@
-# Blinc Render Architecture
+# Junita Render Architecture
 
-This document describes the rendering architecture of the Blinc UI framework.
+This document describes the rendering architecture of the Junita UI framework.
 
 ## Overview
 
-Blinc uses a **SDF-based GPU rendering pipeline** that provides:
+Junita uses a **SDF-based GPU rendering pipeline** that provides:
 - Resolution-independent UI primitives with anti-aliasing
 - Analytical shadows without texture lookups
 - Glass/vibrancy effects (Apple-style backdrop blur)
@@ -56,7 +56,7 @@ User Code
 
 ## Core Components
 
-### DrawContext Trait (`blinc_core::DrawContext`)
+### DrawContext Trait (`junita_core::DrawContext`)
 
 The unified rendering API that all drawing contexts implement:
 
@@ -125,7 +125,7 @@ let batch = gpu_ctx.take_batch();
 renderer.render(&target, &batch);
 ```
 
-### PaintContext (`blinc_paint`)
+### PaintContext (`junita_paint`)
 
 Canvas-like convenience API that implements DrawContext:
 
@@ -381,16 +381,16 @@ Configurable multi-sample anti-aliasing: 1x, 2x, 4x
 
 ```
 crates/
-├── blinc_core/src/
+├── junita_core/src/
 │   ├── draw.rs        # DrawContext trait, RecordingContext
 │   └── layer.rs       # Layer model, geometry types
-├── blinc_gpu/src/
+├── junita_gpu/src/
 │   ├── renderer.rs    # GpuRenderer (wgpu pipelines)
 │   ├── paint.rs       # GpuPaintContext (DrawContext → GPU)
 │   ├── primitives.rs  # GpuPrimitive, PrimitiveBatch
 │   ├── shaders.rs     # WGSL shader source
 │   └── backbuffer.rs  # Double buffering
-└── blinc_paint/src/
+└── junita_paint/src/
     └── context.rs     # PaintContext (Canvas-like API)
 ```
 

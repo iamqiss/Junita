@@ -7,8 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Project configuration
-PROJECT_NAME="BlincApp"
-BUNDLE_ID="com.blinc.example"
+PROJECT_NAME="JunitaApp"
+BUNDLE_ID="com.junita.example"
 LIB_NAME="libexample.a"
 
 # iOS targets

@@ -171,7 +171,7 @@ On-ready callbacks:
 Inside event handlers, use the global `query()` function to get an `ElementHandle`:
 
 ```rust
-use blinc_layout::prelude::*;
+use junita_layout::prelude::*;
 
 div()
     .on_click(|_| {
@@ -183,17 +183,17 @@ div()
     })
 ```
 
-The `query()` function uses the global `BlincContextState` internally, so you don't need to capture any context or registry in your closures.
+The `query()` function uses the global `JunitaContextState` internally, so you don't need to capture any context or registry in your closures.
 
 For simple operations like scroll and focus without needing the full handle:
 
 ```rust
-use blinc_core::BlincContextState;
+use junita_core::JunitaContextState;
 
 div()
     .on_click(|_| {
         // Direct access for simple operations
-        if let Some(ctx) = BlincContextState::try_get() {
+        if let Some(ctx) = JunitaContextState::try_get() {
             ctx.scroll_element_into_view("my-element");
             ctx.set_focus(Some("my-input"));
         }

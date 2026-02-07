@@ -16,7 +16,7 @@
 #   --help           Show this help
 #
 # After running this script, you can:
-#   1. Build Blinc for Fuchsia:
+#   1. Build Junita for Fuchsia:
 #      cargo build --target x86_64-unknown-fuchsia
 #
 #   2. Run in emulator:
@@ -71,7 +71,7 @@ done
 print_banner() {
     echo ""
     echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║       Blinc Fuchsia Development Environment Setup         ║${NC}"
+    echo -e "${CYAN}║       Junita Fuchsia Development Environment Setup         ║${NC}"
     echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -122,7 +122,7 @@ print_summary() {
     echo "  1. Reload your shell environment:"
     echo "     source ~/.zshrc  # or ~/.bashrc"
     echo ""
-    echo "  2. Build Blinc for Fuchsia:"
+    echo "  2. Build Junita for Fuchsia:"
     echo "     cargo build --target x86_64-unknown-fuchsia"
     echo ""
     if [[ "$SETUP_EMULATOR" == "true" ]]; then
@@ -135,7 +135,7 @@ print_summary() {
     fi
     echo -e "${BLUE}Documentation:${NC}"
     echo "  - Fuchsia SDK: https://fuchsia.dev/fuchsia-src/development/sdk"
-    echo "  - Blinc Fuchsia: docs/plans/fuchsia-integration-gaps.md"
+    echo "  - Junita Fuchsia: docs/plans/fuchsia-integration-gaps.md"
     echo ""
 }
 

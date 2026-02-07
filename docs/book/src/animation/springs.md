@@ -1,13 +1,13 @@
 # Spring Physics
 
-Blinc uses spring physics for natural, responsive animations. Springs provide smooth motion that feels organic compared to fixed-duration easing.
+Junita uses spring physics for natural, responsive animations. Springs provide smooth motion that feels organic compared to fixed-duration easing.
 
 ## SpringConfig
 
 All spring animations are configured with `SpringConfig`:
 
 ```rust
-use blinc_animation::SpringConfig;
+use junita_animation::SpringConfig;
 
 // Custom spring
 let config = SpringConfig {
@@ -20,7 +20,7 @@ let config = SpringConfig {
 
 ### Presets
 
-Blinc provides common spring presets:
+Junita provides common spring presets:
 
 ```rust
 SpringConfig::stiff()    // Fast, minimal overshoot (stiffness: 400, damping: 30)
@@ -84,7 +84,7 @@ For smooth spring-animated hover effects, use `motion()` with animated values:
 
 ```rust
 use std::sync::Arc;
-use blinc_layout::motion::motion;
+use junita_layout::motion::motion;
 
 fn hover_scale_card(ctx: &WindowedContext) -> impl ElementBuilder {
     let scale = ctx.use_animated_value(1.0, SpringConfig::snappy());
@@ -120,7 +120,7 @@ fn hover_scale_card(ctx: &WindowedContext) -> impl ElementBuilder {
 Use `motion()` for elements with animated position:
 
 ```rust
-use blinc_layout::motion::motion;
+use junita_layout::motion::motion;
 
 fn draggable_element(ctx: &WindowedContext) -> impl ElementBuilder {
     let x = ctx.use_animated_value(100.0, SpringConfig::wobbly());
@@ -157,7 +157,7 @@ fn draggable_element(ctx: &WindowedContext) -> impl ElementBuilder {
 For declarative enter/exit animations, use `motion()`:
 
 ```rust
-use blinc_layout::motion::motion;
+use junita_layout::motion::motion;
 
 motion()
     .fade_in(300)      // Fade in over 300ms
@@ -186,4 +186,4 @@ See [Motion Containers](./motion.md) for full details.
 
 4. **Don't fight the spring** - Let animations complete naturally. Interrupting with new targets is fine.
 
-5. **Use BlincComponent** - For complex components with multiple animations, use the derive macro for type-safe hooks.
+5. **Use JunitaComponent** - For complex components with multiple animations, use the derive macro for type-safe hooks.

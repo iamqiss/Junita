@@ -44,7 +44,7 @@ cd platforms/android
 # Install and run on connected device
 cd platforms/android
 ./gradlew installDebug
-adb shell am start -n com.blinc.{{project_name_snake}}/.MainActivity
+adb shell am start -n com.junita.{{project_name_snake}}/.MainActivity
 ```
 
 ## Project Structure
@@ -53,9 +53,9 @@ adb shell am start -n com.blinc.{{project_name_snake}}/.MainActivity
 platforms/android/
 ├── app/
 │   ├── src/main/
-│   │   ├── kotlin/com/blinc/
+│   │   ├── kotlin/com/junita/
 │   │   │   ├── MainActivity.kt      # Android entry point
-│   │   │   └── BlincNativeBridge.kt # Rust-to-Kotlin bridge
+│   │   │   └── JunitaNativeBridge.kt # Rust-to-Kotlin bridge
 │   │   ├── jniLibs/                  # Rust .so files (auto-copied)
 │   │   └── AndroidManifest.xml
 │   └── build.gradle.kts
@@ -65,7 +65,7 @@ platforms/android/
 
 ## Native Bridge
 
-The `BlincNativeBridge` allows Rust to call Kotlin functions:
+The `JunitaNativeBridge` allows Rust to call Kotlin functions:
 
 ```rust
 // In Rust
@@ -74,7 +74,7 @@ let battery: String = native_call("device", "get_battery_level", ()).unwrap();
 
 ```kotlin
 // In Kotlin (already registered by default)
-BlincNativeBridge.registerString("device", "get_battery_level") {
+JunitaNativeBridge.registerString("device", "get_battery_level") {
     // Return battery percentage as string
 }
 ```

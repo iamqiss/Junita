@@ -6,7 +6,7 @@ Linux platform files for counter.
 
 ```bash
 # From project root
-blinc build --target linux --release
+junita build --target linux --release
 ```
 
 ## Installation

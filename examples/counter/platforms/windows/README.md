@@ -6,7 +6,7 @@ Windows platform files for counter.
 
 ```bash
 # From project root
-blinc build --target windows --release
+junita build --target windows --release
 ```
 
 ## Configuration

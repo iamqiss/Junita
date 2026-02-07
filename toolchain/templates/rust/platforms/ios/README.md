@@ -1,6 +1,6 @@
 # {{project_name}} iOS Platform
 
-A Blinc UI application for iOS with Metal rendering.
+A Junita UI application for iOS with Metal rendering.
 
 ## Requirements
 
@@ -30,12 +30,12 @@ From the project root directory:
 ./build-ios.sh release
 ```
 
-This compiles the Blinc Rust library as a static library for both device and simulator.
+This compiles the Junita Rust library as a static library for both device and simulator.
 
 ### 3. Open in Xcode
 
 ```bash
-open platforms/ios/BlincApp.xcodeproj
+open platforms/ios/JunitaApp.xcodeproj
 ```
 
 ### 4. Build and Run
@@ -47,12 +47,12 @@ open platforms/ios/BlincApp.xcodeproj
 
 ```text
 platforms/ios/
-├── BlincApp.xcodeproj/     # Xcode project
-├── BlincApp/
+├── JunitaApp.xcodeproj/     # Xcode project
+├── JunitaApp/
 │   ├── AppDelegate.swift        # App entry point
-│   ├── BlincViewController.swift # Main view controller
-│   ├── BlincMetalView.swift     # Metal layer view
-│   ├── Blinc-Bridging-Header.h  # Rust FFI declarations
+│   ├── JunitaViewController.swift # Main view controller
+│   ├── JunitaMetalView.swift     # Metal layer view
+│   ├── Junita-Bridging-Header.h  # Rust FFI declarations
 │   └── Info.plist               # App configuration
 ├── libs/
 │   ├── device/                  # arm64 library (real devices)
@@ -68,16 +68,16 @@ platforms/ios/
 
 The integration uses C FFI (Foreign Function Interface):
 
-1. **Bridging Header** (`Blinc-Bridging-Header.h`) declares the C functions exported by Rust
+1. **Bridging Header** (`Junita-Bridging-Header.h`) declares the C functions exported by Rust
 2. **Static Library** (`lib{{project_name_snake}}.a`) contains the compiled Rust code
-3. Swift calls these C functions to control the Blinc UI
+3. Swift calls these C functions to control the Junita UI
 
 ### Rendering Pipeline
 
 1. `CADisplayLink` fires at ~60fps
-2. Swift checks `blinc_needs_render()` to see if UI changed
-3. If needed, `blinc_build_frame()` rebuilds the UI tree
-4. `blinc_render_frame()` renders to the Metal surface
+2. Swift checks `junita_needs_render()` to see if UI changed
+3. If needed, `junita_build_frame()` rebuilds the UI tree
+4. `junita_render_frame()` renders to the Metal surface
 
 ### Touch Events
 
@@ -87,7 +87,7 @@ Touch events are forwarded from Swift to Rust:
 override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     for touch in touches {
         let point = touch.location(in: view)
-        blinc_handle_touch(ctx, touchId, Float(point.x), Float(point.y), 0)
+        junita_handle_touch(ctx, touchId, Float(point.x), Float(point.y), 0)
     }
 }
 ```
@@ -110,7 +110,7 @@ Ensure:
 
 1. The view controller is receiving touch events (check `touchesBegan` is called)
 2. The render context was created successfully
-3. A UI builder is registered via `blinc_set_ui_builder()`
+3. A UI builder is registered via `junita_set_ui_builder()`
 
 ## Architecture
 
@@ -118,7 +118,7 @@ Ensure:
 +--------------------------------------------------+
 |                  Swift/UIKit                      |
 |  +----------------------------------------------+ |
-|  |          BlincViewController                 | |
+|  |          JunitaViewController                 | |
 |  |  - CADisplayLink (60fps timer)               | |
 |  |  - Touch event forwarding                    | |
 |  |  - Metal view management                     | |
@@ -127,7 +127,7 @@ Ensure:
 |                 C FFI | (bridging header)         |
 |                       v                           |
 |  +----------------------------------------------+ |
-|  |               Rust/Blinc                     | |
+|  |               Rust/Junita                     | |
 |  |  - IOSRenderContext (UI state)               | |
 |  |  - IOSGpuRenderer (Metal/wgpu)               | |
 |  |  - EventRouter (touch -> UI)                 | |

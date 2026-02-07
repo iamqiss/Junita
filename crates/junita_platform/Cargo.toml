@@ -1,0 +1,20 @@
+[package]
+name = "junita_platform"
+description = "Platform abstraction layer for Junita UI - unified windowing, input, and lifecycle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/junita_platform"
+rust-version.workspace = true
+keywords = ["ui", "gui", "platform", "junita"]
+categories = ["gui"]
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+
+[dependencies]
+thiserror.workspace = true

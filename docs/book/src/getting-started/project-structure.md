@@ -2,7 +2,7 @@
 
 ## Recommended Layout
 
-For a typical Blinc application:
+For a typical Junita application:
 
 ```
 my-app/
@@ -32,8 +32,8 @@ my-app/
 
 ```rust
 // src/main.rs
-use blinc_app::prelude::*;
-use blinc_app::windowed::{WindowedApp, WindowedContext};
+use junita_app::prelude::*;
+use junita_app::windowed::{WindowedApp, WindowedContext};
 
 mod app;
 mod components;
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
 
 ```rust
 // src/components/card.rs
-use blinc_app::prelude::*;
+use junita_app::prelude::*;
 
 pub fn card(title: &str) -> Div {
     div()
@@ -105,16 +105,16 @@ pub fn card_with_content<E: ElementBuilder>(title: &str, content: E) -> Div {
 }
 ```
 
-### Stateful Component with BlincComponent
+### Stateful Component with JunitaComponent
 
 ```rust
 // src/components/animated_card.rs
-use blinc_app::prelude::*;
-use blinc_app::windowed::WindowedContext;
-use blinc_animation::SpringConfig;
+use junita_app::prelude::*;
+use junita_app::windowed::WindowedContext;
+use junita_animation::SpringConfig;
 use std::sync::Arc;
 
-#[derive(BlincComponent)]
+#[derive(JunitaComponent)]
 pub struct AnimatedCard {
     #[animation]
     scale: f32,
@@ -149,8 +149,8 @@ pub fn animated_card(ctx: &WindowedContext, title: &str) -> Div {
 
 ```rust
 // src/screens/home.rs
-use blinc_app::prelude::*;
-use blinc_app::windowed::WindowedContext;
+use junita_app::prelude::*;
+use junita_app::windowed::WindowedContext;
 use crate::components::{header, card};
 
 pub fn home_screen(ctx: &WindowedContext) -> impl ElementBuilder {
@@ -178,8 +178,8 @@ pub fn home_screen(ctx: &WindowedContext) -> impl ElementBuilder {
 
 ```rust
 // src/state/app_state.rs
-use blinc_core::reactive::Signal;
-use blinc_app::windowed::WindowedContext;
+use junita_core::reactive::Signal;
+use junita_app::windowed::WindowedContext;
 
 pub struct AppState {
     pub user_name: Signal<String>,
@@ -208,8 +208,8 @@ pub enum Theme {
 
 ```rust
 // src/app.rs
-use blinc_app::prelude::*;
-use blinc_app::windowed::WindowedContext;
+use junita_app::prelude::*;
+use junita_app::windowed::WindowedContext;
 use crate::state::AppState;
 use crate::screens;
 
@@ -281,7 +281,7 @@ svg("assets/icons/menu.svg")
 ## Tips
 
 1. **Keep components small** - Each component should do one thing well
-2. **Use BlincComponent** - For any component with animations or complex state
+2. **Use JunitaComponent** - For any component with animations or complex state
 3. **Separate concerns** - UI building, state management, and business logic
-4. **Use the prelude** - `use blinc_app::prelude::*` imports common items
+4. **Use the prelude** - `use junita_app::prelude::*` imports common items
 5. **Consistent naming** - Use `_screen` suffix for full-page views, no suffix for components

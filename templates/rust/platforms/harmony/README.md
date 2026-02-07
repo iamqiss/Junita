@@ -1,6 +1,6 @@
-# Blinc HarmonyOS Example
+# Junita HarmonyOS Example
 
-HarmonyOS/OpenHarmony platform integration for the Blinc UI framework.
+HarmonyOS/OpenHarmony platform integration for the Junita UI framework.
 
 ## Prerequisites
 
@@ -100,19 +100,19 @@ harmony/
 ┌─────────────▼───────────────────────┐
 │      libexample.so (Rust)           │
 │  ┌─────────────────────────────┐    │
-│  │    blinc_platform_harmony   │    │
+│  │    junita_platform_harmony   │    │
 │  │    - XComponent callbacks   │    │
 │  │    - Touch input            │    │
 │  │    - Surface management     │    │
 │  └─────────────────────────────┘    │
 │  ┌─────────────────────────────┐    │
-│  │       blinc_app             │    │
+│  │       junita_app             │    │
 │  │    - UI tree building       │    │
 │  │    - Event routing          │    │
 │  │    - Animation              │    │
 │  └─────────────────────────────┘    │
 │  ┌─────────────────────────────┐    │
-│  │       blinc_gpu             │    │
+│  │       junita_gpu             │    │
 │  │    - Vulkan rendering       │    │
 │  └─────────────────────────────┘    │
 └─────────────────────────────────────┘

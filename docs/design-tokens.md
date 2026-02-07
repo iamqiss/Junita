@@ -1,12 +1,12 @@
-# Blinc Design & Motion Tokens
+# Junita Design & Motion Tokens
 
-This document outlines the design token system and motion presets for the Blinc UI Framework.
+This document outlines the design token system and motion presets for the Junita UI Framework.
 
 ## Overview
 
 Design tokens are the atomic values that define the visual language of your application. Motion tokens define how elements animate and transition. Together, they create a consistent, cohesive user experience.
 
-**Key Feature: DSL Extensibility** - All tokens are fully extensible from the Blinc DSL, allowing custom theming and UX behaviors without modifying core framework code.
+**Key Feature: DSL Extensibility** - All tokens are fully extensible from the Junita DSL, allowing custom theming and UX behaviors without modifying core framework code.
 
 ## 1. Color Tokens
 
@@ -438,7 +438,7 @@ pub mod tokens {
 
 ### Button with Motion
 
-```blinc
+```junita
 @widget Button {
     @state pressed: bool = false
 
@@ -468,7 +468,7 @@ pub mod tokens {
 
 ### Modal with Choreography
 
-```blinc
+```junita
 @widget Modal {
     @state visible: bool = false
 
@@ -527,12 +527,12 @@ tokens/
 
 ## 12. DSL Extensibility
 
-All tokens are designed to be extended and overridden from the Blinc DSL. This enables custom theming and UX behaviors without modifying core framework code.
+All tokens are designed to be extended and overridden from the Junita DSL. This enables custom theming and UX behaviors without modifying core framework code.
 
 ### Defining Custom Tokens
 
-```blinc
-// my-theme.blinc - Custom token definitions
+```junita
+// my-theme.junita - Custom token definitions
 
 @tokens MyBrandTokens {
     // Extend color palette with brand colors
@@ -559,7 +559,7 @@ All tokens are designed to be extended and overridden from the Blinc DSL. This e
 
 Define springs with your own physics characteristics:
 
-```blinc
+```junita
 @tokens MyMotionTokens {
     // Custom spring for card interactions
     @spring card_hover {
@@ -596,7 +596,7 @@ Define springs with your own physics characteristics:
 
 Define custom cubic bezier curves:
 
-```blinc
+```junita
 @tokens MyEasingTokens {
     // Dramatic ease-out
     @easing dramatic_out: cubic_bezier(0.0, 0.0, 0.1, 1.0)
@@ -616,7 +616,7 @@ Define custom cubic bezier curves:
 
 Create reusable animation sequences:
 
-```blinc
+```junita
 @tokens MyAnimationTokens {
     // Page transition preset
     @animation page_enter {
@@ -658,7 +658,7 @@ Create reusable animation sequences:
 
 Define how widgets respond to user input:
 
-```blinc
+```junita
 @tokens MyInteractionTokens {
     // Hover behavior
     @behavior hover_lift {
@@ -694,7 +694,7 @@ Define how widgets respond to user input:
 
 Compose tokens into a complete theme:
 
-```blinc
+```junita
 @theme MyAppTheme {
     // Import base tokens
     extends: tokens.default
@@ -747,7 +747,7 @@ Compose tokens into a complete theme:
 
 Apply themes at the app or component level:
 
-```blinc
+```junita
 // App-level theme
 @app MyApp {
     theme: MyAppTheme
@@ -791,7 +791,7 @@ Apply themes at the app or component level:
 
 Tokens can inherit and compose from other tokens:
 
-```blinc
+```junita
 @tokens ExtendedTokens {
     // Inherit all from base
     extends: tokens.default
@@ -816,7 +816,7 @@ Tokens can inherit and compose from other tokens:
 
 Tokens can be accessed and modified at runtime:
 
-```blinc
+```junita
 @widget DynamicTheme {
     @state accent_hue: f32 = 200.0
 
@@ -842,7 +842,7 @@ Tokens can be accessed and modified at runtime:
 
 Tokens automatically respect system accessibility preferences:
 
-```blinc
+```junita
 @tokens AccessibleMotion {
     // Standard motion
     @spring default {
@@ -884,7 +884,7 @@ impl Theme {
     pub fn custom(overrides: ThemeOverrides) -> Self { /* ... */ }
 
     /// Create theme from DSL token definitions
-    pub fn from_blinc(tokens_file: &Path) -> Result<Self, ThemeError> { /* ... */ }
+    pub fn from_junita(tokens_file: &Path) -> Result<Self, ThemeError> { /* ... */ }
 }
 ```
 
@@ -899,6 +899,6 @@ This token system provides:
 3. **Performance** - Springs provide 60fps+ physics-based animations
 4. **Accessibility** - Proper contrast ratios, motion preferences
 5. **Maintainability** - Single source of truth for design values
-6. **DSL Extensibility** - Custom tokens, springs, easings, and behaviors defined in Blinc DSL
+6. **DSL Extensibility** - Custom tokens, springs, easings, and behaviors defined in Junita DSL
 7. **Runtime Dynamism** - Reactive token updates for dynamic theming
 8. **Composition** - Tokens can inherit, extend, and compute from other tokens
