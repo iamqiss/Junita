@@ -40,6 +40,9 @@ const os = __importStar(require("os"));
 const vscode_1 = require("vscode");
 const node_1 = require("vscode-languageclient/node");
 let client;
+let hotReloadEnabled = false;
+let statusBarItem;
+let outputChannel;
 async function activate(context) {
     console.log('🎉 Junita DSL Extension activated with LSP support');
     // Determine the LSP server path
@@ -77,12 +80,79 @@ async function activate(context) {
         await client.start();
         vscode_1.window.showInformationMessage('✅ Junita LSP server connected! Enjoy coding with Junita!');
         console.log('✅ Junita LSP client started successfully');
+        // Initialize output channel for hot reload feedback
+        outputChannel = vscode_1.window.createOutputChannel('Junita Hot Reload');
+        outputChannel.appendLine('Hot reload channel ready. Use Ctrl+Shift+P and search "Junita Hot Reload" to start.');
+        // Create status bar item
+        statusBarItem = vscode_1.window.createStatusBarItem(vscode_1.StatusBarAlignment.Right, 100);
+        statusBarItem.command = 'junita.toggleHotReload';
+        updateStatusBar();
+        statusBarItem.show();
+        // Register hot reload commands
+        vscode_1.commands.registerCommand('junita.startHotReload', async () => {
+            try {
+                const result = await client.sendRequest('junita/startHotReload', {});
+                hotReloadEnabled = true;
+                updateStatusBar();
+                outputChannel.appendLine('✅ Hot reload started');
+                vscode_1.window.showInformationMessage('🔴 Hot reload enabled - Changes will auto-compile!');
+            }
+            catch (error) {
+                vscode_1.window.showErrorMessage(`Failed to start hot reload: ${error}`);
+                outputChannel.appendLine(`❌ Error: ${error}`);
+            }
+        });
+        vscode_1.commands.registerCommand('junita.stopHotReload', async () => {
+            try {
+                const result = await client.sendRequest('junita/stopHotReload', {});
+                hotReloadEnabled = false;
+                updateStatusBar();
+                outputChannel.appendLine('⏹️ Hot reload stopped');
+                vscode_1.window.showInformationMessage('⚪ Hot reload disabled');
+            }
+            catch (error) {
+                vscode_1.window.showErrorMessage(`Failed to stop hot reload: ${error}`);
+                outputChannel.appendLine(`❌ Error: ${error}`);
+            }
+        });
+        vscode_1.commands.registerCommand('junita.toggleHotReload', async () => {
+            if (hotReloadEnabled) {
+                vscode_1.commands.executeCommand('junita.stopHotReload');
+            }
+            else {
+                vscode_1.commands.executeCommand('junita.startHotReload');
+            }
+        });
+        // Listen for hot reload update notifications from the server
+        client.onNotification('junita/hotReloadUpdate', (data) => {
+            outputChannel.show();
+            outputChannel.appendLine(`\n[${new Date().toLocaleTimeString()}] ${data.message}`);
+            outputChannel.appendLine(`  📦 Widgets: ${data.widget_count} | Machines: ${data.machine_count} | Animations: ${data.animation_count}`);
+            if (data.action === 'compiled') {
+                vscode_1.window.showInformationMessage('✅ Hot reload compiled successfully', { modal: false });
+            }
+            else if (data.action === 'compile_error') {
+                vscode_1.window.showErrorMessage('❌ Hot reload compilation failed - check output');
+            }
+        });
     }
     catch (error) {
         vscode_1.window.showErrorMessage(`Failed to start Junita LSP: ${error}`);
         console.error('Failed to start Junita LSP client:', error);
     }
     context.subscriptions.push(client);
+    context.subscriptions.push(statusBarItem);
+    context.subscriptions.push(outputChannel);
+}
+function updateStatusBar() {
+    if (hotReloadEnabled) {
+        statusBarItem.text = '🔴 Hot Reload ON';
+        statusBarItem.backgroundColor = '';
+    }
+    else {
+        statusBarItem.text = '⚪ Hot Reload OFF';
+        statusBarItem.backgroundColor = '';
+    }
 }
 function deactivate() {
     if (!client) {

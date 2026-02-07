@@ -58,6 +58,23 @@
         "label": "Junita Icons",
         "path": "./fileicons/junita-icons.json"
       }
+    ],
+    "commands": [
+      {
+        "command": "junita.startHotReload",
+        "title": "Junita: Start Hot Reload",
+        "category": "Junita"
+      },
+      {
+        "command": "junita.stopHotReload",
+        "title": "Junita: Stop Hot Reload",
+        "category": "Junita"
+      },
+      {
+        "command": "junita.toggleHotReload",
+        "title": "Junita: Toggle Hot Reload",
+        "category": "Junita"
+      }
     ]
   },
   "scripts": {

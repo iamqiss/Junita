@@ -1,0 +1,56 @@
+// Diagnostics Demo - This file demonstrates error detection in the Junita LSP
+
+import "ui.junita"
+import "components.junita"
+
+// ✅ Valid widget definition
+@widget Button {
+  label: "Click Me"
+  onClick: handleClick
+  color: "#007AFF"
+}
+
+// ✅ Valid state machine
+@machine ToggleState {
+  state: on
+  state: off
+}
+
+// ✅ Valid animation
+@animation FadeIn {
+  duration: 300ms
+  easing: ease-in-out
+}
+
+// ❌ ERROR: Duplicate widget name
+@widget Button {
+  label: "Duplicate!"
+}
+
+// ❌ ERROR: Invalid decorator
+@invalid MyWidget {
+  content: "This decorator doesn't exist"
+}
+
+// ❌ ERROR: Duplicate animation name
+@animation FadeIn {
+  duration: 500ms
+}
+
+// ❌ WARNING: Unknown decorator with typo
+@widgetx TextField {
+  placeholder: "Type here"
+}
+
+// ✅ Valid state machine (different name)
+@machine FormState {
+  state: idle
+  state: loading
+  state: success
+  state: error
+}
+
+// Test: Multiple errors on the same line would show red squiggles
+@widget Card @widget Panel {
+  content: "Nested definition"
+}
