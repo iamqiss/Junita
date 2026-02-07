@@ -23,7 +23,7 @@
     "hot-reload"
   ],
   "activationEvents": [
-    "onLanguage:junita"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -40,8 +40,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "../docs/book/src/logo.svg",
-          "dark": "../docs/book/src/logo.svg"
+          "light": "./logo.svg",
+          "dark": "./logo.svg"
         }
       }
     ],

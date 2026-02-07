@@ -2,7 +2,7 @@
   "version": "1.0",
   "iconDefinitions": {
     "_junita_file": {
-      "iconPath": "../../docs/book/src/logo.svg"
+      "iconPath": "../../../logo.svg"
     }
   },
   "fileExtensions": {

@@ -1,5 +1,5 @@
 // Junita Hot Reload Demo
-// This example demonstrates the hot reload system in action
+// This example demcargoonstrates the hot reload system in action
 // Edit this file and save to see changes instantly!
 
 @widget Counter {

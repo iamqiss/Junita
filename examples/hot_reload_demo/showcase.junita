@@ -1,0 +1,63 @@
+// Junita DSL Example - Counter Application
+// Status: ✅ LSP Server Enabled
+
+import "std.junita"
+
+@widget CounterApp {
+  @state count: Int = 0
+  @state theme: String = "light"
+  
+  @prop initialValue: Int = 0
+  @prop onCountChange: (Int) -> Void = |_| {}
+  
+  @render {
+    Column(spacing: 16px) {
+      Text("Counter: ${count}")
+        .font(size: 24px, weight: "bold")
+        .color(color: Color.blue)
+      
+      Row(spacing: 8px) {
+        Button {
+          label: "Decrease",
+          onPress: { count -= 1 }
+        }
+        Button {
+          label: "Increase",
+          onPress: { count += 1 }
+        }
+        Button {
+          label: "Reset",
+          onPress: { count = initialValue }
+        }
+      }
+      
+      Text("Total clicks: ${count}")
+        .fontSize(14px)
+        .opacity(0.7)
+    }
+    .padding(16px)
+  }
+}
+
+@machine CounterState {
+  state Idle {
+    on(increment) -> Active
+  }
+  state Active {
+    on(decrement) -> Idle
+    on(reset) -> Idle
+  }
+}
+
+@animation fadeIn {
+  duration: 300ms
+  timingFunction: ease-in-out
+  keyframes {
+    0% { opacity: 0 }
+    100% { opacity: 1 }
+  }
+}
+
+// Try hovering over @widget, @state, @animation decorators
+// Autocomplete works with Ctrl+Space
+// The LSP server provides real-time analysis
