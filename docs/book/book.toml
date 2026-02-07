@@ -1,0 +1,13 @@
+[book]
+authors = ["Junita Contributors"]
+language = "en"
+src = "src"
+title = "Junita UI Framework"
+description = "A GPU-accelerated, reactive UI framework for Rust"
+
+[build]
+build-dir = "../../target/book"
+
+[output.html]
+git-repository-url = "https://github.com/iamqiss/Junita"
+edit-url-template = "https://github.com/iamqiss/Junita/edit/main/docs/book/{path}"
