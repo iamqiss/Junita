@@ -1,0 +1,867 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>CSS Styling - Junita UI Framework</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A GPU-accelerated, reactive UI framework for Rust">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-9be82478.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-208d0d01.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Junita UI Framework</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iamqiss/Junita" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iamqiss/Junita/edit/main/docs/book/src/core/css-styling.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="css-styling"><a class="header" href="#css-styling">CSS Styling</a></h1>
+<p>Junita includes a powerful CSS parser that allows you to define styles using familiar CSS syntax. This enables separation of concerns between layout code and visual styling.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The CSS system supports:</p>
+<ul>
+<li><strong>ID-based selectors</strong> (<code>#element-id</code>)</li>
+<li><strong>State modifiers</strong> (<code>:hover</code>, <code>:active</code>, <code>:focus</code>, <code>:disabled</code>)</li>
+<li><strong>CSS custom properties</strong> (<code>:root</code> and <code>var()</code>)</li>
+<li><strong>Keyframe animations</strong> (<code>@keyframes</code>)</li>
+<li><strong>Automatic animation application</strong> via the <code>animation:</code> property</li>
+<li><strong>Theme integration</strong> (<code>theme()</code> function)</li>
+<li><strong>Length units</strong> (<code>px</code>, <code>sp</code>, <code>%</code>)</li>
+<li><strong>Gradients</strong> (<code>linear-gradient</code>, <code>radial-gradient</code>, <code>conic-gradient</code>)</li>
+</ul>
+<hr>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<h3 id="parsing-css"><a class="header" href="#parsing-css">Parsing CSS</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use junita_layout::prelude::*;
+
+let css = r#"
+    #card {
+        background: #3498db;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+"#;
+
+let result = Stylesheet::parse_with_errors(css);
+
+// Check for errors
+if result.has_errors() {
+    result.print_colored_diagnostics();
+}
+
+let stylesheet = result.stylesheet;
+<span class="boring">}</span></code></pre>
+<h3 id="applying-styles-to-elements"><a class="header" href="#applying-styles-to-elements">Applying Styles to Elements</a></h3>
+<p>Attach the stylesheet to the RenderTree:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::sync::Arc;
+
+// In your render tree setup
+render_tree.set_stylesheet(Some(Arc::new(stylesheet)));
+
+// Then use IDs on elements
+div()
+    .id("card")
+    .child(text("Styled with CSS!"))
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="supported-properties"><a class="header" href="#supported-properties">Supported Properties</a></h2>
+<h3 id="background"><a class="header" href="#background">Background</a></h3>
+<pre><code class="language-css">#element {
+    background: #ff5733;                    /* Hex color */
+    background: rgb(255, 87, 51);           /* RGB */
+    background: rgba(255, 87, 51, 0.8);     /* RGBA */
+    background: theme(primary);             /* Theme token */
+}
+</code></pre>
+<h3 id="gradients"><a class="header" href="#gradients">Gradients</a></h3>
+<p>CSS gradients are fully supported for the <code>background</code> property:</p>
+<h4 id="linear-gradients"><a class="header" href="#linear-gradients">Linear Gradients</a></h4>
+<pre><code class="language-css">#element {
+    /* Angle-based (0deg = up, 90deg = right, 180deg = down) */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+    /* Direction keywords */
+    background: linear-gradient(to right, red, blue);
+    background: linear-gradient(to bottom right, #fff, #000);
+
+    /* Multiple color stops */
+    background: linear-gradient(90deg, red 0%, yellow 50%, green 100%);
+
+    /* Implied positions (evenly distributed) */
+    background: linear-gradient(to bottom, red, yellow, green);
+
+    /* Different angle units */
+    background: linear-gradient(0.25turn, red, blue);  /* 90deg */
+    background: linear-gradient(1.5708rad, red, blue); /* ~90deg */
+}
+</code></pre>
+<h4 id="radial-gradients"><a class="header" href="#radial-gradients">Radial Gradients</a></h4>
+<pre><code class="language-css">#element {
+    /* Simple circle from center */
+    background: radial-gradient(circle, red, blue);
+
+    /* With position */
+    background: radial-gradient(circle at center, red, blue);
+    background: radial-gradient(circle at 25% 75%, red, blue);
+
+    /* Ellipse shape */
+    background: radial-gradient(ellipse at center, red, blue);
+
+    /* Multiple color stops */
+    background: radial-gradient(circle, red 0%, yellow 50%, green 100%);
+}
+</code></pre>
+<h4 id="conic-gradients"><a class="header" href="#conic-gradients">Conic Gradients</a></h4>
+<pre><code class="language-css">#element {
+    /* Simple color wheel */
+    background: conic-gradient(red, yellow, green, blue, red);
+
+    /* With starting angle */
+    background: conic-gradient(from 45deg, red, blue);
+
+    /* With position */
+    background: conic-gradient(at 25% 75%, red, blue);
+
+    /* Combined angle and position */
+    background: conic-gradient(from 90deg at center, red, blue);
+}
+</code></pre>
+<h4 id="gradient-color-stops"><a class="header" href="#gradient-color-stops">Gradient Color Stops</a></h4>
+<p>Color stops can use any supported color format:</p>
+<pre><code class="language-css">#element {
+    /* Hex colors with positions */
+    background: linear-gradient(to right, #667eea 0%, #764ba2 100%);
+
+    /* RGBA colors */
+    background: linear-gradient(45deg, rgba(255, 0, 0, 0.5), rgba(0, 0, 255, 0.8));
+
+    /* Named colors */
+    background: linear-gradient(to right, red, orange, yellow, green, blue);
+
+    /* Mixed formats */
+    background: linear-gradient(135deg, #ff0000, rgba(0, 255, 0, 0.5) 50%, blue);
+}
+</code></pre>
+<h3 id="border-radius"><a class="header" href="#border-radius">Border Radius</a></h3>
+<pre><code class="language-css">#element {
+    border-radius: 8px;                     /* Uniform */
+    border-radius: theme(radius-lg);        /* Theme token */
+}
+</code></pre>
+<h3 id="box-shadow"><a class="header" href="#box-shadow">Box Shadow</a></h3>
+<pre><code class="language-css">#element {
+    box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.3);  /* x y blur color */
+    box-shadow: theme(shadow-md);                 /* Theme token */
+    box-shadow: none;                             /* Remove shadow */
+}
+</code></pre>
+<h3 id="transform"><a class="header" href="#transform">Transform</a></h3>
+<pre><code class="language-css">#element {
+    transform: scale(1.02);                 /* Uniform scale */
+    transform: scale(1.5, 0.8);             /* Non-uniform */
+    transform: translate(10px, 20px);       /* Translation */
+    transform: translateX(10px);            /* X only */
+    transform: translateY(20px);            /* Y only */
+    transform: rotate(45deg);               /* Rotation */
+}
+</code></pre>
+<h3 id="opacity"><a class="header" href="#opacity">Opacity</a></h3>
+<pre><code class="language-css">#element {
+    opacity: 0.8;
+}
+</code></pre>
+<h3 id="render-layer"><a class="header" href="#render-layer">Render Layer</a></h3>
+<pre><code class="language-css">#element {
+    render-layer: foreground;               /* On top */
+    render-layer: background;               /* Behind */
+    render-layer: glass;                    /* Glass layer */
+}
+</code></pre>
+<hr>
+<h2 id="length-units"><a class="header" href="#length-units">Length Units</a></h2>
+<p>Junita CSS supports three types of length units:</p>
+<h3 id="pixels-px"><a class="header" href="#pixels-px">Pixels (<code>px</code>)</a></h3>
+<p>Raw pixel values. These are the default when no unit is specified.</p>
+<pre><code class="language-css">#element {
+    border-radius: 8px;
+    box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translate(10px, 20px);
+}
+</code></pre>
+<h3 id="spacing-units-sp"><a class="header" href="#spacing-units-sp">Spacing Units (<code>sp</code>)</a></h3>
+<p>Spacing units follow a 4px grid system, where <code>1sp = 4px</code>. This helps maintain consistent spacing throughout your application.</p>
+<pre><code class="language-css">#card {
+    border-radius: 2sp;                    /* 2 * 4 = 8px */
+    box-shadow: 1sp 2sp 4sp rgba(0,0,0,0.2); /* 4px 8px 16px */
+    transform: translate(4sp, 2sp);         /* 16px, 8px */
+}
+</code></pre>
+<p>Common <code>sp</code> values:</p>
+<ul>
+<li><code>1sp</code> = 4px</li>
+<li><code>2sp</code> = 8px</li>
+<li><code>4sp</code> = 16px</li>
+<li><code>6sp</code> = 24px</li>
+<li><code>8sp</code> = 32px</li>
+</ul>
+<h3 id="percentages-"><a class="header" href="#percentages-">Percentages (<code>%</code>)</a></h3>
+<p>Percentages are supported in gradient color stops and position values.</p>
+<pre><code class="language-css">#element {
+    /* Gradient color stops use percentages */
+    background: linear-gradient(to right, red 0%, blue 100%);
+
+    /* Radial/conic gradient positions */
+    background: radial-gradient(circle at 25% 75%, red, blue);
+}
+</code></pre>
+<hr>
+<h2 id="state-modifiers"><a class="header" href="#state-modifiers">State Modifiers</a></h2>
+<p>Define different styles for interactive states:</p>
+<pre><code class="language-css">#button {
+    background: theme(primary);
+    transform: scale(1.0);
+}
+
+#button:hover {
+    background: theme(primary-hover);
+    transform: scale(1.02);
+}
+
+#button:active {
+    transform: scale(0.98);
+}
+
+#button:focus {
+    box-shadow: 0 0 0 3px theme(primary);
+}
+
+#button:disabled {
+    opacity: 0.5;
+}
+</code></pre>
+<h3 id="querying-state-styles"><a class="header" href="#querying-state-styles">Querying State Styles</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Get base style
+let base = stylesheet.get("button");
+
+// Get state-specific style
+let hover = stylesheet.get_with_state("button", CssElementState::Hover);
+let active = stylesheet.get_with_state("button", CssElementState::Active);
+
+// Get all states at once
+let (base, states) = stylesheet.get_all_states("button");
+for (state, style) in states {
+    println!(":{} =&gt; {:?}", state, style.opacity);
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="css-variables"><a class="header" href="#css-variables">CSS Variables</a></h2>
+<p>Define reusable values with custom properties:</p>
+<pre><code class="language-css">:root {
+    --brand-color: #3498db;
+    --hover-opacity: 0.85;
+    --card-radius: 12px;
+    --spacing-md: 16px;
+}
+
+#card {
+    background: var(--brand-color);
+    border-radius: var(--card-radius);
+    opacity: 1.0;
+}
+
+#card:hover {
+    opacity: var(--hover-opacity);
+}
+</code></pre>
+<h3 id="fallback-values"><a class="header" href="#fallback-values">Fallback Values</a></h3>
+<pre><code class="language-css">#element {
+    background: var(--undefined-color, #333);  /* Uses fallback */
+}
+</code></pre>
+<h3 id="accessing-variables-programmatically"><a class="header" href="#accessing-variables-programmatically">Accessing Variables Programmatically</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Get a variable value
+if let Some(value) = stylesheet.get_variable("brand-color") {
+    println!("Brand color: {}", value);
+}
+
+// Iterate all variables
+for name in stylesheet.variable_names() {
+    let value = stylesheet.get_variable(name).unwrap();
+    println!("--{}: {}", name, value);
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="theme-integration"><a class="header" href="#theme-integration">Theme Integration</a></h2>
+<p>Use the <code>theme()</code> function to reference theme tokens:</p>
+<pre><code class="language-css">#card {
+    background: theme(surface);
+    border-radius: theme(radius-lg);
+    box-shadow: theme(shadow-md);
+}
+
+#button {
+    background: theme(primary);
+}
+
+#button:hover {
+    background: theme(primary-hover);
+}
+</code></pre>
+<h3 id="available-theme-tokens"><a class="header" href="#available-theme-tokens">Available Theme Tokens</a></h3>
+<p><strong>Colors:</strong></p>
+<ul>
+<li><code>primary</code>, <code>primary-hover</code>, <code>primary-active</code></li>
+<li><code>secondary</code>, <code>secondary-hover</code>, <code>secondary-active</code></li>
+<li><code>success</code>, <code>success-bg</code></li>
+<li><code>warning</code>, <code>warning-bg</code></li>
+<li><code>error</code>, <code>error-bg</code></li>
+<li><code>info</code>, <code>info-bg</code></li>
+<li><code>foreground</code>, <code>foreground-muted</code></li>
+<li><code>background</code>, <code>surface</code>, <code>surface-hover</code></li>
+<li><code>border</code>, <code>border-muted</code></li>
+</ul>
+<p><strong>Radii:</strong></p>
+<ul>
+<li><code>radius-sm</code>, <code>radius-default</code>, <code>radius-md</code></li>
+<li><code>radius-lg</code>, <code>radius-xl</code>, <code>radius-2xl</code></li>
+</ul>
+<p><strong>Shadows:</strong></p>
+<ul>
+<li><code>shadow-sm</code>, <code>shadow-default</code>, <code>shadow-md</code></li>
+<li><code>shadow-lg</code>, <code>shadow-xl</code></li>
+</ul>
+<hr>
+<h2 id="keyframe-animations"><a class="header" href="#keyframe-animations">Keyframe Animations</a></h2>
+<p>Define complex animations with <code>@keyframes</code>:</p>
+<pre><code class="language-css">@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+</code></pre>
+<h3 id="percentage-positions"><a class="header" href="#percentage-positions">Percentage Positions</a></h3>
+<pre><code class="language-css">@keyframes complex-animation {
+    0% { opacity: 0; }
+    25% { opacity: 0.5; transform: scale(1.1); }
+    50% { opacity: 1; }
+    75% { opacity: 0.5; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+}
+</code></pre>
+<h3 id="accessing-keyframes"><a class="header" href="#accessing-keyframes">Accessing Keyframes</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Get keyframes by name
+if let Some(keyframes) = stylesheet.get_keyframes("fade-in") {
+    println!("Animation has {} stops", keyframes.keyframes.len());
+
+    for kf in &amp;keyframes.keyframes {
+        println!("  {}%: opacity={:?}",
+            (kf.position * 100.0) as i32,
+            kf.style.opacity
+        );
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="converting-to-motion-animation"><a class="header" href="#converting-to-motion-animation">Converting to Motion Animation</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Convert to MotionAnimation (for simple from/to animations)
+let motion = keyframes.to_motion_animation(300, 200);  // enter_ms, exit_ms
+
+// Convert to MultiKeyframeAnimation (for complex multi-step animations)
+let animation = keyframes.to_multi_keyframe_animation(1000, Easing::EaseInOut);
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="animation-property"><a class="header" href="#animation-property">Animation Property</a></h2>
+<p>Apply animations to elements with the <code>animation:</code> property:</p>
+<pre><code class="language-css">@keyframes slide-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#modal {
+    animation: slide-in 300ms ease-out;
+}
+</code></pre>
+<h3 id="animation-shorthand"><a class="header" href="#animation-shorthand">Animation Shorthand</a></h3>
+<pre><code class="language-css">#element {
+    /* animation: name duration timing-function delay iteration-count direction fill-mode */
+    animation: pulse 2s ease-in-out 100ms infinite alternate forwards;
+}
+</code></pre>
+<h3 id="individual-properties"><a class="header" href="#individual-properties">Individual Properties</a></h3>
+<pre><code class="language-css">#element {
+    animation-name: pulse;
+    animation-duration: 2s;
+    animation-timing-function: ease-in-out;
+    animation-delay: 100ms;
+    animation-iteration-count: infinite;  /* or a number */
+    animation-direction: alternate;        /* normal | reverse | alternate | alternate-reverse */
+    animation-fill-mode: forwards;         /* none | forwards | backwards | both */
+}
+</code></pre>
+<h3 id="automatic-application"><a class="header" href="#automatic-application">Automatic Application</a></h3>
+<p>When a stylesheet is attached to the RenderTree, elements with IDs automatically receive animations:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let css = r#"
+    @keyframes card-enter {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    #card {
+        animation: card-enter 300ms ease-out;
+    }
+"#;
+
+let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+render_tree.set_stylesheet(Some(Arc::new(stylesheet)));
+
+// This element will automatically animate on render!
+div()
+    .id("card")
+    .child(content())
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h2>
+<p>The CSS parser collects errors without failing:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let css = r#"
+    #card {
+        background: red;
+        opacity: invalid;        /* Error: invalid value */
+        unknown-prop: foo;       /* Warning: unknown property */
+    }
+"#;
+
+let result = Stylesheet::parse_with_errors(css);
+
+// Check for issues
+if result.has_errors() {
+    println!("Has {} error(s)", result.errors_only().count());
+}
+if result.has_warnings() {
+    println!("Has {} warning(s)", result.warnings_only().count());
+}
+
+// Print colored diagnostics to console
+result.print_colored_diagnostics();
+result.print_summary();
+
+// The valid properties are still parsed!
+let style = result.stylesheet.get("card").unwrap();
+assert!(style.background.is_some());  // "red" was parsed
+<span class="boring">}</span></code></pre>
+<h3 id="error-information"><a class="header" href="#error-information">Error Information</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for error in &amp;result.errors {
+    println!("Line {}, Column {}: {}",
+        error.line,
+        error.column,
+        error.message
+    );
+
+    if let Some(ref prop) = error.property {
+        println!("  Property: {}", prop);
+    }
+    if let Some(ref val) = error.value {
+        println!("  Value: {}", val);
+    }
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="motion-container-integration"><a class="header" href="#motion-container-integration">Motion Container Integration</a></h2>
+<p>Use CSS keyframes with the <code>Motion</code> container:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let css = r#"
+    @keyframes modal-enter {
+        from { opacity: 0; transform: scale(0.9) translateY(20px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+"#;
+
+let stylesheet = Stylesheet::parse_with_errors(css).stylesheet;
+
+// Method 1: Using from_stylesheet
+motion()
+    .from_stylesheet(&amp;stylesheet, "modal-enter", 300, 200)
+    .child(modal_content())
+
+// Method 2: Using keyframes_from_stylesheet for multi-step animations
+motion()
+    .keyframes_from_stylesheet(&amp;stylesheet, "pulse", 1000, Easing::EaseInOut)
+    .child(pulsing_element())
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use junita_layout::prelude::*;
+use std::sync::Arc;
+
+fn styled_app() -&gt; impl ElementBuilder {
+    // Define styles
+    let css = r#"
+        :root {
+            --card-bg: theme(surface);
+            --card-radius: theme(radius-lg);
+            --brand-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #app-container {
+            background: theme(background);
+        }
+
+        #card {
+            background: var(--card-bg);
+            border-radius: var(--card-radius);
+            box-shadow: theme(shadow-md);
+            animation: fade-in 300ms ease-out;
+        }
+
+        #card:hover {
+            box-shadow: theme(shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        #gradient-card {
+            background: var(--brand-gradient);
+            border-radius: theme(radius-lg);
+            box-shadow: theme(shadow-md);
+        }
+
+        #gradient-card:hover {
+            background: linear-gradient(135deg, #7c8ff0 0%, #8b5cb8 100%);
+            transform: translateY(-2px);
+        }
+
+        #primary-button {
+            background: theme(primary);
+            border-radius: theme(radius-default);
+        }
+
+        #primary-button:hover {
+            background: theme(primary-hover);
+            transform: scale(1.02);
+        }
+
+        #primary-button:active {
+            transform: scale(0.98);
+        }
+    "#;
+
+    let result = Stylesheet::parse_with_errors(css);
+    if result.has_errors() {
+        result.print_colored_diagnostics();
+    }
+
+    // In real usage, attach to render_tree
+    // render_tree.set_stylesheet(Some(Arc::new(result.stylesheet)));
+
+    div()
+        .id("app-container")
+        .flex_col()
+        .p(24.0)
+        .gap(16.0)
+        .child(
+            div()
+                .id("card")
+                .p(16.0)
+                .child(text("Styled with CSS!"))
+        )
+        .child(
+            div()
+                .id("gradient-card")
+                .p(16.0)
+                .child(text("Gradient background!"))
+        )
+        .child(
+            button("Click me")
+                .id("primary-button")
+        )
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Use CSS variables</strong> for values you want to reuse or override</li>
+<li><strong>Use theme tokens</strong> for colors that should respect the app’s theme</li>
+<li><strong>Check for errors</strong> after parsing to catch typos and invalid values</li>
+<li><strong>Keep animations short</strong> for UI transitions (150-400ms)</li>
+<li><strong>Use state modifiers</strong> for hover/active effects instead of manual callbacks</li>
+<li><strong>Prefer ID selectors</strong> (<code>#id</code>) for precise targeting</li>
+</ol>
+<hr>
+<h2 id="comparison-with-builder-api"><a class="header" href="#comparison-with-builder-api">Comparison with Builder API</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>CSS</th><th>Builder API</th></tr>
+</thead>
+<tbody>
+<tr><td><code>background: #3498db;</code></td><td><code>.bg(Color::hex("#3498db"))</code></td></tr>
+<tr><td><code>border-radius: 8px;</code></td><td><code>.rounded(8.0)</code></td></tr>
+<tr><td><code>transform: scale(1.02);</code></td><td><code>.scale(1.02)</code></td></tr>
+<tr><td><code>opacity: 0.8;</code></td><td><code>.opacity(0.8)</code></td></tr>
+<tr><td><code>box-shadow: theme(shadow-md);</code></td><td><code>.shadow_md()</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Both approaches can be combined - use CSS for base styles and the builder API for dynamic values.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../core/styling-materials.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../core/theming.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../core/styling-materials.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../core/theming.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
