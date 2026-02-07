@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Blinc Book](https://img.shields.io/badge/Blinc_Book-blue.svg?logo=gitbook&logoColor=white)](https://project-blinc.github.io/Blinc)
 
-![Blinc UI](glass_music_player.png)
+![Logo](logo.svg)
 
 **A GPU-accelerated, cross-platform UI framework** with a GPUI-inspired builder API, glassmorphism effects, spring physics animations, and native rendering on Desktop, Android, and iOS.
 
