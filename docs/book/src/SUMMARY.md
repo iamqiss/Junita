@@ -7,6 +7,7 @@
 - [Installation](./getting-started/installation.md)
 - [Your First App](./getting-started/first-app.md)
 - [Project Structure](./getting-started/project-structure.md)
+- [Hot Reload Development](./getting-started/hot-reload.md)
 
 # Mobile Development
 
@@ -61,6 +62,7 @@
 - [Element Query API](./advanced/element-query.md)
 - [Overlay System](./advanced/overlays.md)
 - [Custom State Machines](./advanced/state-machines.md)
+- [Hot Reload Optimization for Teams](./advanced/hot-reload-team.md)
 - [Performance Tips](./advanced/performance.md)
 
 # Architecture
@@ -70,4 +72,5 @@
 - [Reactive State](./architecture/reactive-state.md)
 - [Layout & Diff](./architecture/layout-diff.md)
 - [Animation System](./architecture/animation.md)
+- [Hot Reload Architecture](./architecture/hot-reload.md)
 - [Stateful Elements & FSM](./architecture/stateful.md)
