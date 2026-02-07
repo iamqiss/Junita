@@ -25,6 +25,9 @@ notify.workspace = true
 # Async
 tokio.workspace = true
 
+# Async message passing
+broadcast.workspace = true
+
 # Config
 toml.workspace = true
 serde.workspace = true

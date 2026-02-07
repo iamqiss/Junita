@@ -38,6 +38,7 @@ pub mod context_state;
 pub mod draw;
 pub mod events;
 pub mod fsm;
+pub mod hot_reload;
 pub mod layer;
 pub mod native_bridge;
 pub mod reactive;

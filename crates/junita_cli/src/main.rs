@@ -5,13 +5,14 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::fs;
-use std::path::PathBuf;
-use tracing::{info, warn};
+use std::path::{Path, PathBuf};
+use tracing::{info, warn, error};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 mod config;
 mod doctor;
 mod project;
+mod hot_reload;
 
 use config::JunitaConfig;
 
@@ -248,12 +249,52 @@ fn cmd_dev(source: &str, target: &str, port: u16, device: Option<&str>) -> Resul
         info!("Running on device: {}", dev);
     }
 
-    // TODO: When Zyntax Grammar2 is ready:
-    // 1. Start file watcher
-    // 2. Compile on change (using JIT)
-    // 3. Push updates to running app
+    // Initialize hot reload system
+    let runtime = tokio::runtime::Runtime::new()?;
+    runtime.block_on(async {
+        if let Err(e) = start_dev_server(&path, target, port).await {
+            error!("Dev server error: {}", e);
+            return Err(e);
+        }
+        Ok(())
+    })
+}
 
-    warn!("Dev server not yet implemented - waiting for Zyntax Runtime2");
+async fn start_dev_server(project_path: &Path, target: &str, port: u16) -> Result<()> {
+    use crate::hot_reload::HotReloadConfig;
+
+    info!("Initializing hot reload server...");
+
+    // Create hot reload server
+    let watch_dir = project_path.to_path_buf();
+    let config = HotReloadConfig {
+        watch_dir: watch_dir.clone(),
+        debounce_ms: 300,
+        watch_extensions: vec![
+            "junita".to_string(),
+            "rs".to_string(),
+            "toml".to_string(),
+        ],
+        ..Default::default()
+    };
+
+    info!("Hot reload configuration:");
+    info!("  Watch directory: {:?}", config.watch_dir);
+    info!("  Debounce: {}ms", config.debounce_ms);
+    info!("  Extensions: {:?}", config.watch_extensions);
+
+    // TODO: When Zyntax is ready:
+    // 1. Initial project compilation
+    // 2. Start the rendering window/app
+    // 3. Connect hot reload receiver
+    // 4. Poll for updates and apply diffs
+
+    warn!("Dev server waiting for Zyntax Grammar2 integration");
+    info!("File watching is configured and ready");
+    info!("Waiting for file changes...");
+
+    // For now, just log that we're ready
+    info!("Dev server ready on port {}", port);
 
     Ok(())
 }

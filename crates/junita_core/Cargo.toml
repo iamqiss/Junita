@@ -24,9 +24,19 @@ rustc-hash.workspace = true
 
 # Errors
 thiserror.workspace = true
+anyhow.workspace = true
 
 # Logging
 tracing.workspace = true
+
+# Async runtime and utilities (for hot reload)
+tokio.workspace = true
+
+# Serialization (for hot reload state snapshots)
+serde.workspace = true
+
+# Async message passing (for hot reload)
+broadcast.workspace = true
 
 [dev-dependencies]
 junita_animation = { path = "../junita_animation", version = "0.1.12" }
