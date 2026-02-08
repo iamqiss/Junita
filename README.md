@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/project-junita/Junita/actions/workflows/ci.yml/badge.svg)](https://github.com/project-junita/Junita/actions/workflows/ci.yml)
 [![Tests](https://github.com/project-junita/Junita/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/project-junita/Junita/actions/workflows/ci.yml)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
-[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/proprietary-red.svg)](LICENSE)
 [![Junita Book](https://img.shields.io/badge/Junita_Book-blue.svg?logo=gitbook&logoColor=white)](https://iamqiss.github.io/Junita)
 
 ![Logo](logo.svg)
